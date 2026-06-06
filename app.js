@@ -23,16 +23,38 @@ let editorDescriptionSnapshot = '';
 let currentProjectBaseName = null;
 let sqlDatabaseName = null;
 
+function createIcon(name, extraClass = '') {
+    const classes = ['material-icons', 'icon-glyph', extraClass].filter(Boolean).join(' ');
+
+    if (typeof document === 'undefined') {
+        return { className: classes, textContent: name };
+    }
+
+    const element = document.createElement('span');
+    element.className = classes;
+    element.textContent = name;
+    element.setAttribute('aria-hidden', 'true');
+    return element;
+}
+
 // ── Initialize ────────────────────────────────────────────────────────────────
 
 if (typeof document !== 'undefined') {
 document.addEventListener('DOMContentLoaded', function () {
     M.AutoInit();
 
-    const chipsElem = document.querySelector('.chips');
-    M.Chips.init(chipsElem, {
-        placeholder: 'Adicionar termo',
-        secondaryPlaceholder: '+Termo',
+    const chipWrappers = document.querySelectorAll('.chips');
+    chipWrappers.forEach(wrapper => {
+        M.Chips.init(wrapper, {
+            placeholder: 'Adicionar termo',
+            secondaryPlaceholder: '+Termo'
+        });
+
+        wrapper.setAttribute('role', 'list');
+        wrapper.setAttribute('aria-label', 'Termos de negócio adicionados');
+
+        const input = wrapper.querySelector('input');
+        if (input) input.setAttribute('aria-label', 'Adicionar termo de negócio');
     });
 
     setupEventListeners();
@@ -114,6 +136,10 @@ async function handleSQLUpload(event) {
             console.error(err);
             M.toast({ html: 'Erro ao processar SQL. Verifique o console.' });
         }
+    };
+    reader.onerror = () => {
+        console.error('Erro ao ler arquivo JSON');
+        M.toast({ html: 'Não foi possível ler o arquivo selecionado.' });
     };
     reader.readAsText(file);
 }
@@ -984,29 +1010,42 @@ function renderUpdateWizard() {
     if (updateWizardState.step === 'upload') {
         title.textContent = 'Atualizar Modelo';
         subtitle.textContent = 'Selecione o arquivo SQL da nova versão do banco.';
-        next.innerHTML = '<i class="material-icons">upload_file</i> Escolher SQL';
-        body.innerHTML = `
-            <div class="update-upload-panel">
-                <i class="material-icons">schema</i>
-                <h3>Importar nova versão do banco</h3>
-                <p>O projeto atual será usado como base. Nenhuma alteração será aplicada antes da confirmação final.</p>
-                <button class="btn-cta" id="update-sql-picker-inline" type="button">
-                    <i class="material-icons">upload_file</i>
-                    Procurar arquivo SQL
-                </button>
-            </div>
-        `;
-        document.getElementById('update-sql-picker-inline').addEventListener('click', () => {
+        next.replaceChildren(createIcon('upload_file'), document.createTextNode(' Escolher SQL'));
+
+        const panel = document.createElement('div');
+        panel.className = 'update-upload-panel';
+
+        const heroIcon = createIcon('schema');
+        heroIcon.setAttribute('aria-hidden', 'true');
+        panel.appendChild(heroIcon);
+
+        const heading = document.createElement('h3');
+        heading.textContent = 'Importar nova versão do banco';
+        panel.appendChild(heading);
+
+        const copy = document.createElement('p');
+        copy.textContent = 'O projeto atual será usado como base. Nenhuma alteração será aplicada antes da confirmação final.';
+        panel.appendChild(copy);
+
+        const inlineButton = document.createElement('button');
+        inlineButton.id = 'update-sql-picker-inline';
+        inlineButton.type = 'button';
+        inlineButton.className = 'btn-cta';
+        inlineButton.append(createIcon('upload_file'), document.createTextNode(' Procurar arquivo SQL'));
+        inlineButton.addEventListener('click', () => {
             document.getElementById('input-update-sql').click();
         });
+        panel.appendChild(inlineButton);
+
+        body.replaceChildren(panel);
         return;
     }
 
     if (updateWizardState.step === 'tables') {
         title.textContent = 'Comparar Tabelas';
         subtitle.textContent = 'Revise tabelas adicionadas, excluídas ou renomeadas antes de comparar campos.';
-        next.innerHTML = 'Avançar <i class="material-icons">arrow_forward</i>';
-        body.innerHTML = renderTableComparison();
+        next.replaceChildren(document.createTextNode('Avançar '), createIcon('arrow_forward'));
+        body.replaceChildren(renderTableComparison());
         bindTableComparisonEvents();
         return;
     }
@@ -1014,8 +1053,8 @@ function renderUpdateWizard() {
     if (updateWizardState.step === 'columns') {
         title.textContent = 'Comparar Campos';
         subtitle.textContent = 'Revise campos adicionados, excluídos, renomeados ou com tipo alterado.';
-        next.innerHTML = 'Comparar relacionamentos <i class="material-icons">arrow_forward</i>';
-        body.innerHTML = renderColumnComparison();
+        next.replaceChildren(document.createTextNode('Comparar relacionamentos '), createIcon('arrow_forward'));
+        body.replaceChildren(renderColumnComparison());
         bindColumnComparisonEvents();
         return;
     }
@@ -1023,15 +1062,15 @@ function renderUpdateWizard() {
     if (updateWizardState.step === 'relationships') {
         title.textContent = 'Comparar Relacionamentos';
         subtitle.textContent = 'Revise chaves estrangeiras identificadas entre tabelas.';
-        next.innerHTML = 'Revisar resumo <i class="material-icons">arrow_forward</i>';
-        body.innerHTML = renderRelationshipComparison();
+        next.replaceChildren(document.createTextNode('Revisar resumo '), createIcon('arrow_forward'));
+        body.replaceChildren(renderRelationshipComparison());
         return;
     }
 
     title.textContent = 'Confirmar Atualização';
     subtitle.textContent = 'Confira o resumo das alterações antes de aplicar no projeto atual.';
-    next.innerHTML = '<i class="material-icons">check</i> Aplicar alterações';
-    body.innerHTML = renderUpdateSummary();
+    next.replaceChildren(createIcon('check'), document.createTextNode(' Aplicar alterações'));
+    body.replaceChildren(renderUpdateSummary());
 }
 
 function escapeHtml(value) {
@@ -1190,7 +1229,7 @@ function renderColumnComparison() {
             <section class="diff-table-group">
                 <div class="diff-table-title">
                     <span>${renderNameCell(group.oldTableName)}</span>
-                    <i class="material-icons">arrow_forward</i>
+                    <span class="material-icons icon-glyph" aria-hidden="true">arrow_forward</span>
                     <span>${renderNameCell(group.newTableName)}</span>
                 </div>
                 <table class="diff-grid">
@@ -1353,53 +1392,83 @@ function renderRelationshipCell(relationship) {
 
 function renderRelationshipComparison() {
     if (!updateWizardState.relationshipGroups.length) {
-        return `
-            <div class="update-upload-panel">
-                <i class="material-icons">link_off</i>
-                <h3>Nenhuma alteração de relacionamento</h3>
-                <p>Não foram encontradas inclusões ou remoções de chaves estrangeiras entre o projeto atual e o novo SQL.</p>
-            </div>
-        `;
+        const emptyPanel = document.createElement('div');
+        emptyPanel.className = 'update-upload-panel';
+
+        const emptyIcon = createIcon('link_off');
+        emptyIcon.setAttribute('aria-hidden', 'true');
+        emptyPanel.appendChild(emptyIcon);
+
+        const emptyHeading = document.createElement('h3');
+        emptyHeading.textContent = 'Nenhuma alteração de relacionamento';
+        emptyPanel.appendChild(emptyHeading);
+
+        const emptyCopy = document.createElement('p');
+        emptyCopy.textContent = 'Não foram encontradas inclusões ou remoções de chaves estrangeiras entre o projeto atual e o novo SQL.';
+        emptyPanel.appendChild(emptyCopy);
+
+        return emptyPanel;
     }
 
-    const groups = updateWizardState.relationshipGroups.map(group => {
-        const rows = group.rows.map(row => {
-            const action = row.kind === 'newOnly'
+    const wrapper = document.createElement('div');
+    wrapper.className = 'diff-groups';
+
+    updateWizardState.relationshipGroups.forEach(group => {
+        const section = document.createElement('section');
+        section.className = 'diff-table-group';
+
+        const title = document.createElement('div');
+        title.className = 'diff-table-title';
+        title.append(createIcon('account_tree'), (() => {
+            const span = document.createElement('span');
+            span.textContent = group.tableName;
+            return span;
+        })());
+        section.appendChild(title);
+
+        const table = document.createElement('table');
+        table.className = 'diff-grid';
+
+        const head = document.createElement('thead');
+        head.innerHTML = `
+            <tr>
+                <th>Projeto Atual</th>
+                <th>SQL Novo</th>
+                <th>Ação</th>
+            </tr>
+        `;
+        table.appendChild(head);
+
+        const tbody = document.createElement('tbody');
+        group.rows.forEach(row => {
+            const tr = document.createElement('tr');
+            tr.className = `diff-row is-${row.kind}`;
+
+            const oldCell = document.createElement('td');
+            oldCell.innerHTML = renderRelationshipCell(row.oldRelationship);
+            tr.appendChild(oldCell);
+
+            const newCell = document.createElement('td');
+            newCell.innerHTML = renderRelationshipCell(row.newRelationship);
+            tr.appendChild(newCell);
+
+            const actionCell = document.createElement('td');
+            actionCell.innerHTML = row.kind === 'newOnly'
                 ? '<span class="diff-action-add">Adicionar FK</span>'
                 : row.kind === 'oldOnly'
                     ? '<span class="diff-action-change">Remover FK</span>'
                     : '<span class="diff-action-muted">Sem alteração</span>';
+            tr.appendChild(actionCell);
 
-            return `
-                <tr class="diff-row is-${row.kind}">
-                    <td>${renderRelationshipCell(row.oldRelationship)}</td>
-                    <td>${renderRelationshipCell(row.newRelationship)}</td>
-                    <td>${action}</td>
-                </tr>
-            `;
-        }).join('');
+            tbody.appendChild(tr);
+        });
 
-        return `
-            <section class="diff-table-group">
-                <div class="diff-table-title">
-                    <i class="material-icons">account_tree</i>
-                    <span>${escapeHtml(group.tableName)}</span>
-                </div>
-                <table class="diff-grid">
-                    <thead>
-                        <tr>
-                            <th>Projeto Atual</th>
-                            <th>SQL Novo</th>
-                            <th>Ação</th>
-                        </tr>
-                    </thead>
-                    <tbody>${rows}</tbody>
-                </table>
-            </section>
-        `;
-    }).join('');
+        table.appendChild(tbody);
+        section.appendChild(table);
+        wrapper.appendChild(section);
+    });
 
-    return `<div class="diff-groups">${groups}</div>`;
+    return wrapper;
 }
 
 function renderUpdateSummary() {
@@ -1483,15 +1552,8 @@ function makeReviewButton(item, title, onClick) {
     btn.className = `tree-review-btn is-${status.key}`;
     btn.title = title;
     btn.addEventListener('click', (e) => { e.stopPropagation(); onClick(); });
-    btn.appendChild(makeIcon(status.icon, 'tree-review-icon'));
+    btn.appendChild(createIcon(status.icon, 'tree-review-icon'));
     return btn;
-}
-
-function makeIcon(name, extraClass) {
-    const i = document.createElement('i');
-    i.className = ['material-icons', extraClass].filter(Boolean).join(' ');
-    i.textContent = name;
-    return i;
 }
 
 function getItemSemanticStatus(item) {
@@ -1555,10 +1617,7 @@ function renderTreeView() {
     ]);
 
     // Collapse-all icon
-    const collapseAllIcon = makeIcon(
-        allCollapsed ? 'unfold_more' : 'unfold_less',
-        'tree-collapse-all'
-    );
+    const collapseAllIcon = createIcon(allCollapsed ? 'unfold_more' : 'unfold_less', 'tree-collapse-all');
     collapseAllIcon.title = allCollapsed ? 'Expandir tudo' : 'Recolher tudo';
     collapseAllIcon.addEventListener('click', (e) => { e.stopPropagation(); toggleCollapseAll(); });
 
@@ -1566,7 +1625,7 @@ function renderTreeView() {
     const dbReviewButton = makeReviewButton(db, 'Alternar aprovação da descrição do banco', () => toggleReview('database'));
 
     // DB icon + name
-    const dbIcon = makeIcon('storage', 'tree-item-icon');
+    const dbIcon = createIcon('storage', 'tree-item-icon');
     const dbName = document.createElement('span');
     dbName.className = 'tree-item-name';
     dbName.textContent = db.name;
@@ -1594,7 +1653,7 @@ function renderTreeView() {
 
         if (table.status !== 'REMOVED') {
             // Chevron accordion
-            const chevron = makeIcon('expand_more', 'tree-chevron' + (isCollapsed ? ' is-collapsed' : ''));
+            const chevron = createIcon('expand_more', 'tree-chevron' + (isCollapsed ? ' is-collapsed' : ''));
             chevron.title = isCollapsed ? 'Expandir' : 'Recolher';
             chevron.addEventListener('click', (e) => { e.stopPropagation(); toggleCollapse(tIdx); });
 
@@ -1602,7 +1661,7 @@ function renderTreeView() {
             const tReviewButton = makeReviewButton(table, 'Alternar aprovação da descrição da tabela', () => toggleReview('table', tIdx));
 
             // Table icon + name
-            const tIcon = makeIcon('table_chart', 'tree-item-icon');
+            const tIcon = createIcon('table_chart', 'tree-item-icon');
             const tName = document.createElement('span');
             tName.className = 'tree-item-name';
             tName.textContent = table.name;
@@ -1627,7 +1686,7 @@ function renderTreeView() {
 
         } else {
             // Removed table: simpler display
-            const tIcon = makeIcon('table_chart', 'tree-item-icon');
+            const tIcon = createIcon('table_chart', 'tree-item-icon');
             const tName = document.createElement('span');
             tName.className = 'tree-item-name';
             tName.textContent = table.name;
@@ -1661,7 +1720,7 @@ function renderTreeView() {
                 const cReviewButton = makeReviewButton(col, 'Alternar aprovação da descrição do campo', () => toggleReview('column', tIdx, cIdx));
 
                 // Column icon + name + type
-                const cIcon = makeIcon('fiber_manual_record', 'tree-item-icon');
+                const cIcon = createIcon('fiber_manual_record', 'tree-item-icon');
                 const cName = document.createElement('span');
                 cName.className = 'tree-item-name';
                 cName.textContent = col.name;
@@ -1776,7 +1835,10 @@ function renderRelationshipList(title, icon, relationships, mode) {
 
     const heading = document.createElement('div');
     heading.className = 'relationship-group-title';
-    heading.innerHTML = `<i class="material-icons">${icon}</i><span>${title}</span>`;
+
+    const headingIcon = createIcon(icon);
+    const headingText = document.createElement('span');
+    headingText.textContent = title;
 
     const list = document.createElement('ul');
     list.className = 'relationship-list';
@@ -1790,6 +1852,7 @@ function renderRelationshipList(title, icon, relationships, mode) {
         relationships.forEach(relationship => list.appendChild(createRelationshipItem(relationship, mode)));
     }
 
+    heading.append(headingIcon, headingText);
     group.append(heading, list);
     return group;
 }
@@ -1860,9 +1923,10 @@ function updateEditorReviewAction() {
     const isApproved = canReview && !!item.reviewed;
     btn.disabled = !canReview;
     btn.classList.toggle('is-approved', isApproved);
-    btn.innerHTML = isApproved
-        ? '<i class="material-icons">undo</i> Reabrir Revisão'
-        : '<i class="material-icons">verified</i> Aprovar Descrição';
+    btn.replaceChildren(
+        createIcon(isApproved ? 'undo' : 'verified'),
+        document.createTextNode(isApproved ? ' Reabrir Revisão' : ' Aprovar Descrição')
+    );
     btn.title = canReview
         ? 'Marca a descrição deste item como revisada e aprovada'
         : 'Preencha a descrição antes de aprovar';
@@ -2004,16 +2068,26 @@ function handleJSONUpload(event) {
             if (!json.database.description) json.database.description = "";
             if (!json.database.business_terms) json.database.business_terms = [];
 
-            json.database.tables.forEach(table => {
-                if (table.reviewed === undefined) table.reviewed = false;
+            (json.database.tables || []).forEach(table => {
+                table.reviewed = table.reviewed ?? false;
+                table.description = table.description || "";
+                table.business_terms = Array.isArray(table.business_terms) ? table.business_terms : [];
+                table.status = table.status || 'UNCHANGED';
                 table.relationships = table.relationships || { parents: [], children: [] };
-                table.columns.forEach(col => {
-                    if (col.reviewed === undefined) col.reviewed = false;
-                    if (col.primary_key === undefined) col.primary_key = false;
-                    if (col.foreign_key === undefined) col.foreign_key = false;
+
+                (table.columns || []).forEach(col => {
+                    col.reviewed = col.reviewed ?? false;
+                    col.description = col.description || "";
+                    col.business_terms = Array.isArray(col.business_terms) ? col.business_terms : [];
+                    col.primary_key = col.primary_key ?? false;
+                    col.foreign_key = col.foreign_key ?? false;
+                    col.status = col.status || 'UNCHANGED';
                 });
+
+                table.relationships.parents = (table.relationships.parents || []).map(normalizeRelationship);
+                table.relationships.children = (table.relationships.children || []).map(normalizeRelationship);
             });
-            json.database.tables = normalizeRelationships(json.database.tables);
+            json.database.tables = normalizeRelationships(json.database.tables || []);
 
             const rawName = file.name || '';
             const stem = rawName.replace(/\.json$/i, '');
@@ -2029,6 +2103,7 @@ function handleJSONUpload(event) {
             document.getElementById('welcome-screen').style.display = 'none';
             M.toast({ html: 'Projeto carregado com sucesso!' });
         } catch (err) {
+            console.error('Erro ao carregar projeto JSON', err);
             M.toast({ html: 'Erro ao carregar JSON.' });
         }
     };

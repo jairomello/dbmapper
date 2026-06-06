@@ -48,6 +48,12 @@
     --transition:   0.22s ease;
 }
 
+.icon-glyph {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
 /* ── Reset & Base ─────────────────────────────────────────── */
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -216,6 +222,7 @@ body {
     display: flex;
     align-items: center;
     gap: 4px;
+    line-height: 1;
     padding: 0 8px;
     height: 36px;
     cursor: pointer;
@@ -298,6 +305,7 @@ body {
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+    line-height: 1.2;
 }
 
 .tree-item-type {
