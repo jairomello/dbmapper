@@ -46,6 +46,14 @@ function setupEventListeners() {
         document.getElementById('input-sql').click();
     });
 
+    const importCta = document.getElementById('btn-import-sql-cta');
+    if (importCta) {
+        importCta.addEventListener('click', (e) => {
+            e.preventDefault();
+            document.getElementById('input-sql').click();
+        });
+    }
+
     document.getElementById('btn-save-project').addEventListener('click', (e) => {
         e.preventDefault();
         openSavePrompt();

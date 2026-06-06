@@ -11,9 +11,9 @@ schema: spec-driven
 context: |
   Tech stack: static HTML/CSS/JS site served as-is; no bundler, no framework, no
   build step, no `package.json`. UI is in Portuguese; "DBMapper" and "Semantic
-  Layer" are the only English product labels. UI shell is `index.html`; the
-  read-only companion site is `dbviewr.html`. Both pull Materialize CSS and
-  AlaSQL from CDNs and load `app.js` (or a thin viewer variant).
+  Layer" are the only English product labels. UI shell is `dbmapper.html`; the
+  read-only companion site is `dbviewr.html`. Both pull Materialize CSS/JS
+  from a CDN and load `app.js` (or a thin viewer variant).
   Conventions: 4-space indent in HTML/CSS/JS; `camelCase` for JS; `const`/`let`
   with direct DOM APIs; kebab-case CSS class names; CSS custom properties in
   `:root` (no `--violet` token — use `var(--accent, #6d5dfc)` for violet).

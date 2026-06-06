@@ -4,12 +4,13 @@
 
 This repository is a small static DBMapper web app. Core files are at the root:
 
-- `index.html` defines the UI shell and loads external CDN dependencies.
-- `style.css` contains the full design system and layout styles.
+- `dbmapper.html` defines the UI shell and loads external CDN dependencies.
+- `dbviewr.html` is the read-only companion site (loads `dbviewr.css` + `dbviewr.js`).
+- `dbviewr.css` contains the full design system and layout styles for the viewer.
+- `dbviewr.js` contains the viewer state, JSON loading, search, table navigation, relationships panel, and theme toggle.
+- `style.css` contains the full design system and layout styles for the editor.
 - `app.js` contains client-side state, SQL parsing, rendering, import/export, and editor behavior.
 - `example.sql` and `db_axiis.sql` are SQL inputs for local testing.
-- `dbmapper-novo-banco*.json` files are sample project data exports.
-- `novo-layout.png` is a visual reference asset.
 
 Keep new app code in these root files unless the project is intentionally reorganized.
 
@@ -18,7 +19,7 @@ Keep new app code in these root files unless the project is intentionally reorga
 There is no package manager or build step. Run the app as a static site:
 
 - `python3 -m http.server 8000` starts a local server from the repo root.
-- Open `http://localhost:8000/index.html` to use the app.
+- Open `http://localhost:8000/dbmapper.html` to use the app.
 - Import `example.sql` or `db_axiis.sql` through the UI to test SQL parsing.
 - Use the Save/Open Project buttons to verify JSON export and import behavior.
 
@@ -59,4 +60,4 @@ Keep changes focused and preserve the static-site setup. Do not introduce framew
 
 ### Language
 
-Always communicate with the user in Brazilian Portuguese. Use English only for reserved words, technical terms with no widely accepted Portuguese equivalent (for example: `commit`, `pull request`, `merge`, `refactor`, `parser`, `wizard`, `build`, `deploy`, `toast`, `cookie`), product names (`DBMapper`, `Semantic Layer`, `Materialize`, `AlaSQL`, `OpenSpec`, `GitHub`), file/folder names, code identifiers, and other well-known names that read better in English in their original form.
+Always communicate with the user in Brazilian Portuguese. Use English only for reserved words, technical terms with no widely accepted Portuguese equivalent (for example: `commit`, `pull request`, `merge`, `refactor`, `parser`, `wizard`, `build`, `deploy`, `toast`, `cookie`), product names (`DBMapper`, `Semantic Layer`, `Materialize`, `OpenSpec`, `GitHub`), file/folder names, code identifiers, and other well-known names that read better in English in their original form.
