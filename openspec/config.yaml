@@ -1,0 +1,77 @@
+schema: spec-driven
+
+# Project context (optional)
+# This is shown to AI when creating artifacts.
+# Add your tech stack, conventions, style guides, domain knowledge, etc.
+# Example:
+#   context: |
+#     Tech stack: TypeScript, React, Node.js
+#     We use conventional commits
+#     Domain: e-commerce platform
+context: |
+  Tech stack: static HTML/CSS/JS site served as-is; no bundler, no framework, no
+  build step, no `package.json`. UI is in Portuguese; "DBMapper" and "Semantic
+  Layer" are the only English product labels. UI shell is `index.html`; the
+  read-only companion site is `dbviewr.html`. Both pull Materialize CSS and
+  AlaSQL from CDNs and load `app.js` (or a thin viewer variant).
+  Conventions: 4-space indent in HTML/CSS/JS; `camelCase` for JS; `const`/`let`
+  with direct DOM APIs; kebab-case CSS class names; CSS custom properties in
+  `:root` (no `--violet` token — use `var(--accent, #6d5dfc)` for violet).
+  Testing: ad-hoc Node scripts under `tests/` using `node:assert/strict` that
+  `require('../app.js')` and finish with `console.log('<file>: ok')`. Each
+  capability has one executable contract: `sql-import` → `tests/sql-import.test.js`,
+  `model-update-wizard` → `tests/update-model.test.js`, `coverage-stats` →
+  `tests/coverage-stats.test.js`, `dbviewr` → `tests/dbviewr.test.js`.
+  Domain: data dictionary / semantic layer authoring tool. Tables, columns,
+  and foreign keys are first-class; descriptions, business terms, and a
+  per-item review status are the user-editable metadata. The JSON project
+  format is the contract between DBMapper (editor) and DBViewr (viewer);
+  `project-persistence` is the cross-cutting capability that owns it.
+  `AGENTS.md` at the repo root is the human-facing counterpart to this block
+  and remains the source of truth for humans.
+
+# Per-artifact rules (optional)
+# Add custom rules for specific artifacts.
+# Example:
+#   rules:
+#     proposal:
+#       - Keep proposals under 500 words
+#       - Always include a "Non-goals" section
+#     tasks:
+#       - Break tasks into chunks of max 2 hours
+rules:
+  proposal:
+    - Keep proposals under ~500 words; lead with the "Why", then a short
+      "What Changes" and "Impact" list. Use English section names matching
+      the OpenSpec template; do not invent new sections.
+    - 'Always include a "Non-goals" line item (can be a single line: "_None._")
+      so the diff against the existing behavior is explicit.'
+    - Do not propose a bundler, framework, `package.json` test script, or
+      any other tooling change that conflicts with the static-site rule in
+      `AGENTS.md` without naming the conflict and getting explicit approval.
+  design:
+    - Write a design doc only when the change is cross-cutting (touches
+      multiple capabilities or two or more root files) or when the
+      trade-offs are not obvious from the proposal. Skip it for simple,
+      single-file changes.
+    - 'Every design doc MUST end with a "Migration Plan" section, even if
+      the migration is a no-op ("Documentation/config-only change. Steps: ...").'
+  specs:
+    - Scenarios MUST use exactly four hashtags (`#### Scenario:`). Three
+      hashtags or bullets fail OpenSpec validation silently.
+    - Prefer `ADDED Requirements` over `MODIFIED Requirements` for new
+      requirements. For modifications, include the full updated content
+      of every changed block; for non-changing existing requirements, do
+      not duplicate them in the delta.
+    - Hygiene-only changes that touch no real spec MUST add at least one
+      thin `ADDED Requirements` block (a one-scenario requirement that
+      documents the housekeeping) to satisfy the OpenSpec validator's
+      "must have at least one delta" rule.
+  tasks:
+    - Tasks MUST be checkbox items (`- [ ] ...`) in execution order,
+      broken into chunks of max ~2 hours each. Do not group a whole
+      capability into a single task.
+    - Each task line MUST start with a section number (`## 1. ...`,
+      `## 2. ...`) followed by numbered subtasks (`- [ ] 1.1 ...`).
+    - End the task list with an `## N. Validate` and `## N+1. Archive`
+      section so the close-out steps are explicit.

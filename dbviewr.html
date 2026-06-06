@@ -1,0 +1,1463 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DBViewr - Dicionário de Dados</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+    <style>
+        :root {
+            --bg: #f4f7fb;
+            --surface: #ffffff;
+            --surface-rgb: 255, 255, 255;
+            --ink: #102033;
+            --muted: #64748b;
+            --soft: #e2e8f0;
+            --line: #d8e0ea;
+            --blue: #2563eb;
+            --blue-soft: #dbeafe;
+            --green: #059669;
+            --green-soft: #d1fae5;
+            --amber: #d97706;
+            --amber-soft: #fef3c7;
+            --rose: #e11d48;
+            --rose-soft: #ffe4e6;
+            --violet: #6d5dfc;
+            --cyan: #0891b2;
+            --nav: #0f172a;
+            --shadow: 0 18px 50px rgba(15, 23, 42, 0.12);
+            --shadow-sm: 0 8px 24px rgba(15, 23, 42, 0.08);
+            --radius: 18px;
+            --font: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            --mono: 'JetBrains Mono', 'Fira Code', monospace;
+        }
+
+        body.theme-dark {
+            --bg: #0b1020;
+            --surface: #111827;
+            --surface-rgb: 17, 24, 39;
+            --ink: #e5edf7;
+            --muted: #a6b3c5;
+            --soft: #263244;
+            --line: #263244;
+            --blue-soft: #1e3a8a;
+            --green-soft: #064e3b;
+            --amber-soft: #78350f;
+            --nav: #050816;
+            --shadow: 0 18px 50px rgba(0, 0, 0, 0.38);
+            --shadow-sm: 0 8px 24px rgba(0, 0, 0, 0.28);
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        html {
+            scroll-behavior: smooth;
+        }
+
+        body {
+            min-height: 100vh;
+            background:
+                radial-gradient(circle at 8% 0%, rgba(37, 99, 235, 0.18), transparent 28%),
+                radial-gradient(circle at 92% 6%, rgba(5, 150, 105, 0.16), transparent 24%),
+                var(--bg);
+            color: var(--ink);
+            font-family: var(--font);
+            -webkit-font-smoothing: antialiased;
+        }
+
+        body.theme-dark {
+            background:
+                radial-gradient(circle at 8% 0%, rgba(37, 99, 235, 0.22), transparent 28%),
+                radial-gradient(circle at 92% 6%, rgba(5, 150, 105, 0.18), transparent 24%),
+                var(--bg);
+        }
+
+        button,
+        input {
+            font: inherit;
+        }
+
+        .app-shell {
+            min-height: 100vh;
+        }
+
+        .topbar {
+            position: sticky;
+            top: 0;
+            z-index: 50;
+            min-height: 64px;
+            padding: 12px 28px;
+            background: rgba(15, 23, 42, 0.92);
+            backdrop-filter: blur(16px);
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            color: #fff;
+            box-shadow: 0 1px 0 rgba(255,255,255,0.08);
+        }
+
+        .brand {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            min-width: max-content;
+        }
+
+        .brand-mark {
+            width: 34px;
+            height: 34px;
+            border-radius: 10px;
+            display: grid;
+            place-items: center;
+            background: linear-gradient(135deg, #60a5fa, #34d399);
+            box-shadow: 0 10px 24px rgba(37, 99, 235, 0.35);
+        }
+
+        .brand-mark .material-icons {
+            font-size: 20px;
+        }
+
+        .brand-title {
+            font-weight: 800;
+            letter-spacing: -0.4px;
+            font-size: 18px;
+        }
+
+        .brand-subtitle {
+            color: #94a3b8;
+            font-size: 11px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.8px;
+        }
+
+        .topbar-spacer {
+            flex: 1;
+        }
+
+        .search-wrap {
+            position: relative;
+            width: min(420px, 34vw);
+        }
+
+        .search-wrap .material-icons {
+            position: absolute;
+            left: 12px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: #94a3b8;
+            font-size: 18px;
+            pointer-events: none;
+        }
+
+        .search-input {
+            width: 100%;
+            height: 38px;
+            border: 1px solid rgba(148, 163, 184, 0.28);
+            border-radius: 999px;
+            background: rgba(255,255,255,0.08);
+            color: #fff;
+            padding: 0 14px 0 38px;
+            outline: none;
+            transition: border-color 0.2s ease, background 0.2s ease;
+        }
+
+        .search-input::placeholder {
+            color: #94a3b8;
+        }
+
+        .search-input:focus {
+            border-color: #60a5fa;
+            background: rgba(255,255,255,0.13);
+        }
+
+        .open-btn,
+        .ghost-btn,
+        .theme-btn,
+        .copy-link {
+            border: none;
+            border-radius: 999px;
+            min-height: 38px;
+            padding: 0 16px;
+            display: inline-flex;
+            align-items: center;
+            gap: 7px;
+            cursor: pointer;
+            font-weight: 700;
+            transition: transform 0.18s ease, box-shadow 0.18s ease, background 0.18s ease;
+        }
+
+        .open-btn {
+            background: linear-gradient(135deg, #2563eb, #6d5dfc);
+            color: #fff;
+            box-shadow: 0 12px 28px rgba(37, 99, 235, 0.34);
+        }
+
+        .open-btn:hover,
+        .ghost-btn:hover,
+        .theme-btn:hover,
+        .copy-link:hover {
+            transform: translateY(-1px);
+        }
+
+        .ghost-btn {
+            background: rgba(255,255,255,0.09);
+            color: #dbeafe;
+            border: 1px solid rgba(255,255,255,0.12);
+        }
+
+        .theme-btn {
+            background: rgba(255,255,255,0.09);
+            color: #dbeafe;
+            border: 1px solid rgba(255,255,255,0.12);
+            width: 38px;
+            padding: 0;
+            justify-content: center;
+        }
+
+        .open-btn .material-icons,
+        .ghost-btn .material-icons,
+        .theme-btn .material-icons,
+        .copy-link .material-icons {
+            font-size: 17px;
+        }
+
+        .hero {
+            min-height: calc(100vh - 64px);
+            padding: 76px 32px 40px;
+            display: grid;
+            align-items: center;
+        }
+
+        .hero-inner {
+            width: min(1180px, 100%);
+            margin: 0 auto;
+            display: grid;
+            grid-template-columns: minmax(0, 1.08fr) minmax(330px, 0.92fr);
+            gap: 34px;
+            align-items: center;
+        }
+
+        .eyebrow {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            color: #1e40af;
+            background: rgba(219, 234, 254, 0.82);
+            border: 1px solid rgba(37, 99, 235, 0.14);
+            border-radius: 999px;
+            padding: 7px 12px;
+            font-size: 12px;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: 0.7px;
+            margin-bottom: 18px;
+        }
+
+        .hero h1 {
+            font-size: clamp(44px, 6vw, 76px);
+            line-height: 0.95;
+            letter-spacing: 0;
+            font-weight: 800;
+            max-width: 850px;
+        }
+
+        .hero-copy {
+            margin-top: 22px;
+            color: var(--muted);
+            font-size: 18px;
+            line-height: 1.65;
+            max-width: 700px;
+        }
+
+        .hero-actions {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+            margin-top: 28px;
+        }
+
+        .hero-panel {
+            background: rgba(var(--surface-rgb), 0.74);
+            border: 1px solid rgba(216, 224, 234, 0.86);
+            box-shadow: var(--shadow);
+            border-radius: 28px;
+            padding: 24px;
+            backdrop-filter: blur(18px);
+        }
+
+        .preview-title {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 16px;
+            margin-bottom: 18px;
+        }
+
+        .preview-title h2 {
+            font-size: 16px;
+            letter-spacing: 0;
+        }
+
+        .preview-pill {
+            color: var(--green);
+            background: var(--green-soft);
+            border-radius: 999px;
+            padding: 5px 9px;
+            font-size: 11px;
+            font-weight: 800;
+        }
+
+        .preview-card {
+            border: 1px solid var(--line);
+            border-radius: 18px;
+            background: var(--surface);
+            padding: 16px;
+            margin-bottom: 12px;
+        }
+
+        .preview-card h3 {
+            font-size: 15px;
+            margin-bottom: 8px;
+            font-family: var(--mono);
+        }
+
+        .preview-card p {
+            color: var(--muted);
+            font-size: 13px;
+            line-height: 1.5;
+        }
+
+        .preview-columns {
+            display: grid;
+            gap: 8px;
+            margin-top: 14px;
+        }
+
+        .preview-column {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) auto;
+            gap: 12px;
+            align-items: center;
+            padding: 9px 10px;
+            border-radius: 12px;
+            background: var(--soft);
+            color: var(--muted);
+            font-size: 12px;
+        }
+
+        .preview-column strong {
+            color: var(--ink);
+            font-family: var(--mono);
+            font-size: 12px;
+        }
+
+        .viewer {
+            display: none;
+            width: min(1480px, 100%);
+            margin: 0 auto;
+            padding: 28px 28px 56px;
+        }
+
+        body.has-data .hero {
+            min-height: auto;
+            padding: 30px 28px 10px;
+        }
+
+        body.has-data .hero-inner {
+            display: block;
+        }
+
+        body.has-data .hero-panel,
+        body.has-data .hero-actions,
+        body.has-data .eyebrow {
+            display: none;
+        }
+
+        body.has-data .hero h1 {
+            font-size: clamp(34px, 4vw, 54px);
+            max-width: 1040px;
+        }
+
+        body.has-data .hero-copy {
+            max-width: 980px;
+            margin-top: 12px;
+        }
+
+        body.has-data .viewer {
+            display: grid;
+            grid-template-columns: 320px minmax(0, 1fr);
+            gap: 24px;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(5, minmax(0, 1fr));
+            gap: 12px;
+            margin-bottom: 20px;
+            grid-column: 1 / -1;
+        }
+
+        .stat-card {
+            background: rgba(var(--surface-rgb), 0.86);
+            border: 1px solid rgba(216, 224, 234, 0.92);
+            border-radius: 18px;
+            padding: 16px;
+            box-shadow: var(--shadow-sm);
+        }
+
+        .stat-card span {
+            color: var(--muted);
+            font-size: 12px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.55px;
+        }
+
+        .stat-card strong {
+            display: block;
+            font-size: 28px;
+            margin-top: 8px;
+            letter-spacing: 0;
+        }
+
+        .layout-nav {
+            position: sticky;
+            top: 86px;
+            max-height: calc(100vh - 108px);
+            overflow: hidden;
+            align-self: start;
+            background: rgba(var(--surface-rgb), 0.9);
+            border: 1px solid rgba(216, 224, 234, 0.92);
+            border-radius: 22px;
+            box-shadow: var(--shadow-sm);
+        }
+
+        .nav-header {
+            padding: 18px;
+            border-bottom: 1px solid var(--line);
+        }
+
+        .nav-header h2 {
+            font-size: 14px;
+            text-transform: uppercase;
+            letter-spacing: 0.7px;
+            color: var(--muted);
+        }
+
+        .table-nav {
+            overflow-y: auto;
+            max-height: calc(100vh - 182px);
+            padding: 10px;
+        }
+
+        .table-nav a {
+            display: flex;
+            align-items: center;
+            gap: 9px;
+            min-height: 38px;
+            padding: 8px 10px;
+            color: var(--ink);
+            text-decoration: none;
+            border-radius: 12px;
+            font-size: 13px;
+            font-weight: 700;
+        }
+
+        .table-nav a:hover,
+        .table-nav a.is-active {
+            background: #eef2ff;
+            color: #3730a3;
+        }
+
+        .nav-name {
+            flex: 1;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            font-family: var(--mono);
+            font-size: 12px;
+        }
+
+        .nav-count {
+            color: var(--muted);
+            font-size: 11px;
+            font-weight: 800;
+        }
+
+        .content {
+            min-width: 0;
+            display: grid;
+            gap: 18px;
+        }
+
+        .table-card {
+            scroll-margin-top: 92px;
+            background: rgba(var(--surface-rgb), 0.94);
+            border: 1px solid rgba(216, 224, 234, 0.94);
+            border-radius: 24px;
+            box-shadow: var(--shadow-sm);
+            overflow: hidden;
+        }
+
+        .table-card.is-hidden {
+            display: none;
+        }
+
+        .table-head {
+            padding: 20px 22px;
+            background:
+                linear-gradient(135deg, rgba(37, 99, 235, 0.10), rgba(5, 150, 105, 0.08)),
+                var(--surface);
+            border-bottom: 1px solid var(--line);
+            display: grid;
+            grid-template-columns: minmax(0, 1fr);
+            gap: 12px;
+            align-items: start;
+        }
+
+        .table-title-row {
+            display: flex;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 10px;
+            min-width: 0;
+        }
+
+        .table-title-row h2 {
+            font-family: var(--mono);
+            font-size: 23px;
+            letter-spacing: 0;
+            overflow-wrap: anywhere;
+        }
+
+        .copy-link {
+            min-height: 30px;
+            padding: 0 10px;
+            background: var(--surface);
+            color: var(--muted);
+            border: 1px solid var(--line);
+            font-size: 12px;
+        }
+
+        .description {
+            color: var(--muted);
+            font-size: 14px;
+            line-height: 1.6;
+            max-width: 920px;
+        }
+
+        .table-description {
+            grid-column: 1 / -1;
+            max-width: none;
+        }
+
+        .relationships-accordion {
+            grid-column: 1 / -1;
+            width: 100%;
+            margin-top: 2px;
+            border: 1px solid var(--line);
+            border-radius: 16px;
+            background: rgba(var(--surface-rgb), 0.66);
+            overflow: hidden;
+        }
+
+        .relationships-accordion summary {
+            min-height: 42px;
+            padding: 10px 14px;
+            display: flex;
+            align-items: center;
+            gap: 9px;
+            cursor: pointer;
+            color: var(--muted);
+            font-size: 12px;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: 0.55px;
+            list-style: none;
+        }
+
+        .relationships-accordion summary::-webkit-details-marker {
+            display: none;
+        }
+
+        .relationships-accordion summary .material-icons {
+            color: var(--blue);
+            font-size: 18px;
+            transition: transform 0.18s ease;
+        }
+
+        .relationships-accordion[open] summary {
+            border-bottom: 1px solid var(--line);
+        }
+
+        .relationships-accordion[open] summary .material-icons {
+            transform: rotate(90deg);
+        }
+
+        .relationships-summary-count {
+            margin-left: auto;
+            color: var(--muted);
+            font-size: 11px;
+            font-weight: 800;
+            text-transform: none;
+            letter-spacing: 0;
+        }
+
+        .relationships-panel {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 10px;
+            width: 100%;
+            padding: 12px;
+            align-items: stretch;
+        }
+
+        .relationship-group {
+            border: 1px solid var(--line);
+            border-radius: 14px;
+            background: rgba(var(--surface-rgb), 0.78);
+            overflow: hidden;
+            min-width: 0;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .relationship-title {
+            min-height: 34px;
+            padding: 8px 11px;
+            display: flex;
+            align-items: center;
+            gap: 7px;
+            border-bottom: 1px solid var(--line);
+            color: var(--muted);
+            font-size: 11px;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: 0.55px;
+        }
+
+        .relationship-title .material-icons {
+            font-size: 15px;
+            color: var(--blue);
+        }
+
+        .relationship-list {
+            list-style: none;
+            display: grid;
+            gap: 5px;
+            padding: 9px;
+            flex: 1;
+            align-content: start;
+        }
+
+        .relationship-item {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 8px;
+            min-height: 28px;
+            font-size: 12px;
+        }
+
+        .relationship-item a {
+            color: var(--blue);
+            font-family: var(--mono);
+            font-weight: 800;
+            text-decoration: none;
+        }
+
+        .relationship-item a:hover {
+            text-decoration: underline;
+        }
+
+        .relationship-columns,
+        .relationship-empty {
+            color: var(--muted);
+            font-family: var(--mono);
+            font-size: 11px;
+        }
+
+        .table-meta {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            justify-content: flex-start;
+        }
+
+        .tag,
+        .type-pill {
+            display: inline-flex;
+            align-items: center;
+            min-height: 24px;
+            border-radius: 999px;
+            padding: 3px 8px;
+            font-size: 11px;
+            font-weight: 800;
+            line-height: 1;
+            white-space: nowrap;
+        }
+
+        .tag {
+            color: #075985;
+            background: #e0f2fe;
+        }
+
+        body.theme-dark .tag {
+            color: #bae6fd;
+            background: #164e63;
+        }
+
+        .columns-table {
+            width: 100%;
+            border-collapse: separate;
+            border-spacing: 0;
+        }
+
+        .columns-table th {
+            position: sticky;
+            top: 64px;
+            z-index: 3;
+            background: var(--surface);
+            color: var(--muted);
+            text-align: left;
+            font-size: 11px;
+            font-weight: 800;
+            letter-spacing: 0.6px;
+            text-transform: uppercase;
+            padding: 11px 16px;
+            border-bottom: 1px solid var(--line);
+        }
+
+        .columns-table td {
+            padding: 13px 16px;
+            border-bottom: 1px solid #edf2f7;
+            vertical-align: top;
+            font-size: 13px;
+        }
+
+        .columns-table tr:last-child td {
+            border-bottom: none;
+        }
+
+        .column-name {
+            font-family: var(--mono);
+            font-weight: 700;
+            color: var(--ink);
+        }
+
+        .type-pill {
+            color: #475569;
+            background: #e2e8f0;
+            font-family: var(--mono);
+            font-weight: 600;
+        }
+
+        .key-pill {
+            display: inline-flex;
+            align-items: center;
+            min-height: 20px;
+            margin-left: 6px;
+            padding: 2px 6px;
+            border-radius: 999px;
+            background: var(--green-soft);
+            color: var(--green);
+            font-size: 10px;
+            font-weight: 800;
+        }
+
+        body.theme-dark .type-pill {
+            color: #cbd5e1;
+            background: #263244;
+        }
+
+        .column-description {
+            color: var(--muted);
+            line-height: 1.55;
+        }
+
+        .term-list {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+        }
+
+        .empty-state {
+            width: min(760px, calc(100% - 48px));
+            margin: 80px auto;
+            background: rgba(var(--surface-rgb), 0.82);
+            border: 1px solid rgba(216, 224, 234, 0.92);
+            border-radius: 24px;
+            padding: 34px;
+            text-align: center;
+            box-shadow: var(--shadow-sm);
+            display: none;
+        }
+
+        .empty-state.is-visible {
+            display: block;
+        }
+
+        .empty-state .material-icons {
+            color: var(--blue);
+            font-size: 42px;
+            margin-bottom: 12px;
+        }
+
+        .empty-state h2 {
+            font-size: 22px;
+            margin-bottom: 8px;
+        }
+
+        .empty-state p {
+            color: var(--muted);
+            line-height: 1.55;
+        }
+
+        .to-top {
+            position: fixed;
+            right: 24px;
+            bottom: 24px;
+            width: 44px;
+            height: 44px;
+            border: none;
+            border-radius: 999px;
+            background: var(--nav);
+            color: #fff;
+            display: none;
+            place-items: center;
+            box-shadow: var(--shadow-sm);
+            cursor: pointer;
+            z-index: 40;
+        }
+
+        body.has-data .to-top {
+            display: grid;
+        }
+
+        @media (max-width: 1050px) {
+            .topbar {
+                flex-wrap: wrap;
+            }
+
+            .search-wrap {
+                order: 3;
+                width: 100%;
+            }
+
+            .hero-inner {
+                grid-template-columns: 1fr;
+            }
+
+            body.has-data .viewer {
+                grid-template-columns: 1fr;
+            }
+
+            .layout-nav {
+                position: relative;
+                top: auto;
+                max-height: none;
+            }
+
+            .table-nav {
+                max-height: 260px;
+            }
+
+            .stats-grid {
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+            }
+        }
+
+        @media (max-width: 720px) {
+            .topbar {
+                padding: 12px 16px;
+            }
+
+            .hero,
+            body.has-data .hero {
+                padding-left: 18px;
+                padding-right: 18px;
+            }
+
+            body.has-data .viewer {
+                padding: 18px;
+            }
+
+            .stats-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .table-head {
+                grid-template-columns: 1fr;
+            }
+
+            .relationships-panel {
+                grid-template-columns: 1fr;
+            }
+
+            .table-meta {
+                justify-content: flex-start;
+            }
+
+            .columns-table {
+                display: block;
+                overflow-x: auto;
+            }
+
+            .columns-table th,
+            .columns-table td {
+                min-width: 150px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <input type="file" id="json-input" accept=".json" hidden>
+
+    <div class="app-shell">
+        <header class="topbar">
+            <div class="brand">
+                <div class="brand-mark">
+                    <i class="material-icons">hub</i>
+                </div>
+                <div>
+                    <div class="brand-title">DBViewr</div>
+                    <div class="brand-subtitle">Data Dictionary</div>
+                </div>
+            </div>
+            <div class="topbar-spacer"></div>
+            <div class="search-wrap" id="search-wrap" hidden>
+                <i class="material-icons">search</i>
+                <input class="search-input" id="search-input" type="search" placeholder="Buscar tabela, campo, tipo ou descrição">
+            </div>
+            <button class="ghost-btn" id="clear-btn" type="button" hidden>
+                <i class="material-icons">close</i>
+                Limpar
+            </button>
+            <button class="theme-btn" id="theme-toggle" type="button" title="Alternar modo claro/escuro">
+                <i class="material-icons" id="theme-icon">dark_mode</i>
+            </button>
+            <button class="open-btn" id="open-json-btn" type="button">
+                <i class="material-icons">folder_open</i>
+                Abrir JSON
+            </button>
+        </header>
+
+        <section class="hero" id="top">
+            <div class="hero-inner">
+                <div>
+                    <div class="eyebrow">
+                        <i class="material-icons">auto_stories</i>
+                        Visualizador de dicionário de dados
+                    </div>
+                    <h1 id="hero-title">Transforme seu JSON do DBMapper em uma documentação navegável.</h1>
+                    <p class="hero-copy" id="hero-copy">
+                        Abra um projeto gerado pelo DBMapper para navegar por tabelas, campos, tipos, termos de negócio e descrições sem editar o modelo.
+                    </p>
+                    <div class="hero-actions">
+                        <button class="open-btn" id="hero-open-json-btn" type="button">
+                            <i class="material-icons">upload_file</i>
+                            Abrir JSON do Projeto
+                        </button>
+                    </div>
+                </div>
+
+                <aside class="hero-panel" aria-label="Exemplo visual">
+                    <div class="preview-title">
+                        <h2>Exemplo de leitura</h2>
+                        <span class="preview-pill">Documento</span>
+                    </div>
+                    <div class="preview-card">
+                        <h3>system_users</h3>
+                        <p>Cadastro de usuários do sistema, incluindo dados de acesso, identificação e vínculos operacionais.</p>
+                        <div class="preview-columns">
+                            <div class="preview-column">
+                                <strong>id</strong>
+                                <span>serial</span>
+                            </div>
+                            <div class="preview-column">
+                                <strong>email</strong>
+                                <span>varchar</span>
+                            </div>
+                            <div class="preview-column">
+                                <strong>inserted_at</strong>
+                                <span>timestamp</span>
+                            </div>
+                        </div>
+                    </div>
+                </aside>
+            </div>
+        </section>
+
+        <main class="viewer" id="viewer">
+            <section class="stats-grid" id="stats-grid" aria-label="Resumo do dicionário"></section>
+
+            <aside class="layout-nav">
+                <div class="nav-header">
+                    <h2>Tabelas</h2>
+                </div>
+                <nav class="table-nav" id="table-nav" aria-label="Navegação por tabelas"></nav>
+            </aside>
+
+            <section class="content" id="content"></section>
+        </main>
+
+        <section class="empty-state" id="empty-state">
+            <i class="material-icons">manage_search</i>
+            <h2>Nenhum resultado encontrado</h2>
+            <p>Ajuste a busca ou remova o filtro aplicado para visualizar outras tabelas do dicionário.</p>
+        </section>
+    </div>
+
+    <button class="to-top" id="to-top" type="button" title="Voltar ao topo">
+        <i class="material-icons">arrow_upward</i>
+    </button>
+
+    <script>
+        const state = {
+            database: null,
+            query: ''
+        };
+
+        const els = {
+            input: document.getElementById('json-input'),
+            openBtn: document.getElementById('open-json-btn'),
+            heroOpenBtn: document.getElementById('hero-open-json-btn'),
+            clearBtn: document.getElementById('clear-btn'),
+            themeToggle: document.getElementById('theme-toggle'),
+            themeIcon: document.getElementById('theme-icon'),
+            searchWrap: document.getElementById('search-wrap'),
+            searchInput: document.getElementById('search-input'),
+            heroTitle: document.getElementById('hero-title'),
+            heroCopy: document.getElementById('hero-copy'),
+            statsGrid: document.getElementById('stats-grid'),
+            tableNav: document.getElementById('table-nav'),
+            content: document.getElementById('content'),
+            emptyState: document.getElementById('empty-state'),
+            toTop: document.getElementById('to-top')
+        };
+
+        function normalizeText(value) {
+            return String(value || '')
+                .normalize('NFD')
+                .replace(/[\u0300-\u036f]/g, '')
+                .toLowerCase();
+        }
+
+        function slugify(value) {
+            return normalizeText(value)
+                .replace(/[^a-z0-9]+/g, '-')
+                .replace(/(^-|-$)/g, '') || 'tabela';
+        }
+
+        function escapeHtml(value) {
+            return String(value || '').replace(/[&<>"']/g, char => ({
+                '&': '&amp;',
+                '<': '&lt;',
+                '>': '&gt;',
+                '"': '&quot;',
+                "'": '&#39;'
+            }[char]));
+        }
+
+        function normalizeRelationship(relationship) {
+            return {
+                table: relationship.table || '',
+                local_columns: [...(relationship.local_columns || [])],
+                referenced_columns: [...(relationship.referenced_columns || [])],
+                constraint_name: relationship.constraint_name || ''
+            };
+        }
+
+        function relationshipKey(relationship) {
+            return [
+                relationship.table,
+                (relationship.local_columns || []).join(','),
+                (relationship.referenced_columns || []).join(',')
+            ].join('|');
+        }
+
+        function dedupeRelationships(relationships) {
+            const seen = new Set();
+            return (relationships || []).filter(relationship => {
+                const key = relationshipKey(relationship);
+                if (seen.has(key)) return false;
+                seen.add(key);
+                return true;
+            });
+        }
+
+        function normalizeRelationships(tables) {
+            const tableMap = new Map((tables || []).map(table => [table.name, table]));
+
+            (tables || []).forEach(table => {
+                table.relationships = table.relationships || { parents: [], children: [] };
+                table.relationships.parents = dedupeRelationships((table.relationships.parents || []).map(normalizeRelationship));
+                table.relationships.children = [];
+                table.columns.forEach(column => {
+                    column.primary_key = column.primary_key ?? false;
+                    column.foreign_key = column.foreign_key ?? false;
+                });
+            });
+
+            (tables || []).forEach(childTable => {
+                childTable.relationships.parents.forEach(parentRelationship => {
+                    const parentTable = tableMap.get(parentRelationship.table);
+                    if (!parentTable) return;
+
+                    parentRelationship.local_columns.forEach(columnName => {
+                        const column = childTable.columns.find(candidate => candidate.name === columnName);
+                        if (column) column.foreign_key = true;
+                    });
+
+                    parentTable.relationships.children.push(normalizeRelationship({
+                        table: childTable.name,
+                        local_columns: parentRelationship.referenced_columns,
+                        referenced_columns: parentRelationship.local_columns,
+                        constraint_name: parentRelationship.constraint_name
+                    }));
+                });
+            });
+
+            tables.forEach(table => {
+                table.relationships.children = dedupeRelationships(table.relationships.children);
+            });
+
+            return tables;
+        }
+
+        function normalizeProject(json) {
+            if (!json || !json.database) {
+                throw new Error('Formato de JSON inválido.');
+            }
+
+            const db = json.database;
+            const tables = normalizeRelationships((db.tables || [])
+                .filter(table => table.status !== 'REMOVED')
+                .map(table => ({
+                    name: table.name || 'tabela_sem_nome',
+                    description: table.description || '',
+                    business_terms: table.business_terms || [],
+                    relationships: {
+                        parents: ((table.relationships && table.relationships.parents) || []).map(normalizeRelationship),
+                        children: ((table.relationships && table.relationships.children) || []).map(normalizeRelationship)
+                    },
+                    columns: (table.columns || []).map(column => ({
+                        name: column.name || 'campo_sem_nome',
+                        type: column.type || '',
+                        primary_key: column.primary_key ?? false,
+                        foreign_key: column.foreign_key ?? false,
+                        description: column.description || '',
+                        business_terms: column.business_terms || []
+                    }))
+                })));
+
+            return {
+                name: db.name || 'Banco de Dados',
+                description: db.description || '',
+                business_terms: db.business_terms || [],
+                tables
+            };
+        }
+
+        function computeStats(db) {
+            const totalTables = db.tables.length;
+            const totalColumns = db.tables.reduce((sum, table) => sum + table.columns.length, 0);
+            const totalRelationships = db.tables.reduce((sum, table) => sum + ((table.relationships && table.relationships.parents) || []).length, 0);
+            const businessTerms = new Set();
+            db.business_terms.forEach(term => businessTerms.add(term));
+            db.tables.forEach(table => {
+                table.business_terms.forEach(term => businessTerms.add(term));
+                table.columns.forEach(column => column.business_terms.forEach(term => businessTerms.add(term)));
+            });
+
+            return {
+                totalTables,
+                totalColumns,
+                totalRelationships,
+                businessTerms: businessTerms.size
+            };
+        }
+
+        function tableSearchText(table) {
+            return normalizeText([
+                table.name,
+                table.description,
+                table.business_terms.join(' '),
+                ...((table.relationships && table.relationships.parents) || []).map(relationship => relationship.table),
+                ...((table.relationships && table.relationships.children) || []).map(relationship => relationship.table),
+                ...table.columns.flatMap(column => [
+                    column.name,
+                    column.type,
+                    column.description,
+                    column.business_terms.join(' ')
+                ])
+            ].join(' '));
+        }
+
+        function columnMatches(column) {
+            if (!state.query) return true;
+            return normalizeText([
+                column.name,
+                column.type,
+                column.description,
+                column.business_terms.join(' ')
+            ].join(' ')).includes(state.query);
+        }
+
+        function tableMatches(table) {
+            return !state.query || tableSearchText(table).includes(state.query);
+        }
+
+        function renderStats(db) {
+            const stats = computeStats(db);
+            const items = [
+                ['Tabelas', stats.totalTables],
+                ['Campos', stats.totalColumns],
+                ['FKs', stats.totalRelationships],
+                ['Termos', stats.businessTerms]
+            ];
+
+            els.statsGrid.innerHTML = items.map(([label, value]) => `
+                <article class="stat-card">
+                    <span>${label}</span>
+                    <strong>${value}</strong>
+                </article>
+            `).join('');
+        }
+
+        function renderTags(tags) {
+            if (!tags || tags.length === 0) return '';
+            return `
+                <div class="term-list">
+                    ${tags.map(tag => `<span class="tag">${escapeHtml(tag)}</span>`).join('')}
+                </div>
+            `;
+        }
+
+        function renderDescription(item) {
+            return `<p class="description">${escapeHtml(item.description || 'Sem descrição cadastrada.')}</p>`;
+        }
+
+        function renderRelationshipGroup(title, icon, relationships, mode) {
+            const items = relationships.length > 0
+                ? relationships.map(relationship => {
+                    const columns = mode === 'parent'
+                        ? `${relationship.local_columns.join(', ')} → ${relationship.referenced_columns.join(', ')}`
+                        : `${relationship.local_columns.join(', ')} ← ${relationship.referenced_columns.join(', ')}`;
+                    return `
+                        <li class="relationship-item">
+                            <a href="#${slugify(relationship.table)}" data-table-link="${escapeHtml(relationship.table)}">${escapeHtml(relationship.table)}</a>
+                            <span class="relationship-columns">${escapeHtml(columns)}</span>
+                        </li>
+                    `;
+                }).join('')
+                : '<li class="relationship-empty">Nenhum relacionamento identificado.</li>';
+
+            return `
+                <div class="relationship-group">
+                    <div class="relationship-title">
+                        <i class="material-icons">${icon}</i>
+                        <span>${title}</span>
+                    </div>
+                    <ul class="relationship-list">${items}</ul>
+                </div>
+            `;
+        }
+
+        function renderRelationships(table) {
+            const relationships = table.relationships || { parents: [], children: [] };
+            const parentCount = (relationships.parents || []).length;
+            const childCount = (relationships.children || []).length;
+            const totalCount = parentCount + childCount;
+            return `
+                <details class="relationships-accordion">
+                    <summary>
+                        <i class="material-icons">chevron_right</i>
+                        <span>Relacionamentos</span>
+                        <span class="relationships-summary-count">${totalCount} vínculo${totalCount === 1 ? '' : 's'}</span>
+                    </summary>
+                    <div class="relationships-panel">
+                        ${renderRelationshipGroup('Filha de', 'call_received', relationships.parents || [], 'parent')}
+                        ${renderRelationshipGroup('Mãe de', 'call_made', relationships.children || [], 'child')}
+                    </div>
+                </details>
+            `;
+        }
+
+        function renderKeyPills(column) {
+            return [
+                column.primary_key ? '<span class="key-pill">PK</span>' : '',
+                column.foreign_key ? '<span class="key-pill">FK</span>' : ''
+            ].join('');
+        }
+
+        function renderNav(db) {
+            els.tableNav.innerHTML = db.tables
+                .filter(tableMatches)
+                .map(table => {
+                    return `
+                        <a href="#${slugify(table.name)}" data-table-link="${escapeHtml(table.name)}">
+                            <span class="nav-name">${escapeHtml(table.name)}</span>
+                            <span class="nav-count">${table.columns.length}</span>
+                        </a>
+                    `;
+                }).join('');
+        }
+
+        function renderTable(table) {
+            const visibleColumns = table.columns.filter(column => columnMatches(column) || !state.query);
+
+            const columns = visibleColumns.length > 0 ? visibleColumns : table.columns;
+            return `
+                <article class="table-card" id="${slugify(table.name)}" data-table="${escapeHtml(table.name)}">
+                    <header class="table-head">
+                        <div>
+                            <div class="table-title-row">
+                                <h2>${escapeHtml(table.name)}</h2>
+                                <button class="copy-link" type="button" data-copy-link="${slugify(table.name)}">
+                                    <i class="material-icons">link</i>
+                                    Link
+                                </button>
+                            </div>
+                        </div>
+                        <div class="table-meta">
+                            <span class="type-pill">${table.columns.length} campos</span>
+                            ${renderTags(table.business_terms)}
+                        </div>
+                        ${renderDescription(table).replace('class="description"', 'class="description table-description"')}
+                        ${renderRelationships(table)}
+                    </header>
+                    <table class="columns-table">
+                        <thead>
+                            <tr>
+                                <th>Campo</th>
+                                <th>Tipo</th>
+                                <th>Descrição</th>
+                                <th>Termos</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${columns.map(column => {
+                                return `
+                                    <tr>
+                                        <td><span class="column-name">${escapeHtml(column.name)}</span>${renderKeyPills(column)}</td>
+                                        <td><span class="type-pill">${escapeHtml(column.type || '-')}</span></td>
+                                        <td>${renderDescription(column)}</td>
+                                        <td>${renderTags(column.business_terms) || '<span class="description">-</span>'}</td>
+                                    </tr>
+                                `;
+                            }).join('')}
+                        </tbody>
+                    </table>
+                </article>
+            `;
+        }
+
+        function renderContent(db) {
+            const visibleTables = db.tables.filter(tableMatches);
+            els.content.innerHTML = visibleTables.map(renderTable).join('');
+            els.emptyState.classList.toggle('is-visible', visibleTables.length === 0);
+            bindCopyLinks();
+        }
+
+        function render() {
+            if (!state.database) return;
+
+            const db = state.database;
+            document.body.classList.add('has-data');
+            els.searchWrap.hidden = false;
+            els.clearBtn.hidden = false;
+            els.heroTitle.textContent = db.name;
+            els.heroCopy.textContent = db.description || 'Dicionário de dados gerado a partir do projeto DBMapper.';
+            renderStats(db);
+            renderNav(db);
+            renderContent(db);
+        }
+
+        function bindCopyLinks() {
+            document.querySelectorAll('[data-copy-link]').forEach(button => {
+                button.addEventListener('click', async () => {
+                    const hash = `#${button.dataset.copyLink}`;
+                    const url = `${location.origin}${location.pathname}${hash}`;
+                    try {
+                        await navigator.clipboard.writeText(url);
+                        button.innerHTML = '<i class="material-icons">done</i> Copiado';
+                        setTimeout(() => {
+                            button.innerHTML = '<i class="material-icons">link</i> Link';
+                        }, 1400);
+                    } catch (err) {
+                        location.hash = hash;
+                    }
+                });
+            });
+        }
+
+        function applyTheme(theme) {
+            const useDark = theme === 'dark';
+            document.body.classList.toggle('theme-dark', useDark);
+            els.themeIcon.textContent = useDark ? 'light_mode' : 'dark_mode';
+            els.themeToggle.title = useDark ? 'Usar modo claro' : 'Usar modo escuro';
+            localStorage.setItem('dbviewr-theme', useDark ? 'dark' : 'light');
+        }
+
+        async function loadFile(file) {
+            const text = await file.text();
+            const json = JSON.parse(text);
+            state.database = normalizeProject(json);
+            state.query = '';
+            els.searchInput.value = '';
+            render();
+        }
+
+        els.openBtn.addEventListener('click', () => els.input.click());
+        els.heroOpenBtn.addEventListener('click', () => els.input.click());
+        els.input.addEventListener('change', async (event) => {
+            const file = event.target.files[0];
+            if (!file) return;
+            try {
+                await loadFile(file);
+            } catch (err) {
+                alert('Não foi possível abrir este JSON do DBMapper.');
+                console.error(err);
+            }
+        });
+
+        els.searchInput.addEventListener('input', event => {
+            state.query = normalizeText(event.target.value.trim());
+            render();
+        });
+
+        els.clearBtn.addEventListener('click', () => {
+            state.query = '';
+            els.searchInput.value = '';
+            render();
+        });
+
+        els.themeToggle.addEventListener('click', () => {
+            applyTheme(document.body.classList.contains('theme-dark') ? 'light' : 'dark');
+        });
+
+        els.toTop.addEventListener('click', () => {
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        });
+
+        document.addEventListener('click', event => {
+            const link = event.target.closest('[data-table-link]');
+            if (!link) return;
+            document.querySelectorAll('[data-table-link]').forEach(item => {
+                item.classList.toggle('is-active', item === link);
+            });
+        });
+
+        applyTheme(localStorage.getItem('dbviewr-theme') || 'light');
+    </script>
+</body>
+</html>

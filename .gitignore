@@ -1,0 +1,15 @@
+# .gitignore — intentionally minimal.
+# Add per-machine or per-tool exclusions here as needed.
+# Project source: index.html, app.js, style.css, dbviewr.html,
+#                 AGENTS.md, tests/, openspec/, example.sql,
+#                 db_axiis.sql, dbmapper-novo-banco*.json, novo-layout.png
+
+# Per-machine AI tooling (skills/commands live next to the repo
+# but are not part of the shipped source).
+.claude/
+.codex/
+.gemini/
+.opencode/
+
+# Local screenshots dropped in for ad-hoc visual reference.
+modal*.png

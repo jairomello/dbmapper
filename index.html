@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DBMapper - Semantic Layer</title>
+    <!-- Google Fonts: Inter -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <!-- Material Icons -->
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+    <!-- Materialize CSS (mantido para chips e toasts) -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/css/materialize.min.css">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+    <!-- Navbar -->
+    <header class="app-navbar">
+        <div class="navbar-brand">
+            <i class="material-icons navbar-brand-icon">hub</i>
+            <span class="navbar-brand-name">DBMapper</span>
+            <span class="navbar-brand-tag">Semantic Layer</span>
+        </div>
+        <div class="navbar-actions">
+            <button class="nav-btn" id="btn-import-sql">
+                <i class="material-icons">upload_file</i>
+                <span>Importar SQL</span>
+            </button>
+            <button class="nav-btn" id="btn-update-model" hidden>
+                <i class="material-icons">sync_alt</i>
+                <span>Atualizar Modelo</span>
+            </button>
+            <button class="nav-btn" id="btn-save-project">
+                <i class="material-icons">save</i>
+                <span>Salvar</span>
+            </button>
+            <button class="nav-btn nav-btn-primary" id="btn-load-project">
+                <i class="material-icons">folder_open</i>
+                <span>Abrir Projeto</span>
+            </button>
+        </div>
+    </header>
+
+    <div class="app-layout">
+
+        <!-- Sidebar -->
+        <aside class="app-sidebar">
+            <div class="sidebar-header">
+                <i class="material-icons sidebar-header-icon">account_tree</i>
+                <span>Estrutura do Banco</span>
+            </div>
+            <div id="tree-view" class="tree-view">
+                <div class="tree-empty">
+                    <i class="material-icons">cloud_upload</i>
+                    <p>Importe um arquivo SQL para começar.</p>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="app-main">
+
+            <!-- Welcome Screen -->
+            <div id="welcome-screen" class="welcome-screen">
+                <div class="welcome-card">
+                    <div class="welcome-icon-wrap">
+                        <i class="material-icons">hub</i>
+                    </div>
+                    <h1 class="welcome-title">Bem-vindo ao DBMapper</h1>
+                    <p class="welcome-subtitle">Enriqueça seu banco de dados com metadados semânticos para IA e documentação.</p>
+                    <button class="btn-cta" onclick="document.getElementById('input-sql').click()">
+                        <i class="material-icons">upload_file</i>
+                        Importar arquivo SQL
+                    </button>
+                </div>
+            </div>
+
+            <!-- Editor Area -->
+            <div id="editor-area" style="display: none;">
+                <div class="editor-header">
+                    <div class="editor-breadcrumb" id="editor-breadcrumb"></div>
+                    <h2 id="editor-title" class="editor-title">Selecione um item</h2>
+                </div>
+
+                <div class="editor-card">
+                    <div class="editor-section">
+                        <label class="field-label">
+                            <i class="material-icons field-label-icon">description</i>
+                            Descrição Semântica
+                        </label>
+                        <div class="field-hint">Explique o propósito deste item para sistemas de IA e documentação.</div>
+                        <textarea id="item-description" class="field-textarea" placeholder="Ex: Identificador único do usuário, gerado automaticamente pelo banco..."></textarea>
+                    </div>
+
+                    <div class="editor-section" id="relationships-section" hidden>
+                        <label class="field-label">
+                            <i class="material-icons field-label-icon">account_tree</i>
+                            Relacionamentos
+                        </label>
+                        <div class="field-hint">Chaves estrangeiras identificadas no SQL importado.</div>
+                        <div class="relationships-box" id="relationships-box"></div>
+                    </div>
+
+                    <div class="editor-section">
+                        <label class="field-label">
+                            <i class="material-icons field-label-icon">sell</i>
+                            Termos de Negócio
+                        </label>
+                        <div class="field-hint">Pressione Enter para adicionar cada termo.</div>
+                        <div class="chips chips-placeholder field-chips" id="item-business-terms"></div>
+                    </div>
+
+                    <div class="editor-actions">
+                        <button class="btn-review-item" id="btn-review-item" type="button">
+                            <i class="material-icons">verified</i>
+                            Aprovar Descrição
+                        </button>
+                        <button class="btn-save" id="btn-save-item">
+                            <i class="material-icons">check</i>
+                            Salvar Alterações
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+        </main>
+    </div>
+
+    <!-- Status Bar -->
+    <footer class="status-bar" id="status-bar">
+        <div class="status-bar-inner">
+
+            <!-- Grupo 1: Identidade do banco -->
+            <button class="sb-group sb-db-name" id="sb-db-name" title="Editar banco de dados">
+                <i class="material-icons sb-icon">hub</i>
+                <span id="sb-db-label">Novo Banco</span>
+            </button>
+
+            <div class="sb-divider"></div>
+
+            <!-- Grupo 2: Dimensão -->
+            <div class="sb-group">
+                <i class="material-icons sb-icon">table_chart</i>
+                <span class="sb-label">Tabelas:</span>
+                <span class="sb-value" id="sb-total-tables">—</span>
+            </div>
+            <div class="sb-group">
+                <i class="material-icons sb-icon">view_column</i>
+                <span class="sb-label">Campos:</span>
+                <span class="sb-value" id="sb-total-cols">—</span>
+            </div>
+
+            <div class="sb-divider"></div>
+
+            <!-- Grupo 3: Cobertura de descrição -->
+            <div class="sb-group">
+                <i class="material-icons sb-icon sb-icon-amber">description</i>
+                <span class="sb-label">Descritas:</span>
+                <span class="sb-value" id="sb-desc-tables">—</span>
+                <span class="sb-sublabel">tab</span>
+                <span class="sb-sep">·</span>
+                <span class="sb-value" id="sb-desc-cols">—</span>
+                <span class="sb-sublabel">campos</span>
+            </div>
+
+            <div class="sb-divider"></div>
+
+            <!-- Grupo 4: Revisão -->
+            <div class="sb-group">
+                <i class="material-icons sb-icon sb-icon-emerald">check_circle</i>
+                <span class="sb-label">Revisados:</span>
+                <span class="sb-value" id="sb-rev-tables">—</span>
+                <span class="sb-sublabel">tab</span>
+                <span class="sb-sep">·</span>
+                <span class="sb-value" id="sb-rev-cols">—</span>
+                <span class="sb-sublabel">campos</span>
+            </div>
+
+            <div class="sb-divider"></div>
+
+            <!-- Grupo 5: Pendentes -->
+            <div class="sb-group">
+                <i class="material-icons sb-icon sb-icon-muted">pending</i>
+                <span class="sb-label">Pendentes:</span>
+                <span class="sb-value sb-value-pending" id="sb-pending">—</span>
+            </div>
+
+            <div class="sb-divider"></div>
+
+            <!-- Grupo 5b: Relacionamentos (FKs) -->
+            <div class="sb-group">
+                <i class="material-icons sb-icon sb-icon-violet">link</i>
+                <span class="sb-label">FKs:</span>
+                <span class="sb-value" id="sb-total-fks">—</span>
+            </div>
+            <div class="sb-group">
+                <i class="material-icons sb-icon sb-icon-amber">description</i>
+                <span class="sb-label">Descritas:</span>
+                <span class="sb-value" id="sb-fk-desc">—</span>
+                <span class="sb-sublabel">fks</span>
+            </div>
+            <div class="sb-group">
+                <i class="material-icons sb-icon sb-icon-emerald">check_circle</i>
+                <span class="sb-label">Revisadas:</span>
+                <span class="sb-value" id="sb-fk-rev">—</span>
+                <span class="sb-sublabel">fks</span>
+            </div>
+
+            <!-- Spacer -->
+            <div class="sb-spacer"></div>
+
+            <!-- Grupo 6: Progresso geral -->
+            <div class="sb-group sb-progress-group">
+                <span class="sb-label">Progresso</span>
+                <div class="sb-progress-track">
+                    <div class="sb-progress-fill" id="sb-progress-fill"></div>
+                </div>
+                <span class="sb-value sb-value-pct" id="sb-progress-pct">0%</span>
+            </div>
+
+            <div class="sb-divider"></div>
+
+            <!-- Créditos -->
+            <div class="sb-group sb-credits">
+                <i class="material-icons sb-icon sb-icon-muted">code</i>
+                <span class="sb-label">by</span>
+                <a class="sb-author-link" href="https://github.com/jairomello" target="_blank" rel="noopener noreferrer" title="Ver perfil no GitHub">Jairo Mello</a>
+            </div>
+
+        </div>
+    </footer>
+
+    <!-- Hidden Inputs -->
+    <input type="file" id="input-sql" accept=".sql" style="display: none;">
+    <input type="file" id="input-json" accept=".json" style="display: none;">
+    <input type="file" id="input-update-sql" accept=".sql" style="display: none;">
+
+    <!-- Update Model Wizard -->
+    <div class="update-modal" id="update-modal" aria-hidden="true">
+        <div class="update-modal-backdrop"></div>
+        <section class="update-dialog" role="dialog" aria-modal="true" aria-labelledby="update-modal-title">
+            <header class="update-dialog-header">
+                <div>
+                    <div class="wizard-steps">
+                        <span class="wizard-step" data-step="upload">SQL</span>
+                        <span class="wizard-step" data-step="tables">Tabelas</span>
+                        <span class="wizard-step" data-step="columns">Campos</span>
+                        <span class="wizard-step" data-step="relationships">FKs</span>
+                        <span class="wizard-step" data-step="summary">Resumo</span>
+                    </div>
+                    <h2 id="update-modal-title">Atualizar Modelo</h2>
+                    <p id="update-modal-subtitle">Selecione o arquivo SQL da nova versão do banco.</p>
+                </div>
+                <button class="icon-btn" id="update-modal-close" type="button" title="Fechar">
+                    <i class="material-icons">close</i>
+                </button>
+            </header>
+            <div class="update-dialog-body" id="update-modal-body"></div>
+            <footer class="update-dialog-footer">
+                <button class="btn-secondary" id="update-modal-cancel" type="button">Cancelar</button>
+                <div class="footer-spacer"></div>
+                <button class="btn-secondary" id="update-modal-back" type="button">Voltar</button>
+                <button class="btn-primary" id="update-modal-next" type="button">
+                    <i class="material-icons">upload_file</i>
+                    Escolher SQL
+                </button>
+            </footer>
+        </section>
+    </div>
+
+    <!-- Save Project Prompt -->
+    <div class="update-modal" id="save-prompt-modal" aria-hidden="true">
+        <div class="update-modal-backdrop"></div>
+        <section class="update-dialog" role="dialog" aria-modal="true" aria-labelledby="save-prompt-title">
+            <header class="update-dialog-header">
+                <div>
+                    <h2 id="save-prompt-title">Salvar projeto</h2>
+                    <p id="save-prompt-subtitle">Confirme ou edite o nome do arquivo antes de salvar.</p>
+                </div>
+                <button class="icon-btn" id="save-prompt-close" type="button" title="Fechar">
+                    <i class="material-icons">close</i>
+                </button>
+            </header>
+            <div class="update-dialog-body">
+                <div class="editor-section">
+                    <label class="field-label" for="save-prompt-filename">
+                        <i class="material-icons field-label-icon">save</i>
+                        Nome do arquivo
+                    </label>
+                    <div class="field-hint">A data e a hora já vêm preenchidas; troque apenas o final se preferir.</div>
+                    <input type="text" id="save-prompt-filename" class="field-textarea" autocomplete="off" spellcheck="false">
+                    <small id="save-prompt-error" class="red-text"></small>
+                </div>
+            </div>
+            <footer class="update-dialog-footer">
+                <button class="btn-secondary" id="save-prompt-cancel" type="button">Cancelar</button>
+                <div class="footer-spacer"></div>
+                <button class="btn-primary" id="save-prompt-confirm" type="button">
+                    <i class="material-icons">save</i>
+                    Salvar
+                </button>
+            </footer>
+        </section>
+    </div>
+
+    <!-- Materialize JS -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/js/materialize.min.js"></script>
+    <!-- SQL Parser (AlaSQL) -->
+    <script src="https://cdn.jsdelivr.net/npm/alasql@4.5.2/dist/alasql.min.js"></script>
+    <script src="app.js"></script>
+</body>
+</html>
