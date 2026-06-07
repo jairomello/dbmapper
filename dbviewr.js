@@ -269,6 +269,25 @@
         `;
     }
 
+    function sortColumns(columns) {
+        const pkColumns = [];
+        const nonPkColumns = [];
+
+        columns.forEach(column => {
+            if (column.primary_key) {
+                pkColumns.push(column);
+            } else {
+                nonPkColumns.push(column);
+            }
+        });
+
+        nonPkColumns.sort((a, b) => {
+            return a.name.localeCompare(b.name, undefined, { sensitivity: 'base' });
+        });
+
+        return [...pkColumns, ...nonPkColumns];
+    }
+
     function renderKeyPills(column) {
         return [
             column.primary_key ? '<span class="key-pill">PK</span>' : '',
@@ -292,7 +311,7 @@
     function renderTable(table) {
         const visibleColumns = table.columns.filter(column => columnMatches(column) || !state.query);
 
-        const columns = visibleColumns.length > 0 ? visibleColumns : table.columns;
+        const columns = sortColumns(visibleColumns.length > 0 ? visibleColumns : table.columns);
         return `
             <article class="table-card" id="${slugify(table.name)}" data-table="${escapeHtml(table.name)}">
                 <header class="table-head">

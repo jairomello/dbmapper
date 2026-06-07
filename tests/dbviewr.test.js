@@ -32,4 +32,9 @@ assert.ok(!html.includes('Aprovado'), 'viewer final nao deve expor status de apr
 assert.ok(!html.includes('<script>'), 'dbviewr.html nao deve conter script embutido');
 assert.ok(!html.includes('<style>'), 'dbviewr.html nao deve conter bloco <style> embutido');
 
+// Column sorting: PK first, then alphabetical
+assert.match(script, /function sortColumns\(columns\)/, 'deve existir helper sortColumns');
+assert.match(script, /column\.primary_key/, 'sortColumns deve identificar colunas PK');
+assert.match(script, /localeCompare/, 'sortColumns deve ordenar alfabeticamente');
+
 console.log('dbviewr.test.js: ok');
