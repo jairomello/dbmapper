@@ -10,7 +10,7 @@ This repository is a small static DBMapper web app. Core files are at the root:
 - `dbviewr.js` contains the viewer state, JSON loading, search, table navigation, relationships panel, and theme toggle.
 - `style.css` contains the full design system and layout styles for the editor.
 - `app.js` contains client-side state, SQL parsing, rendering, import/export, and editor behavior.
-- `example.sql` and `db_axiis.sql` are SQL inputs for local testing.
+- `example.sql` is a SQL input for local testing.
 
 Keep new app code in these root files unless the project is intentionally reorganized.
 
@@ -20,7 +20,7 @@ There is no package manager or build step. Run the app as a static site:
 
 - `python3 -m http.server 8000` starts a local server from the repo root.
 - Open `http://localhost:8000/dbmapper.html` to use the app.
-- Import `example.sql` or `db_axiis.sql` through the UI to test SQL parsing.
+- Import `example.sql` through the UI to test SQL parsing.
 - Use the Save/Open Project buttons to verify JSON export and import behavior.
 
 Avoid adding tooling unless it solves an immediate maintenance need.

@@ -76,7 +76,7 @@ node tests/dbviewr.test.js              # contrato do DBViewr
 node tests/project-persistence.test.js  # export/import de JSON
 ```
 
-Para mudanças no parser de SQL, teste pelo menos um arquivo com constraints (FKs) e um com múltiplas tabelas. Os arquivos `example.sql` e `db_axiis.sql` na raiz são insumos úteis.
+Para mudanças no parser de SQL, teste pelo menos um arquivo com constraints (FKs) e um com múltiplas tabelas. O arquivo `example.sql` na raiz é um insumo útil.
 
 Para cada mudança, valide manualmente no navegador:
 
