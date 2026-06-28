@@ -94,3 +94,12 @@ The `## Purpose` section of this spec MUST describe the capability in 1–3 beha
 - **THEN** the `## Purpose` section MUST NOT contain the string `TBD - created by archiving`
 - **AND** the section MUST contain at least one complete sentence describing the capability's user-facing responsibility
 
+### Requirement: Viewer filenames are spelled correctly
+
+The static-site-security controls MUST name the viewer's companion files with the corrected spelling: `dbviewer.html`, `dbviewer.js`, and `dbviewer.css` (not `dbviewr.*`). The misspelled `dbviewr` filename MUST NOT appear in any reference to the viewer in shipped artifacts, docs, tests, or OpenSpec specs.
+
+#### Scenario: Viewer references use the corrected spelling
+
+- **WHEN** a reader inspects `static-site-security/spec.md`, `dbviewer.html`, `tests/dbviewer.test.js`, or any other shipped artifact
+- **THEN** the artifact MUST NOT contain the substring `dbviewr` when referring to the viewer
+

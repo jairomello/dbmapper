@@ -153,9 +153,11 @@ Each parent relationship in the in-memory model and in the exported JSON MUST be
 - **AND** the on-disk field names MUST be exactly `description` and `reviewed`
 
 ### Requirement: Capability Purpose paragraph
+
 The `## Purpose` section of this spec MUST describe the capability in 1–3 behavior-oriented sentences, must NOT contain the placeholder `TBD - created by archiving`, and MUST name the executable test script (if any) and the cross-cutting `project-persistence` contract (if relevant).
 
 #### Scenario: Purpose paragraph is non-placeholder
+
 - **WHEN** a reader opens this spec file
 - **THEN** the `## Purpose` section MUST NOT contain the string `TBD - created by archiving`
 - **AND** the section MUST contain at least one complete sentence describing the capability's user-facing responsibility
@@ -185,4 +187,13 @@ The page that hosts this capability (`dbmapper.html`) MUST be served with the SR
 
 - **WHEN** `dbmapper.html` is loaded
 - **THEN** the page MUST satisfy every `Requirement` of the `static-site-security` capability (SRI on every CDN resource including the Materialize CSS and JS at version `1.0.0` on cdnjs, a `<meta http-equiv="Content-Security-Policy">` in the head, no inline `<script>` or `<style>` block, no `on*=` handlers, and external CSS/JS in standalone files)
+
+### Requirement: Viewer consumer reference uses the corrected name
+
+The cross-consumer JSON contract MUST name the viewer consumer as `DBViewer` and reference its file as `dbviewer.html`. The misspelled `DBViewr` / `dbviewr.html` references MUST NOT appear in this spec or in any other shipped artifact that points at the viewer.
+
+#### Scenario: Viewer consumer reference is spelled correctly
+
+- **WHEN** a reader inspects `project-persistence/spec.md` or any cross-reference to the viewer consumer in shipped artifacts
+- **THEN** the artifact MUST NOT contain the substrings `DBViewr` or `dbviewr.html` when referring to the viewer
 

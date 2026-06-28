@@ -82,22 +82,27 @@ The viewer MUST provide a way to copy a per-table anchor link so the user can sh
 The viewer MUST support a light theme and a dark theme, with the choice persisted across reloads.
 
 #### Scenario: Theme toggle present
+
 - **WHEN** the page is loaded
 - **THEN** the `body.theme-dark` class MUST be the documented dark-theme hook
 - **AND** the `#theme-toggle` element MUST be present in the DOM
 
 #### Scenario: Theme persists in localStorage
+
 - **WHEN** the user toggles the theme
 - **THEN** the selected theme MUST be written to `localStorage` under the `dbviewer-theme` key
 
 #### Scenario: Theme is restored on reload
+
 - **WHEN** the page is reloaded with a stored theme
 - **THEN** `applyTheme(theme)` MUST read the stored value and apply the corresponding class to the body
 
 ### Requirement: Capability Purpose paragraph
+
 The `## Purpose` section of this spec MUST describe the capability in 1–3 behavior-oriented sentences, must NOT contain the placeholder `TBD - created by archiving`, and MUST name the executable test script (if any) and the cross-cutting `project-persistence` contract (if relevant).
 
 #### Scenario: Purpose paragraph is non-placeholder
+
 - **WHEN** a reader opens this spec file
 - **THEN** the `## Purpose` section MUST NOT contain the string `TBD - created by archiving`
 - **AND** the section MUST contain at least one complete sentence describing the capability's user-facing responsibility
@@ -111,4 +116,14 @@ The page MUST be served with the SRI, CSP, and "no inline scripts/handlers" cont
 - **WHEN** `dbviewer.html` is loaded
 - **THEN** the page MUST satisfy every `Requirement` of the `static-site-security` capability (SRI on CDN resources, a `<meta http-equiv="Content-Security-Policy">` in the head, no inline `<script>` or `<style>` block, no `on*=` handlers, and external CSS/JS in standalone files)
 - **AND** the executable contract `tests/dbviewer.test.js` MUST assert the absence of inline blocks in `dbviewer.html` and the presence of the `<script src="dbviewer.js">` and `<link rel="stylesheet" href="dbviewer.css">` references
+
+### Requirement: Viewer is published under the correct name
+
+The viewer MUST ship under the spelling `DBViewer` (in-page brand and `<title>`) and MUST be served from `dbviewer.html` at the repo root. The misspelled `dbviewr` name MUST NOT appear in any user-facing string, filename, localStorage key, executable contract, or OpenSpec artifact that ships as part of the project.
+
+#### Scenario: No `dbviewr` references remain in shipped artifacts
+
+- **WHEN** a reader inspects `dbviewer.html`, `dbviewer.js`, `dbviewer.css`, `tests/dbviewer.test.js`, or `openspec/specs/dbviewer/spec.md`
+- **THEN** none of these files MUST contain the substrings `dbviewr` or `DBViewr`
+- **AND** the `localStorage` key used by the theme toggle MUST be `dbviewer-theme`
 
