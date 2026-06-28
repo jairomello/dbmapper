@@ -6,7 +6,7 @@
 - [x] 1.4 Edit `openspec/specs/semantic-editor/spec.md` Purpose — describe the per-item editor (description, terms, review, relationships) and reference `project-persistence`
 - [x] 1.5 Edit `openspec/specs/coverage-stats/spec.md` Purpose — describe the status bar metrics (totals, described, reviewed, FK coverage, pending, progress) and point to `tests/coverage-stats.test.js`
 - [x] 1.6 Edit `openspec/specs/model-update-wizard/spec.md` Purpose — describe the 5-step diff wizard and point to `tests/update-model.test.js`
-- [x] 1.7 Edit `openspec/specs/dbviewr/spec.md` Purpose — describe the read-only data dictionary, the `REMOVED` filter, the theme toggle, and point to `tests/dbviewr.test.js`
+- [x] 1.7 Edit `openspec/specs/dbviewer/spec.md` Purpose — describe the read-only data dictionary, the `REMOVED` filter, the theme toggle, and point to `tests/dbviewer.test.js`
 
 ## 2. Validate and archive
 

@@ -1,13 +1,13 @@
 ## Context
 
-DBViewr is the read-only companion site that renders a project JSON as a navigable data dictionary. Columns are currently rendered in the order they appear in the JSON (which reflects the original SQL definition order). This makes it hard for readers to scan for a specific column, especially in wide tables.
+DBViewer is the read-only companion site that renders a project JSON as a navigable data dictionary. Columns are currently rendered in the order they appear in the JSON (which reflects the original SQL definition order). This makes it hard for readers to scan for a specific column, especially in wide tables.
 
-The change is scoped to `dbviewr.js` only. The editor (`dbmapper.html` / `app.js`) preserves SQL order because that reflects the schema definition and is useful during authoring.
+The change is scoped to `dbviewer.js` only. The editor (`dbmapper.html` / `app.js`) preserves SQL order because that reflects the schema definition and is useful during authoring.
 
 ## Goals / Non-Goals
 
 **Goals:**
-- Make column lists in DBViewr scannable by placing the primary key column first, followed by all other columns in alphabetical order.
+- Make column lists in DBViewer scannable by placing the primary key column first, followed by all other columns in alphabetical order.
 - Keep the change minimal and localized to the viewer's rendering logic.
 
 **Non-Goals:**

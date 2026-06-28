@@ -45,7 +45,7 @@ License: MIT License
 Project   : https://rsms.me/inter/
 Version   : dynamically loaded by Google Fonts CSS API
 File      : https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700
-Usage     : primary UI typeface in both `dbmapper.html` and `dbviewr.html`.
+Usage     : primary UI typeface in both `dbmapper.html` and `dbviewer.html`.
 
 License: SIL Open Font License, Version 1.1
 
@@ -103,7 +103,7 @@ License: SIL Open Font License, Version 1.1
 
 Project   : https://fonts.google.com/icons
 File      : https://fonts.googleapis.com/icon?family=Material+Icons
-Usage     : icon font used throughout `dbmapper.html` and `dbviewr.html`
+Usage     : icon font used throughout `dbmapper.html` and `dbviewer.html`
             (sidebar, status bar, wizard, buttons, search, etc.).
 
 License: Apache License, Version 2.0

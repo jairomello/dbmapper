@@ -5,9 +5,9 @@
 This repository is a small static DBMapper web app. Core files are at the root:
 
 - `dbmapper.html` defines the UI shell and loads external CDN dependencies.
-- `dbviewr.html` is the read-only companion site (loads `dbviewr.css` + `dbviewr.js`).
-- `dbviewr.css` contains the full design system and layout styles for the viewer.
-- `dbviewr.js` contains the viewer state, JSON loading, search, table navigation, relationships panel, and theme toggle.
+- `dbviewer.html` is the read-only companion site (loads `dbviewer.css` + `dbviewer.js`).
+- `dbviewer.css` contains the full design system and layout styles for the viewer.
+- `dbviewer.js` contains the viewer state, JSON loading, search, table navigation, relationships panel, and theme toggle.
 - `style.css` contains the full design system and layout styles for the editor.
 - `app.js` contains client-side state, SQL parsing, rendering, import/export, and editor behavior.
 - `example.sql` is a SQL input for local testing.
@@ -37,7 +37,7 @@ Ad-hoc Node `assert` scripts under `tests/` are the executable contract for the 
 
 - `node tests/sql-import.test.js` — executable contract for the `sql-import` capability (parser: `parseSQLToTables`, `parseAlterTableForeignKeys`, `normalizeRelationships`).
 - `node tests/update-model.test.js` — executable contract for the `model-update-wizard` capability, and a secondary check on the parser.
-- `node tests/dbviewr.test.js` — executable contract for the `dbviewr` capability.
+- `node tests/dbviewer.test.js` — executable contract for the `dbviewer` capability.
 
 For each change, also manually verify the browser flow that it touches:
 

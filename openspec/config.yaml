@@ -12,7 +12,7 @@ context: |
   Tech stack: static HTML/CSS/JS site served as-is; no bundler, no framework, no
   build step, no `package.json`. UI is in Portuguese; "DBMapper" and "Semantic
   Layer" are the only English product labels. UI shell is `dbmapper.html`; the
-  read-only companion site is `dbviewr.html`. Both pull Materialize CSS/JS
+  read-only companion site is `dbviewer.html`. Both pull Materialize CSS/JS
   from a CDN and load `app.js` (or a thin viewer variant).
   Conventions: 4-space indent in HTML/CSS/JS; `camelCase` for JS; `const`/`let`
   with direct DOM APIs; kebab-case CSS class names; CSS custom properties in
@@ -21,11 +21,11 @@ context: |
   `require('../app.js')` and finish with `console.log('<file>: ok')`. Each
   capability has one executable contract: `sql-import` → `tests/sql-import.test.js`,
   `model-update-wizard` → `tests/update-model.test.js`, `coverage-stats` →
-  `tests/coverage-stats.test.js`, `dbviewr` → `tests/dbviewr.test.js`.
+  `tests/coverage-stats.test.js`, `dbviewer` → `tests/dbviewer.test.js`.
   Domain: data dictionary / semantic layer authoring tool. Tables, columns,
   and foreign keys are first-class; descriptions, business terms, and a
   per-item review status are the user-editable metadata. The JSON project
-  format is the contract between DBMapper (editor) and DBViewr (viewer);
+  format is the contract between DBMapper (editor) and DBViewer (viewer);
   `project-persistence` is the cross-cutting capability that owns it.
   `AGENTS.md` at the repo root is the human-facing counterpart to this block
   and remains the source of truth for humans.

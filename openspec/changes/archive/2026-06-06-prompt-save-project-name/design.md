@@ -63,11 +63,11 @@ The project has no build step, no framework, and reuses Materialize CSS from a C
 
 ## Migration Plan
 
-No data migration: the JSON file format is unchanged, so existing `dbmapper-*.json` files keep opening in both DBMapper and DBViewr.
+No data migration: the JSON file format is unchanged, so existing `dbmapper-*.json` files keep opening in both DBMapper and DBViewer.
 
 **Deploy steps:**
 1. Land the new helpers, modal markup, and modal event wiring in `app.js` / `index.html` / `style.css`.
-2. Land `tests/project-persistence.test.js` and run `node tests/project-persistence.test.js` plus the existing `node tests/sql-import.test.js`, `node tests/update-model.test.js`, and `node tests/dbviewr.test.js` to confirm no regression.
+2. Land `tests/project-persistence.test.js` and run `node tests/project-persistence.test.js` plus the existing `node tests/sql-import.test.js`, `node tests/update-model.test.js`, and `node tests/dbviewer.test.js` to confirm no regression.
 3. Serve with `python3 -m http.server 8000` and manually verify: import a SQL, edit the database name, click "Salvar", confirm the modal opens with the right default, confirm the file lands in `~/Downloads` with the timestamped name, click "Salvar" again, confirm only the timestamp changes.
 
 **Rollback steps:** Revert the commit. The previous `exportProjectJSON` is restored and the modal is removed from `index.html`; no persisted data exists to clean up because `currentProjectBaseName` and `sqlDatabaseName` are in-memory only.

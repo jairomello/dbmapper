@@ -22,8 +22,8 @@ This change is intentionally not a feature change. It does not introduce, modify
 ## Decisions
 
 - **Tone and length: one to three sentences per paragraph.** Long enough to convey what the capability is and where its executable surface lives; short enough to skim. We avoid implementation details and we avoid marketing language.
-- **Reference the executable test where one exists.** `sql-import`, `model-update-wizard`, `dbviewr`, and `coverage-stats` all have a `tests/*.test.js` script. We name the script in the Purpose paragraph so a reader knows where to look for the executable contract without having to read every requirement.
-- **Reference `project-persistence` from the UI specs.** `schema-tree`, `semantic-editor`, `coverage-stats`, `model-update-wizard`, and `dbviewr` all read or write the JSON project format. We mention `project-persistence` in those Purpose paragraphs so the cross-cutting contract is visible.
+- **Reference the executable test where one exists.** `sql-import`, `model-update-wizard`, `dbviewer`, and `coverage-stats` all have a `tests/*.test.js` script. We name the script in the Purpose paragraph so a reader knows where to look for the executable contract without having to read every requirement.
+- **Reference `project-persistence` from the UI specs.** `schema-tree`, `semantic-editor`, `coverage-stats`, `model-update-wizard`, and `dbviewer` all read or write the JSON project format. We mention `project-persistence` in those Purpose paragraphs so the cross-cutting contract is visible.
 - **No `## MODIFIED Requirements` block.** We are not changing requirements. The change has no delta specs. The `specs/` directory of this change is empty; the only spec edits are direct file edits in `openspec/specs/`, which OpenSpec allows for non-spec changes.
 
 ## Risks / Trade-offs
@@ -45,4 +45,4 @@ Rollback, if needed, is `rm -rf openspec/changes/fill-spec-purposes` and reverti
 ## Open Questions
 
 - _Should the `## Purpose` paragraph reference the AGENTS.md "Testing Guidelines" section instead of naming each test script directly?_ Naming the test file is more direct and survives a future AGENTS.md rewrite. We chose the direct reference.
-- _Should the Purpose paragraph for `dbviewr` mention that it is the read-only counterpart of the editor, even though `dbviewr` is its own capability in the spec layer?_ The two are separate capabilities in OpenSpec because they have different requirements, but they share the project format. The Purpose paragraph will name the project-format dependency without claiming the two are "the same capability".
+- _Should the Purpose paragraph for `dbviewer` mention that it is the read-only counterpart of the editor, even though `dbviewer` is its own capability in the spec layer?_ The two are separate capabilities in OpenSpec because they have different requirements, but they share the project format. The Purpose paragraph will name the project-format dependency without claiming the two are "the same capability".

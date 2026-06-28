@@ -1,7 +1,7 @@
 # project-persistence Specification
 
 ## Purpose
-Owns the in-memory project model and the JSON file format that DBMapper exports and that DBViewr consumes. The shape is a single `database` object containing identity, business metadata, and a list of tables; each table carries columns, relationships, and review metadata. Importing a project backfills fields that older exports may omit, captures the picked file's base name for the next save, and normalizes relationships so the rest of the app can rely on a consistent in-memory shape. The save action opens a modal that suggests a timestamped filename and lets the user confirm or edit it before download. The pure helpers behind the suggestion (`buildTimestamp`, `stripTimestampPrefix`, `slugifyBaseName`, `resolveBaseName`, `suggestSaveFilename`, `sanitizeUserFilename`) are exercised by `tests/project-persistence.test.js`, which is the executable contract for the suggestion logic; the cross-cutting JSON contract itself is verified indirectly by the other capability tests.
+Owns the in-memory project model and the JSON file format that DBMapper exports and that DBViewer consumes. The shape is a single `database` object containing identity, business metadata, and a list of tables; each table carries columns, relationships, and review metadata. Importing a project backfills fields that older exports may omit, captures the picked file's base name for the next save, and normalizes relationships so the rest of the app can rely on a consistent in-memory shape. The save action opens a modal that suggests a timestamped filename and lets the user confirm or edit it before download. The pure helpers behind the suggestion (`buildTimestamp`, `stripTimestampPrefix`, `slugifyBaseName`, `resolveBaseName`, `suggestSaveFilename`, `sanitizeUserFilename`) are exercised by `tests/project-persistence.test.js`, which is the executable contract for the suggestion logic; the cross-cutting JSON contract itself is verified indirectly by the other capability tests.
 ## Requirements
 ### Requirement: Project data model
 
@@ -123,10 +123,10 @@ When a JSON project is loaded, the system MUST capture the picked file's base na
 
 ### Requirement: Cross-consumer JSON contract
 
-The same JSON shape produced by DBMapper's export MUST be consumable by DBViewr and by any future consumer, without any field renaming or version negotiation.
+The same JSON shape produced by DBMapper's export MUST be consumable by DBViewer and by any future consumer, without any field renaming or version negotiation.
 
-#### Scenario: DBViewr reads a DBMapper export
-- **WHEN** a JSON file produced by `exportProjectJSON` is opened in `dbviewr.html`
+#### Scenario: DBViewer reads a DBMapper export
+- **WHEN** a JSON file produced by `exportProjectJSON` is opened in `dbviewer.html`
 - **THEN** the viewer MUST render the database name, every non-`REMOVED` table, and its columns
 - **AND** the viewer MUST display the parent/child relationships using the `parents` and `children` arrays from the JSON
 

@@ -401,7 +401,7 @@
         document.body.classList.toggle('theme-dark', useDark);
         els.themeIcon.textContent = useDark ? 'light_mode' : 'dark_mode';
         els.themeToggle.title = useDark ? 'Usar modo claro' : 'Usar modo escuro';
-        localStorage.setItem('dbviewr-theme', useDark ? 'dark' : 'light');
+        localStorage.setItem('dbviewer-theme', useDark ? 'dark' : 'light');
     }
 
     async function loadFile(file) {
@@ -453,5 +453,5 @@
         });
     });
 
-    applyTheme(localStorage.getItem('dbviewr-theme') || 'light');
+    applyTheme(localStorage.getItem('dbviewer-theme') || 'light');
 

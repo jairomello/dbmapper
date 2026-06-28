@@ -2,7 +2,7 @@
 
 ## Context
 
-The DBMapper/DBViewr pair is a static HTML/CSS/JS site served as-is, with no build step and no server-side component. Before this change, the runtime trust boundary was a single line of CSS/JS per page that loaded Materialize from cdnjs and Google Fonts from Google's CDN. The `SECURITY.md` already described this as the largest open risk: a compromised CDN could ship arbitrary code to every user, and there was no defense-in-depth layer between the network and the app's own DOM rendering.
+The DBMapper/DBViewer pair is a static HTML/CSS/JS site served as-is, with no build step and no server-side component. Before this change, the runtime trust boundary was a single line of CSS/JS per page that loaded Materialize from cdnjs and Google Fonts from Google's CDN. The `SECURITY.md` already described this as the largest open risk: a compromised CDN could ship arbitrary code to every user, and there was no defense-in-depth layer between the network and the app's own DOM rendering.
 
 This change closes the three items that the project itself had flagged as known limitations, and turns the resulting controls into a first-class OpenSpec capability so that future changes cannot regress the security posture.
 
@@ -31,7 +31,7 @@ The policy itself is the strictest we can ship without breaking the app:
 default-src 'self';
 script-src 'self' https://cdnjs.cloudflare.com;
 style-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com;   /* DBMapper only */
-style-src 'self' https://fonts.googleapis.com;                    /* DBViewr only */
+style-src 'self' https://fonts.googleapis.com;                    /* DBViewer only */
 font-src 'self' https://fonts.gstatic.com https://fonts.googleapis.com;
 img-src 'self' data:;
 connect-src 'self';
@@ -41,11 +41,11 @@ form-action 'self';
 frame-ancestors 'none';
 ```
 
-`'unsafe-inline'` in `style-src` is needed only on `dbmapper.html` for the editor's `style="display: none;"` toggles. The DBViewr page has no inline styles, so its `style-src` is clean. A follow-up change can move the editor's `style=""` toggles to a `[hidden]` class and drop `'unsafe-inline'` from the editor's CSP too — this is documented as a remaining limitation in `SECURITY.md`.
+`'unsafe-inline'` in `style-src` is needed only on `dbmapper.html` for the editor's `style="display: none;"` toggles. The DBViewer page has no inline styles, so its `style-src` is clean. A follow-up change can move the editor's `style=""` toggles to a `[hidden]` class and drop `'unsafe-inline'` from the editor's CSP too — this is documented as a remaining limitation in `SECURITY.md`.
 
-### D3. The DBViewr CSS and JS are extracted to standalone files
+### D3. The DBViewer CSS and JS are extracted to standalone files
 
-`dbviewr.html` is reduced from a 1460-line file with embedded CSS+JS to a 115-line shell that links out to `dbviewr.css` and `dbviewr.js`. This:
+`dbviewer.html` is reduced from a 1460-line file with embedded CSS+JS to a 115-line shell that links out to `dbviewer.css` and `dbviewer.js`. This:
 
 - makes the viewer's code reviewable in isolation,
 - lets the browser cache the script and the stylesheet independently of the HTML,
@@ -65,25 +65,25 @@ In OpenSpec, a cross-cutting concern like "every page must have a CSP" is best m
 - it can be referenced from the other specs by a thin `## ADDED Requirements` block, and
 - a regression in the security controls is a spec violation that can be caught by review.
 
-We chose to *add* a one-scenario requirement to each of the six non-`dbviewr` capabilities ("this capability's page is served under the controls defined in `static-site-security`") instead of duplicating the security rules in every spec. The single source of truth is `static-site-security/spec.md`; the others link to it.
+We chose to *add* a one-scenario requirement to each of the six non-`dbviewer` capabilities ("this capability's page is served under the controls defined in `static-site-security`") instead of duplicating the security rules in every spec. The single source of truth is `static-site-security/spec.md`; the others link to it.
 
 ## Trade-offs
 
 - **SRI hash maintenance.** Pinning SRI means we have to bump a hash whenever Materialize releases a new version. This is a one-line PR per bump, and the cost is much smaller than the cost of a silent CDN compromise.
 - **CSP as `<meta>`.** We give up the ability to set `report-uri`/`report-to` and some legacy `frame-ancestors` behavior. In exchange, the controls work in any static hosting setup, including `file://`. The follow-up documentation in the spec and in `SECURITY.md` encourages server-side CSP for additional hardening.
-- **Two `dbviewr.*` files instead of one HTML blob.** Adds two files at the repo root and a small navigation cost when reading the code. Pays for itself the first time the viewer needs a CSS or JS change that doesn't touch the HTML.
+- **Two `dbviewer.*` files instead of one HTML blob.** Adds two files at the repo root and a small navigation cost when reading the code. Pays for itself the first time the viewer needs a CSS or JS change that doesn't touch the HTML.
 - **`'unsafe-inline'` still in the editor's `style-src`.** The cleanest fix is to migrate the four `style="display: none;"` toggles to the HTML5 `hidden` attribute and to update `app.js` to toggle `.hidden` instead of `.style.display`. That is a small follow-up change, not part of this hardening pass.
 
 ## Migration Plan
 
 Documentation/config-only change at the user level, code-level change at the developer level. Steps:
 
-1. Land the code changes: SRI tags, CSP meta tags, `onclick` refactor, `dbviewr.css` and `dbviewr.js` extraction, `tests/dbviewr.test.js` update.
+1. Land the code changes: SRI tags, CSP meta tags, `onclick` refactor, `dbviewer.css` and `dbviewer.js` extraction, `tests/dbviewer.test.js` update.
 2. Run the full `tests/` suite and confirm every script exits `0` and prints its `ok` line. All five scripts are part of the executable contract for the affected capabilities.
-3. Serve the site locally with `python3 -m http.server 8000` and load both pages in a browser. Verify that Materialize renders, Google Fonts loads, the DBViewr opens a JSON, and the editor's wizard opens. No console errors. No CSP violation reports in the dev tools.
+3. Serve the site locally with `python3 -m http.server 8000` and load both pages in a browser. Verify that Materialize renders, Google Fonts loads, the DBViewer opens a JSON, and the editor's wizard opens. No console errors. No CSP violation reports in the dev tools.
 4. Land the new `openspec/specs/static-site-security/spec.md` and the deltas to the seven existing specs.
-5. Run `openspec validate security-hardening` from the repo root and resolve any reported errors. If the CLI is not installed locally, the equivalent manual check is: every scenario uses exactly four `####` hashtags, every requirement lives under a `### Requirement: …` heading, the `## Purpose` section of the new spec is a non-placeholder paragraph that names the test contract (none, in this case) and the cross-cutting reference, and the `## MODIFIED Requirements` block for `dbviewr` includes the full updated content of the changed `Internal helpers` requirement.
-6. Run `openspec show security-hardening` and skim the rendered output to confirm eight capability deltas are listed (one new, one modified for `dbviewr`, six cross-cutting adds for the other capabilities) and the cross-cutting links resolve.
+5. Run `openspec validate security-hardening` from the repo root and resolve any reported errors. If the CLI is not installed locally, the equivalent manual check is: every scenario uses exactly four `####` hashtags, every requirement lives under a `### Requirement: …` heading, the `## Purpose` section of the new spec is a non-placeholder paragraph that names the test contract (none, in this case) and the cross-cutting reference, and the `## MODIFIED Requirements` block for `dbviewer` includes the full updated content of the changed `Internal helpers` requirement.
+6. Run `openspec show security-hardening` and skim the rendered output to confirm eight capability deltas are listed (one new, one modified for `dbviewer`, six cross-cutting adds for the other capabilities) and the cross-cutting links resolve.
 7. After review approval, run `openspec archive security-hardening --yes` to promote the delta specs to `openspec/specs/<capability>/spec.md`, then `openspec list --specs` to confirm `static-site-security` is in the list.
 8. Confirm `openspec/changes/security-hardening/` is removed and `openspec/specs/` now contains the eight capability folders.
 

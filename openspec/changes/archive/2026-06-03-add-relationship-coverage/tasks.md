@@ -24,7 +24,7 @@
 
 - [x] 5.1 Run `node tests/sql-import.test.js` and confirm ok
 - [x] 5.2 Run `node tests/update-model.test.js` and confirm ok (updated 3 `assert.deepEqual` blocks to include the new `description: ''` and `reviewed: false` fields per the new contract)
-- [x] 5.3 Run `node tests/dbviewr.test.js` and confirm ok
+- [x] 5.3 Run `node tests/dbviewer.test.js` and confirm ok
 - [x] 5.4 Run `node tests/coverage-stats.test.js` and confirm ok
 - [x] 5.5 Run `openspec validate add-relationship-coverage` and resolve any errors
 - [x] 5.6 Run `openspec show add-relationship-coverage` and skim

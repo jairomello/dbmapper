@@ -6,7 +6,7 @@
 
 ## 2. Update AGENTS.md
 
-- [x] 2.1 Replace the sentence "No automated tests are currently configured" with a section that names the three test scripts (`tests/sql-import.test.js`, `tests/update-model.test.js`, `tests/dbviewr.test.js`) and maps each to its capability
+- [x] 2.1 Replace the sentence "No automated tests are currently configured" with a section that names the three test scripts (`tests/sql-import.test.js`, `tests/update-model.test.js`, `tests/dbviewer.test.js`) and maps each to its capability
 - [x] 2.2 Keep the existing manual browser checklist intact
 - [x] 2.3 Re-read `AGENTS.md` to confirm the change is local and the rest of the file is unchanged
 
@@ -14,7 +14,7 @@
 
 - [x] 3.1 Run `node tests/sql-import.test.js` (new) and confirm `ok`
 - [x] 3.2 Run `node tests/update-model.test.js` (regression) and confirm `ok`
-- [x] 3.3 Run `node tests/dbviewr.test.js` (regression) and confirm `ok`
+- [x] 3.3 Run `node tests/dbviewer.test.js` (regression) and confirm `ok`
 
 ## 4. Validate and archive
 

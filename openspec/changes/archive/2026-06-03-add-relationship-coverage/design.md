@@ -4,7 +4,7 @@ The status bar (`#status-bar` in `index.html`, rendered by `app.js:766-826`) is 
 
 The decision recorded in the conversation is to add FK coverage now. The two natural questions for any new metric are (1) what is an "FK" in this model and (2) what does it mean for one to be "described" and "reviewed". The model is: each parent relationship is a record `{ table, local_columns, referenced_columns, constraint_name }` on a non-`REMOVED` table. The new fields we add to that record are `description: string` and `reviewed: boolean`, both defaulted to `""` and `false` on import, mirroring the per-item model. A "described FK" has a non-whitespace `description`; a "reviewed FK" is described AND `reviewed: true`. We do not ask the user to enter these fields yet — that is a separate future change for the relationships panel in `semantic-editor` — but the spec change here makes the data model and the status bar agree so that when that editor change lands, the metrics just work.
 
-This change does not touch `dbviewr.html`; the viewer does not currently display relationship metadata and we are not extending it here. The metrics live in the editor's status bar.
+This change does not touch `dbviewer.html`; the viewer does not currently display relationship metadata and we are not extending it here. The metrics live in the editor's status bar.
 
 ## Goals / Non-Goals
 
@@ -20,8 +20,8 @@ This change does not touch `dbviewr.html`; the viewer does not currently display
 **Non-Goals:**
 
 - Adding a relationship-description editor UI in `semantic-editor`. The fields exist in the data model and the status bar reads them, but the user has no way to fill them in yet. That is a deliberate, planned follow-up.
-- Changing `dbviewr.html` to display FK descriptions. The viewer is read-only and does not yet show this metadata; we are not extending it here.
-- Changing how `dbviewr` filters `REMOVED` tables; the existing `table.status !== 'REMOVED'` rule is reused.
+- Changing `dbviewer.html` to display FK descriptions. The viewer is read-only and does not yet show this metadata; we are not extending it here.
+- Changing how `dbviewer` filters `REMOVED` tables; the existing `table.status !== 'REMOVED'` rule is reused.
 - Refactoring `computeStats` or `renderStatusBar`. We append to the returned object and to the DOM update sequence.
 
 ## Decisions
@@ -60,5 +60,5 @@ Rollback, if needed before archiving, is `rm -rf openspec/changes/add-relationsh
 
 - _Should the relationship-description editor land in the same change, or in a follow-up?_
 - _Should the overall progress percentage eventually include FKs? If so, the "Pendentes" counter and the percentage definition both need a MODIFIED Requirement in a follow-up change._
-- _Should `dbviewr` also display FK descriptions? That is a `dbviewr` spec change and out of scope here._
+- _Should `dbviewer` also display FK descriptions? That is a `dbviewer` spec change and out of scope here._
 - _Should the new status bar group also count children relationships? We currently ignore them to avoid double-counting; if the team wants a single "edges" metric, that is a small follow-up._

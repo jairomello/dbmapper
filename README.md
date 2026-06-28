@@ -4,7 +4,7 @@ DBMapper is a static web app that parses SQL schemas into an interactive model, 
 
 ## O que é
 
-DBMapper é um app web estático para autoria de **camada semântica** sobre um banco de dados relacional. A partir de um arquivo SQL (`CREATE TABLE`, `ALTER TABLE … ADD CONSTRAINT`), o app monta um modelo navegável onde você pode descrever tabelas, campos e relacionamentos, marcar termos de negócio e controlar o status de revisão de cada item. O modelo é salvo em JSON e consumido pelo [DBViewr](./dbviewr.html), o visualizador somente leitura que acompanha o projeto.
+DBMapper é um app web estático para autoria de **camada semântica** sobre um banco de dados relacional. A partir de um arquivo SQL (`CREATE TABLE`, `ALTER TABLE … ADD CONSTRAINT`), o app monta um modelo navegável onde você pode descrever tabelas, campos e relacionamentos, marcar termos de negócio e controlar o status de revisão de cada item. O modelo é salvo em JSON e consumido pelo [DBViewer](./dbviewer.html), o visualizador somente leitura que acompanha o projeto.
 
 A proposta é alimentar IAs e documentação com metadados de negócio (descrições semânticas, termos de negócio, status de revisão) sem acoplar o modelo a um banco ou a um schema físico específico.
 
@@ -19,11 +19,11 @@ A proposta é alimentar IAs e documentação com metadados de negócio (descriç
 - **Wizard "Atualizar Modelo"** — compare uma nova versão do SQL com o projeto atual: tabelas/colunas adicionadas, removidas, renomeadas ou com tipo alterado, e FKs novas/alteradas. Você confirma o diff antes de aplicar.
 - **Salvar/Abrir Projeto** — exporta o modelo completo para `.json` e reimporta em outra máquina ou versão.
 - **Barra de status** com cobertura: total de tabelas, campos, FKs, % descrita, % revisada, pendentes e progresso geral.
-- **DBViewr** (`dbviewr.html`) — companheiro somente leitura: hero, navegação lateral, busca por tabela/campo/tipo/descrição, accordion de relacionamentos, modo claro/escuro.
+- **DBViewer** (`dbviewer.html`) — companheiro somente leitura: hero, navegação lateral, busca por tabela/campo/tipo/descrição, accordion de relacionamentos, modo claro/escuro.
 
 ## Como o modelo é estruturado
 
-O JSON exportado segue o formato abaixo. Ele é o **contrato** entre o DBMapper (editor) e o DBViewr (visualizador).
+O JSON exportado segue o formato abaixo. Ele é o **contrato** entre o DBMapper (editor) e o DBViewer (visualizador).
 
 ```json
 {
@@ -80,7 +80,7 @@ Você também pode abrir `dbmapper.html` direto no navegador (`file://`) — o a
 Para abrir o visualizador:
 
 ```bash
-# http://localhost:8000/dbviewr.html
+# http://localhost:8000/dbviewer.html
 ```
 
 Fluxo mínimo de uso:
@@ -89,16 +89,16 @@ Fluxo mínimo de uso:
 2. Clique em **Importar SQL** e selecione um arquivo `.sql` (ex.: `example.sql`).
 3. Navegue pela árvore lateral, preencha descrições e termos de negócio.
 4. Clique em **Salvar** para exportar o projeto em JSON.
-5. Abra `dbviewr.html` e carregue o JSON gerado para visualizar a documentação.
+5. Abra `dbviewer.html` e carregue o JSON gerado para visualizar a documentação.
 
 ## Estrutura do repositório
 
 - `dbmapper.html` — UI shell do editor. Carrega dependências via CDN e o `app.js`.
-- `dbviewr.html` — visualizador somente leitura (autocontido, sem dependências externas além de fontes e ícones).
+- `dbviewer.html` — visualizador somente leitura (autocontido, sem dependências externas além de fontes e ícones).
 - `app.js` — estado da aplicação, parser de SQL, renderização, import/export, editor e wizard de atualização.
 - `style.css` — design system e layout do editor.
 - `example.sql`— entradas SQL para teste local do parser.
-- `tests/` — contratos executáveis por capacidade (`sql-import`, `update-model`, `coverage-stats`, `dbviewr`, `project-persistence`).
+- `tests/` — contratos executáveis por capacidade (`sql-import`, `update-model`, `coverage-stats`, `dbviewer`, `project-persistence`).
 - `AGENTS.md` — guia para agentes de IA e convenções de contribuição.
 - `openspec/` — specs e change sets do projeto (mudanças com capacidade cross-cutting são conduzidas por aqui).
 
@@ -120,7 +120,7 @@ Cada capacidade tem um contrato executável em `tests/`. Rode o script relevante
 node tests/sql-import.test.js           # parser de CREATE TABLE / FKs
 node tests/update-model.test.js         # wizard de atualização de modelo
 node tests/coverage-stats.test.js       # métricas de cobertura
-node tests/dbviewr.test.js              # contrato do DBViewr
+node tests/dbviewer.test.js              # contrato do DBViewer
 node tests/project-persistence.test.js  # ciclo de save/open do JSON
 ```
 

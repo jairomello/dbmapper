@@ -1,31 +1,4 @@
-# static-site-security Specification
-
-## Purpose
-TBD - created by archiving change security-hardening. Update Purpose after archive.
-## Requirements
-### Requirement: Subresource Integrity on every third-party CDN resource
-
-Every `<link rel="stylesheet">` and `<script src>` that points to a third-party CDN MUST load with an `integrity` attribute whose value is a `sha384-` hash of the exact bytes served at the pinned URL, and MUST also carry `crossorigin="anonymous"`. If the upstream file changes, the browser MUST refuse to apply it. Google Fonts is the only third-party resource that is exempt from this rule, because the Google Fonts CSS API version-locks the served font files in its query string and the API already serves `Access-Control-Allow-Origin: *` with content-hashed `.woff2` payloads.
-
-#### Scenario: Materialize CSS carries SRI
-
-- **WHEN** `dbmapper.html` is loaded
-- **THEN** the Materialize CSS `<link>` tag MUST carry an `integrity="sha384-…"` value that matches the bytes of the file at the pinned cdnjs URL
-- **AND** it MUST also carry `crossorigin="anonymous"`
-- **AND** the URL MUST be pinned to a specific version path (no floating `latest`)
-
-#### Scenario: Materialize JS carries SRI
-
-- **WHEN** `dbmapper.html` is loaded
-- **THEN** the Materialize JS `<script>` tag MUST carry an `integrity="sha384-…"` value that matches the bytes of the file at the pinned cdnjs URL
-- **AND** it MUST also carry `crossorigin="anonymous"`
-- **AND** the URL MUST be pinned to a specific version path (no floating `latest`)
-
-#### Scenario: SRI failure blocks execution
-
-- **WHEN** the bytes served at the pinned Materialize URL do not match the pinned hash
-- **THEN** the browser MUST refuse to apply the stylesheet or run the script
-- **AND** the page MUST fail closed (Materialize-dependent UI does not appear) rather than fall back to running unverified code
+## MODIFIED Requirements
 
 ### Requirement: Content-Security-Policy meta tag in every HTML page
 
@@ -84,13 +57,13 @@ JavaScript and CSS MUST live in their own files at the repo root, with a name th
 - **AND** neither file MUST be embedded in `dbviewer.html`
 - **AND** the files MUST live at the repo root (not inside a `dist/` or `build/` subdirectory, since the project has no build step)
 
-### Requirement: Capability Purpose paragraph
+## ADDED Requirements
 
-The `## Purpose` section of this spec MUST describe the capability in 1–3 behavior-oriented sentences, must NOT contain the placeholder `TBD - created by archiving`, and MUST name the cross-cutting `static-site-security` contract as the source of the page-delivery rules it depends on.
+### Requirement: Viewer filenames are spelled correctly
 
-#### Scenario: Purpose paragraph is non-placeholder
+The static-site-security controls MUST name the viewer's companion files with the corrected spelling: `dbviewer.html`, `dbviewer.js`, and `dbviewer.css` (not `dbviewr.*`). The misspelled `dbviewr` filename MUST NOT appear in any reference to the viewer in shipped artifacts, docs, tests, or OpenSpec specs.
 
-- **WHEN** a reader opens this spec file
-- **THEN** the `## Purpose` section MUST NOT contain the string `TBD - created by archiving`
-- **AND** the section MUST contain at least one complete sentence describing the capability's user-facing responsibility
+#### Scenario: Viewer references use the corrected spelling
 
+- **WHEN** a reader inspects `static-site-security/spec.md`, `dbviewer.html`, `tests/dbviewer.test.js`, or any other shipped artifact
+- **THEN** the artifact MUST NOT contain the substring `dbviewr` when referring to the viewer

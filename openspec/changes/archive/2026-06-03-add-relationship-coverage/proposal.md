@@ -29,9 +29,9 @@ _None._
 - `app.js`: edit `computeStats` (line 766) and `renderStatusBar` (line 789). No refactor of the existing logic; the new counters are appended to the returned object and to the status bar DOM update sequence.
 - `index.html`: insert a new `<div class="sb-group">` block in the status bar, after the "Pendentes" group, with three `<span class="sb-value">` elements (`#sb-total-fks`, `#sb-fk-desc`, `#sb-fk-rev`).
 - `style.css`: no edit. Reuse the existing `.sb-group`, `.sb-label`, `.sb-value` classes.
-- `tests/sql-import.test.js`, `tests/update-model.test.js`, `tests/dbviewr.test.js`: no edit. The new test surface is `tests/coverage-stats.test.js`, added in this change.
+- `tests/sql-import.test.js`, `tests/update-model.test.js`, `tests/dbviewer.test.js`: no edit. The new test surface is `tests/coverage-stats.test.js`, added in this change.
 - `openspec/specs/coverage-stats/spec.md`: one new Requirement added under the existing 5.
 - `openspec/specs/project-persistence/spec.md`: one new Requirement added under the existing 4. This also affects the JSON round-trip but does not change the on-disk field names.
-- `dbviewr.html`: not modified. The viewer does not currently display relationship metadata; that is its own future change.
+- `dbviewer.html`: not modified. The viewer does not currently display relationship metadata; that is its own future change.
 - Backward compatibility: existing project JSONs that lack `description`/`reviewed` on relationships will have them backfilled to `""` and `false` by `normalizeRelationships` on import, matching the existing backfill pattern in `handleJSONUpload`.
 - No build step, no new dependencies, no deployment impact.

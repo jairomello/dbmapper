@@ -8,7 +8,7 @@ The two earlier housekeeping changes (`reconcile-testing-contract` and `add-rela
 
 **Goals:**
 
-- Populate `context:` with 5–8 lines describing the project (static site, no bundler, Portuguese UI, ad-hoc Node tests, 7 capabilities, JSON project format shared with DBViewr).
+- Populate `context:` with 5–8 lines describing the project (static site, no bundler, Portuguese UI, ad-hoc Node tests, 7 capabilities, JSON project format shared with DBViewer).
 - Populate `rules:` with a small set of per-artifact rules: short proposals, `WHEN`/`THEN` scenarios, `- [ ]` checkbox tasks, design docs only when cross-cutting, and the static-site guardrail from `AGENTS.md`.
 - Keep the change reviewable: the new content is a small additive edit, not a structural rewrite.
 - No spec is added or modified. The change has no delta specs.

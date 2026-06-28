@@ -57,9 +57,9 @@ The system MUST provide an "Abrir Projeto" action that lets the user pick a `.js
 
 ### Requirement: Cross-consumer JSON contract
 
-The same JSON shape produced by DBMapper's export MUST be consumable by DBViewr and by any future consumer, without any field renaming or version negotiation.
+The same JSON shape produced by DBMapper's export MUST be consumable by DBViewer and by any future consumer, without any field renaming or version negotiation.
 
-#### Scenario: DBViewr reads a DBMapper export
-- **WHEN** a JSON file produced by `exportProjectJSON` is opened in `dbviewr.html`
+#### Scenario: DBViewer reads a DBMapper export
+- **WHEN** a JSON file produced by `exportProjectJSON` is opened in `dbviewer.html`
 - **THEN** the viewer MUST render the database name, every non-`REMOVED` table, and its columns
 - **AND** the viewer MUST display the parent/child relationships using the `parents` and `children` arrays from the JSON

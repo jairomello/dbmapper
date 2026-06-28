@@ -24,5 +24,5 @@ _None._
 - `openspec/config.yaml`: edit. The file is read by `openspec new change`, `openspec instructions`, and `openspec validate` for every subsequent artifact, so the change is purely additive for future work and does not modify any existing capability.
 - `openspec/changes/`: a new `configure-openspec-context/` directory is created and will be archived when this change is closed.
 - `openspec/specs/`: `project-persistence` gains one thin `OpenSpec context and rules configured` requirement (3 scenarios).
-- `app.js`, `index.html`, `style.css`, `dbviewr.html`, `AGENTS.md`, `tests/*`: not modified.
+- `app.js`, `index.html`, `style.css`, `dbviewer.html`, `AGENTS.md`, `tests/*`: not modified.
 - No build step, no new dependencies, no deployment impact.

@@ -30,9 +30,9 @@ Essas CDNs são uma **fronteira de confiança**: se qualquer uma delas for compr
 - ❌ Não executa o SQL importado — o parser (`parseSQLToTables` em `app.js`) é um analisador léxico/sintático de `CREATE TABLE` / `ALTER TABLE … ADD CONSTRAINT`. Nenhum `INSERT`/`UPDATE`/`DELETE` ou DDL destrutivo chega a ser interpretado.
 - ❌ Não interpola dados do projeto em `innerHTML` sem escape: nomes de tabela/coluna, descrições, termos de negócio e constraint names passam por `textContent` ou pelo helper `escapeHtml` (`app.js:1029`) antes de chegar ao DOM.
 - ✅ Links externos (`dbmapper.html:230`) usam `rel="noopener noreferrer"`.
-- ✅ **CSP** declarada via `<meta http-equiv="Content-Security-Policy">` em `dbmapper.html` e `dbviewr.html` restringindo `script-src`, `style-src`, `font-src`, `img-src`, `connect-src`, `object-src`, `base-uri`, `form-action` e `frame-ancestors` a uma allowlist explícita.
+- ✅ **CSP** declarada via `<meta http-equiv="Content-Security-Policy">` em `dbmapper.html` e `dbviewer.html` restringindo `script-src`, `style-src`, `font-src`, `img-src`, `connect-src`, `object-src`, `base-uri`, `form-action` e `frame-ancestors` a uma allowlist explícita.
 - ✅ **SRI** em todos os recursos de CDN: Materialize CSS 1.0.0 e Materialize JS 1.0.0 carregam com `integrity="sha384-…"` + `crossorigin="anonymous"` em `dbmapper.html`. Google Fonts é servida com CORS próprio, então não exige SRI pinado.
-- ✅ **JS do DBViewr extraído** para `dbviewr.js`, e o CSS extraído para `dbviewr.css`. Nenhum `<script>` ou `<style>` inline em `dbviewr.html` (verificado por `tests/dbviewr.test.js`).
+- ✅ **JS do DBViewer extraído** para `dbviewer.js`, e o CSS extraído para `dbviewer.css`. Nenhum `<script>` ou `<style>` inline em `dbviewer.html` (verificado por `tests/dbviewer.test.js`).
 - ✅ **Sem handlers inline** em `dbmapper.html`. O único `onclick` foi refatorado para `id="btn-import-sql-cta"` + `addEventListener` em `app.js`.
 
 ### Limitações conhecidas

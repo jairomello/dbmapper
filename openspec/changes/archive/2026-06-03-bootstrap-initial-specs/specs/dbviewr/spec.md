@@ -81,7 +81,7 @@ The viewer MUST support a light theme and a dark theme, with the choice persiste
 
 #### Scenario: Theme persists in localStorage
 - **WHEN** the user toggles the theme
-- **THEN** the selected theme MUST be written to `localStorage` under the `dbviewr-theme` key
+- **THEN** the selected theme MUST be written to `localStorage` under the `dbviewer-theme` key
 
 #### Scenario: Theme is restored on reload
 - **WHEN** the page is reloaded with a stored theme

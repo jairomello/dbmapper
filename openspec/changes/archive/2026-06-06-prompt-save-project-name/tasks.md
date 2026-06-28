@@ -38,13 +38,13 @@
 
 ## 7. Validate
 
-- [x] 7.1 Run `node tests/sql-import.test.js`, `node tests/update-model.test.js`, `node tests/dbviewr.test.js`, `node tests/coverage-stats.test.js` (if present), and `node tests/project-persistence.test.js`; all MUST print their `ok` line.
+- [x] 7.1 Run `node tests/sql-import.test.js`, `node tests/update-model.test.js`, `node tests/dbviewer.test.js`, `node tests/coverage-stats.test.js` (if present), and `node tests/project-persistence.test.js`; all MUST print their `ok` line.
 - [x] 7.2 Start `python3 -m http.server 8000` and load `http://localhost:8000/index.html` in a browser. Confirm the page loads with no console errors.
 - [x] 7.3 Import `example.sql` and confirm the "Salvar" modal opens with a timestamped suggestion whose base is the SQL database name (or `mapper` if none).
 - [x] 7.4 Edit the database name in the editor, click "Salvar" again, confirm the suggestion's base now matches the edited name.
 - [x] 7.5 Click "Salvar" twice in a row without reloading, confirm the second suggestion keeps the same base and updates only the timestamp.
 - [x] 7.6 Save a JSON file, then "Abrir Projeto" that same file, click "Salvar", confirm the suggestion's base is the original stem (with the timestamp prefix stripped).
-- [x] 7.7 Open a saved JSON in `dbviewr.html` and confirm it still renders identically to a pre-change export (the JSON shape is unchanged).
+- [x] 7.7 Open a saved JSON in `dbviewer.html` and confirm it still renders identically to a pre-change export (the JSON shape is unchanged).
 
 ## 8. Refine the save-prompt modal styling
 

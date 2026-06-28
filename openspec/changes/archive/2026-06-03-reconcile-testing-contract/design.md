@@ -1,6 +1,6 @@
 ## Context
 
-The `bootstrap-initial-specs` change archived seven capabilities, of which three (`sql-import`, `model-update-wizard`, `dbviewr`) lean on Node `assert` scripts as their executable surface. Two of those scripts exist (`tests/update-model.test.js`, `tests/dbviewr.test.js`); the third, a parser-specific script, does not — the parser is currently exercised only through the wizard test. The same archived change left two follow-up items in its housekeeping list: reconcile the `AGENTS.md` "no automated tests" sentence with reality (6.1), and decide whether to add a dedicated parser test file (6.2). We are resolving both items in this change. The decision recorded in the conversation is to add a dedicated parser test rather than continue relying solely on the wizard tests.
+The `bootstrap-initial-specs` change archived seven capabilities, of which three (`sql-import`, `model-update-wizard`, `dbviewer`) lean on Node `assert` scripts as their executable surface. Two of those scripts exist (`tests/update-model.test.js`, `tests/dbviewer.test.js`); the third, a parser-specific script, does not — the parser is currently exercised only through the wizard test. The same archived change left two follow-up items in its housekeeping list: reconcile the `AGENTS.md` "no automated tests" sentence with reality (6.1), and decide whether to add a dedicated parser test file (6.2). We are resolving both items in this change. The decision recorded in the conversation is to add a dedicated parser test rather than continue relying solely on the wizard tests.
 
 The repo is a static, framework-free site. Tests are ad-hoc Node scripts invoked directly with `node tests/foo.js`; there is no `package.json` test script, no runner, and no CI. That constraint is preserved here.
 
@@ -17,8 +17,8 @@ The repo is a static, framework-free site. Tests are ad-hoc Node scripts invoked
 
 - Refactoring or splitting `app.js`.
 - Adding a test framework, a `package.json` `test` script, or any CI configuration.
-- Modifying the existing two test scripts (`tests/update-model.test.js`, `tests/dbviewr.test.js`).
-- Modifying the `model-update-wizard` or `dbviewr` specs — both already reference their respective test files correctly.
+- Modifying the existing two test scripts (`tests/update-model.test.js`, `tests/dbviewer.test.js`).
+- Modifying the `model-update-wizard` or `dbviewer` specs — both already reference their respective test files correctly.
 - Filling in the `## Purpose` paragraph of any spec — that is a separate follow-up change (`fill-spec-purposes`).
 
 ## Decisions

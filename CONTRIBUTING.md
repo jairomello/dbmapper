@@ -72,7 +72,7 @@ Cada capacidade tem um contrato executável em `tests/`. Rode o script relevante
 node tests/sql-import.test.js           # parseSQLToTables, parseAlterTableForeignKeys, normalizeRelationships
 node tests/update-model.test.js         # wizard de atualização de modelo
 node tests/coverage-stats.test.js       # métricas de cobertura
-node tests/dbviewr.test.js              # contrato do DBViewr
+node tests/dbviewer.test.js              # contrato do DBViewer
 node tests/project-persistence.test.js  # export/import de JSON
 ```
 
