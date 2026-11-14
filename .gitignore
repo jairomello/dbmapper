@@ -1,7 +1,7 @@
 # .gitignore — intentionally minimal.
 # Add per-machine or per-tool exclusions here as needed.
-# Project source: index.html, app.js, style.css, dbviewer.html,
-#                 AGENTS.md, tests/, openspec/, example.sql,
+# Project source: legacy/ (v1: dbmapper.html, app.js, style.css, dbviewer.*,
+#                 example.sql, tests/), docs/analysis/, AGENTS.md, openspec/,
 #                 dbmapper-novo-banco*.json, novo-layout.png
 
 # Per-machine AI tooling (skills/commands live next to the repo

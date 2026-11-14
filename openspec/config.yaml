@@ -9,19 +9,22 @@ schema: spec-driven
 #     We use conventional commits
 #     Domain: e-commerce platform
 context: |
-  Tech stack: static HTML/CSS/JS site served as-is; no bundler, no framework, no
-  build step, no `package.json`. UI is in Portuguese; "DBMapper" and "Semantic
-  Layer" are the only English product labels. UI shell is `dbmapper.html`; the
-  read-only companion site is `dbviewer.html`. Both pull Materialize CSS/JS
-  from a CDN and load `app.js` (or a thin viewer variant).
-  Conventions: 4-space indent in HTML/CSS/JS; `camelCase` for JS; `const`/`let`
+  Project state (2026-11-14): v1 is a static HTML/CSS/JS app, frozen in `legacy/`
+  (editor `legacy/dbmapper.html`, viewer `legacy/dbviewer.html`, logic in
+  `legacy/app.js`, tests in `legacy/tests/` — run them from `legacy/`). v2 — a
+  Bun + React + SQLite server with auth, multi-user, embedded agent and MCP — is
+  approved in direction and specified in `docs/analysis/03-proposta-evolucao-v2.md`;
+  v2 code may be introduced only through OpenSpec changes.
+  UI is in Portuguese; "DBMapper" and "Semantic Layer" are the only English
+  product labels. The v1 pulls Materialize CSS/JS from a CDN and loads `legacy/app.js`.
+  Conventions (v1): 4-space indent in HTML/CSS/JS; `camelCase` for JS; `const`/`let`
   with direct DOM APIs; kebab-case CSS class names; CSS custom properties in
   `:root` (no `--violet` token — use `var(--accent, #6d5dfc)` for violet).
-  Testing: ad-hoc Node scripts under `tests/` using `node:assert/strict` that
+  Testing (v1): ad-hoc Node scripts under `legacy/tests/` using `node:assert/strict` that
   `require('../app.js')` and finish with `console.log('<file>: ok')`. Each
-  capability has one executable contract: `sql-import` → `tests/sql-import.test.js`,
-  `model-update-wizard` → `tests/update-model.test.js`, `coverage-stats` →
-  `tests/coverage-stats.test.js`, `dbviewer` → `tests/dbviewer.test.js`.
+  capability has one executable contract: `sql-import` → `legacy/tests/sql-import.test.js`,
+  `model-update-wizard` → `legacy/tests/update-model.test.js`, `coverage-stats` →
+  `legacy/tests/coverage-stats.test.js`, `dbviewer` → `legacy/tests/dbviewer.test.js`.
   Domain: data dictionary / semantic layer authoring tool. Tables, columns,
   and foreign keys are first-class; descriptions, business terms, and a
   per-item review status are the user-editable metadata. The JSON project

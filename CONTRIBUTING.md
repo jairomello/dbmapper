@@ -6,14 +6,15 @@ Obrigado por contribuir!
 
 - Seja respeitoso e construtivo em todas as discussões.
 - Todas as contribuições são aceitas sob a [Apache 2.0](./LICENSE) do projeto.
-- Mantenha a filosofia do projeto em mente: **zero dependências de build, zero `npm`, JS puro no navegador**.
+- **Escopo atual:** a v1 (em `legacy/`) é estática e congelada — **zero dependências de build, zero `npm`, JS puro no navegador** para qualquer correção ali. A v2 (servidor Bun + React + SQLite, em planejamento — ver [`docs/analysis/03-proposta-evolucao-v2.md`](./docs/analysis/03-proposta-evolucao-v2.md)) será guiada por OpenSpec e terá as regras dela registradas em `AGENTS.md` quando a implementação começar.
 
 ## Como reportar um bug
 
 1. Pesquise as [Issues](../../issues) existentes para evitar duplicatas.
 2. Abra uma nova issue usando o template **Bug report**.
-3. Inclua: navegador/SO, passos para reproduzir, o que você esperava, o que aconteceu de fato.
-4. Se o bug envolve parsing de SQL, anexe (ou descreva) o trecho de SQL que reproduz o problema — sem ele é difícil corrigir o parser.
+3. Indique se o bug é da v1 (`legacy/`) ou do planejamento da v2.
+4. Inclua: navegador/SO, passos para reproduzir, o que você esperava, o que aconteceu de fato.
+5. Se o bug envolve parsing de SQL, anexe (ou descreva) o trecho de SQL que reproduz o problema — sem ele é difícil corrigir o parser.
 
 ## Como sugerir uma funcionalidade
 
@@ -21,21 +22,22 @@ Obrigado por contribuir!
 2. Abra uma issue usando o template **Feature request**.
 3. Explique o **problema** que está resolvendo, não apenas a solução.
 
-Mudanças que tocam mais de uma capacidade ou dois arquivos raiz devem idealmente começar por um change set em [`openspec/`](./openspec/) — veja a seção "Mudanças com OpenSpec" abaixo.
+Mudanças que tocam mais de uma capacidade ou dois arquivos devem idealmente começar por um change set em [`openspec/`](./openspec/) — veja a seção "Mudanças com OpenSpec" abaixo.
 
-## Setup de desenvolvimento
+## Setup de desenvolvimento (v1)
 
-Não há build. Clone o repositório e abra `dbmapper.html` direto no navegador:
+Não há build. Clone o repositório e abra o editor a partir de `legacy/`:
 
 ```bash
 git clone https://github.com/jairomello/dbmapper.git
-cd dbmapper
+cd dbmapper/legacy
 # Abra dbmapper.html no navegador
 ```
 
-Para um workflow com live-reload, use qualquer servidor estático:
+Para um workflow com live-reload, use qualquer servidor estático a partir de `legacy/`:
 
 ```bash
+cd legacy
 python3 -m http.server 8000
 # ou: npx serve .
 ```
@@ -55,28 +57,33 @@ O app não depende de `file://` ser restritivo, mas o `FileReader` para `input t
 
 ## Estilo de código
 
+Regras da **v1** (`legacy/`):
+
 - **Sem dependências de runtime novas.** Não introduza pacotes `npm` ou CDNs adicionais sem aprovação explícita.
 - **Sem build/toolchain.** A saída precisa continuar sendo a tríade HTML + CSS + JS que abre direto do disco.
 - **Indentação de 4 espaços** em HTML, CSS e JS.
 - **JS:** `camelCase` para funções e variáveis, `'use strict'` no topo, prefira `const`/`let`, APIs DOM diretas.
 - **CSS:** seletores em kebab-case, custom properties em `:root`, reúse as variáveis existentes (`--accent`, `--ink`, `--bg`, etc.) antes de introduzir novas.
 - **UI em português (pt-BR).** Exceções: rótulos de produto como "DBMapper" e "Semantic Layer".
-- **Renderização de texto controlado pelo usuário:** use `textContent` ou o helper `escapeHtml` definido em `app.js`. Não interpole dados do usuário em `innerHTML` sem escape.
+- **Renderização de texto controlado pelo usuário:** use `textContent` ou o helper `escapeHtml` definido em `legacy/app.js`. Não interpole dados do usuário em `innerHTML` sem escape.
 - **Sem comentários** a menos que a intenção não seja óbvia pelo código.
+
+Regras da **v2** (quando implementada): TypeScript strict, Biome, `bun test`, convenções registradas em `AGENTS.md` e nos specs do change correspondente.
 
 ## Testes
 
-Cada capacidade tem um contrato executável em `tests/`. Rode o script relevante antes de considerar a mudança pronta:
+Cada capacidade da v1 tem um contrato executável em `legacy/tests/`. Rode a partir de `legacy/` antes de considerar a mudança pronta:
 
 ```bash
+cd legacy
 node tests/sql-import.test.js           # parseSQLToTables, parseAlterTableForeignKeys, normalizeRelationships
 node tests/update-model.test.js         # wizard de atualização de modelo
 node tests/coverage-stats.test.js       # métricas de cobertura
-node tests/dbviewer.test.js              # contrato do DBViewer
+node tests/dbviewer.test.js             # contrato do DBViewer
 node tests/project-persistence.test.js  # export/import de JSON
 ```
 
-Para mudanças no parser de SQL, teste pelo menos um arquivo com constraints (FKs) e um com múltiplas tabelas. O arquivo `example.sql` na raiz é um insumo útil.
+Para mudanças no parser de SQL, teste pelo menos um arquivo com constraints (FKs) e um com múltiplas tabelas. O arquivo `legacy/example.sql` é um insumo útil.
 
 Para cada mudança, valide manualmente no navegador:
 
@@ -86,7 +93,7 @@ Para cada mudança, valide manualmente no navegador:
 
 ## Mudanças com OpenSpec
 
-Mudanças com capacidade cross-cutting — que tocam múltiplas capacidades, dois ou mais arquivos raiz, ou que precisam de design antes da implementação — devem ser conduzidas via [OpenSpec](https://github.com/Fission-AI/OpenSpec):
+Mudanças com capacidade cross-cutting — que tocam múltiplas capacidades, dois ou mais arquivos, ou que precisam de design antes da implementação — devem ser conduzidas via [OpenSpec](https://github.com/Fission-AI/OpenSpec):
 
 1. Crie um change set em `openspec/changes/<slug-descritivo>/` com `proposal.md`, `tasks.md` e (se cross-cutting) `design.md`.
 2. Atualize os specs correspondentes em `openspec/specs/<capability>/` no formato `## ADDED Requirements` / `## MODIFIED Requirements` / `## REMOVED Requirements` com `#### Scenario:` (exatamente 4 hashtags).
