@@ -38,7 +38,7 @@
 
 - [x] 8.1 Commit with an imperative message (repo now lives on GitHub — push to `origin` if access is configured, otherwise note it for the push queue)
 - [x] 8.2 Mark the fix round as ✅ in `ROADMAP.md` (new row "3.5 — Ajustes pós-teste") and commit
-- [ ] 8.3 Run `openspec archive v2-gallery-and-import-fixes --yes` to move the change under `openspec/changes/archive/` (including the promoted `project-gallery` spec and the modified `web-editor`/`web-import-wizard` specs)
+- [x] 8.3 Run `openspec archive v2-gallery-and-import-fixes --yes` to move the change under `openspec/changes/archive/` (including the promoted `project-gallery` spec and the modified `web-editor`/`web-import-wizard` specs)
 
 ## Workflow follow-up
 
