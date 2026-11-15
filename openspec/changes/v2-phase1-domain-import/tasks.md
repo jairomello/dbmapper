@@ -51,7 +51,7 @@
 ## 10. Archive
 
 - [x] 10.1 Copy source only (never `node_modules` or build output) from `~/work/dbmapper/` to the share and commit with an imperative message
-- [ ] 10.2 Mark Fase 1 as ✅ in `ROADMAP.md` and commit the roadmap update
+- [x] 10.2 Mark Fase 1 as ✅ in `ROADMAP.md` and commit the roadmap update
 - [ ] 10.3 Run `openspec archive v2-phase1-domain-import --yes` to move the change under `openspec/changes/archive/`
 
 ## Workflow follow-up
