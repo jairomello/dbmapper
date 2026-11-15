@@ -83,10 +83,12 @@ session cookie. Pass `{ cookie: null }` to exercise unauthenticated `401`s.
 
 ## Web UI (v2 — Fase 3)
 
-`apps/web` is the React UI (login, workspace, semantic tree, metadata editor,
-coverage bar, update wizard, SQL create and JSON export/import). It talks to the
-API through the typed client in `apps/web/src/api` with `credentials: 'include'`;
-React Query owns cache invalidation after mutations.
+`apps/web` is the React UI (login, project gallery, workspace, semantic tree,
+metadata editor, coverage bar, update wizard, SQL create and JSON export/import).
+`/` is the post-login gallery and `/project/:id` is the workspace behind the
+`RequireProject` guard. It talks to the API through the typed client in
+`apps/web/src/api` with `credentials: 'include'`; React Query owns cache
+invalidation after mutations.
 
 - `bun run dev` starts API (`:3000`, `PORT` honored) and web (`:5173`) with Vite
   proxying `/api` and `/health`. Open `http://localhost:5173`.

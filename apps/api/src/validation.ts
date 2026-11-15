@@ -4,64 +4,66 @@ import { ApiError } from './errors'
 
 export const reviewStatusSchema = z.enum(['NEW', 'UNCHANGED', 'REMOVED', 'RENAMED', 'CHANGED'])
 
-const relationshipInputSchema = z
-  .object({
-    table: z.string().trim().min(1),
-    local_columns: z.array(z.string()).default([]),
-    referenced_columns: z.array(z.string()).default([]),
-    constraint_name: z.string().default(''),
-    description: z.string().default(''),
-    reviewed: z.boolean().default(false),
-  })
-  .strict()
+/**
+ * Legacy DBMapper 1.0 exports are looser than the v2 model: v1 omitted some
+ * fields (its importer backfilled them) and may carry fields v2 does not model.
+ * The document schema therefore strips unknown keys and falls back to the same
+ * defaults as `handleJSONUpload` in `legacy/app.js`. Only a missing `database`
+ * object is treated as a structural rejection.
+ */
+const tolerantDescription = z.string().default('').catch('')
+const tolerantBoolean = z.boolean().default(false).catch(false)
+const tolerantStringArray = z.array(z.string()).default([]).catch([])
+const tolerantStatus = reviewStatusSchema.catch('UNCHANGED')
+const tolerantArray = <T extends z.ZodTypeAny>(item: T) =>
+  z.preprocess((value) => (Array.isArray(value) ? value : []), z.array(item))
 
-const columnInputSchema = z
-  .object({
-    name: z.string().trim().min(1),
-    type: z.string().trim().min(1),
-    primary_key: z.boolean().default(false),
-    foreign_key: z.boolean().default(false),
-    description: z.string().default(''),
-    business_terms: z.array(z.string()).default([]),
-    reviewed: z.boolean().default(false),
-    status: reviewStatusSchema.default('UNCHANGED'),
-  })
-  .strict()
+const relationshipInputSchema = z.object({
+  table: z.string().trim().min(1),
+  local_columns: tolerantStringArray,
+  referenced_columns: tolerantStringArray,
+  constraint_name: tolerantDescription,
+  description: tolerantDescription,
+  reviewed: tolerantBoolean,
+})
 
-const relationshipsInputSchema = z
-  .object({
-    parents: z.array(relationshipInputSchema).default([]),
-    children: z.array(relationshipInputSchema).default([]),
-  })
-  .strict()
+const columnInputSchema = z.object({
+  name: z.string().trim().min(1),
+  type: z.string().trim().min(1).default('unknown').catch('unknown'),
+  primary_key: tolerantBoolean,
+  foreign_key: tolerantBoolean,
+  description: tolerantDescription,
+  business_terms: tolerantStringArray,
+  reviewed: tolerantBoolean,
+  status: tolerantStatus,
+})
 
-const tableInputSchema = z
-  .object({
-    name: z.string().trim().min(1),
-    description: z.string().default(''),
-    business_terms: z.array(z.string()).default([]),
-    reviewed: z.boolean().default(false),
-    status: reviewStatusSchema.default('UNCHANGED'),
-    relationships: relationshipsInputSchema.default({ parents: [], children: [] }),
-    columns: z.array(columnInputSchema).default([]),
-  })
-  .strict()
+const relationshipsInputSchema = z.object({
+  parents: tolerantArray(relationshipInputSchema),
+  children: tolerantArray(relationshipInputSchema),
+})
 
-const databaseInputSchema = z
-  .object({
-    name: z.string().trim().min(1),
-    description: z.string().default(''),
-    business_terms: z.array(z.string()).default([]),
-    reviewed: z.boolean().default(false),
-    tables: z.array(tableInputSchema).default([]),
-  })
-  .strict()
+const tableInputSchema = z.object({
+  name: z.string().trim().min(1),
+  description: tolerantDescription,
+  business_terms: tolerantStringArray,
+  reviewed: tolerantBoolean,
+  status: tolerantStatus,
+  relationships: relationshipsInputSchema.default({ parents: [], children: [] }).catch({ parents: [], children: [] }),
+  columns: tolerantArray(columnInputSchema),
+})
 
-export const projectDocumentSchema = z
-  .object({
-    database: databaseInputSchema,
-  })
-  .strict()
+const databaseInputSchema = z.object({
+  name: z.string().trim().min(1).default('Projeto importado').catch('Projeto importado'),
+  description: tolerantDescription,
+  business_terms: tolerantStringArray,
+  reviewed: tolerantBoolean,
+  tables: tolerantArray(tableInputSchema),
+})
+
+export const projectDocumentSchema = z.object({
+  database: databaseInputSchema,
+})
 
 export const createProjectSchema = z
   .object({

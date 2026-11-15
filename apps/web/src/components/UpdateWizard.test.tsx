@@ -224,6 +224,30 @@ describe('UpdateWizard', () => {
     expect(screen.getByTestId('table-row-produto').textContent).toContain('sem desc')
   })
 
+  test('lê um arquivo .sql de vários MB no cliente e envia o texto completo no preview', async () => {
+    const filler = '-- linha de comentário do dump\n'.repeat(120_000)
+    const largeSql = `CREATE TABLE cliente (id int, nome varchar);\n${filler}-- fim do dump\n`
+    expect(largeSql.length).toBeGreaterThan(3 * 1024 * 1024)
+
+    const { previewBodies } = installedWizardHandlers({
+      onApply: () => jsonResponse({ project: sampleProject(), plan: makePlan(), run: {} }),
+    })
+
+    renderWithClient(<UpdateWizard projectId="projeto-1" onClose={() => {}} onApplied={() => {}} />)
+
+    const file = new File([largeSql], 'grande.sql', { type: 'text/plain' })
+    fireEvent.change(screen.getByLabelText('Importar arquivo .sql'), { target: { files: [file] } })
+
+    await waitFor(() => expect((screen.getByLabelText('SQL de atualização') as HTMLTextAreaElement).value.length).toBe(largeSql.length))
+
+    fireEvent.click(screen.getByRole('button', { name: 'Gerar prévia' }))
+    await screen.findByTestId('table-removed-cidades')
+
+    expect(previewBodies).toHaveLength(1)
+    expect(previewBodies[0].sql.length).toBe(largeSql.length)
+    expect(previewBodies[0].sql.endsWith('-- fim do dump\n')).toBe(true)
+  })
+
   test('mostra o envelope de erro quando o plano está desatualizado e não aplica', async () => {
     let applied = false
     installedWizardHandlers({

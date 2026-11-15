@@ -18,7 +18,7 @@ function submitLogin(email: string, password: string) {
 }
 
 describe('LoginPage', () => {
-  test('faz login e redireciona para o workspace', async () => {
+  test('faz login e cai na galeria de projetos', async () => {
     let loginPayload: unknown
 
     restoreCallbacks.push(
@@ -36,7 +36,8 @@ describe('LoginPage', () => {
     renderApp(['/login'])
     submitLogin(sampleUser.email, 'tester-password')
 
-    expect(await screen.findByRole('button', { name: 'Sair' })).toBeTruthy()
+    expect(await screen.findByRole('heading', { name: 'Seus projetos' })).toBeTruthy()
+    expect(await screen.findByText('Nenhum projeto ainda')).toBeTruthy()
     expect(loginPayload).toEqual({ email: sampleUser.email, password: 'tester-password' })
   })
 

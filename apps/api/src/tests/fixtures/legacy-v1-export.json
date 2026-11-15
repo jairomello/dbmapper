@@ -1,0 +1,108 @@
+{
+  "database": {
+    "name": "ecommerce-legado",
+    "description": "Banco de produção exportado pelo DBMapper 1.0",
+    "business_terms": ["venda", "cliente"],
+    "reviewed": false,
+    "exported_with": "dbmapper-1.0",
+    "tables": [
+      {
+        "name": "cliente",
+        "description": "Cadastro de clientes do e-commerce",
+        "business_terms": ["cliente", "pessoa"],
+        "reviewed": true,
+        "status": "UNCHANGED",
+        "legacy_position": 0,
+        "relationships": {
+          "parents": [],
+          "children": [
+            {
+              "table": "pedido",
+              "local_columns": ["id"],
+              "referenced_columns": ["cliente_id"],
+              "constraint_name": "fk_pedido_cliente",
+              "description": "Pedidos do cliente",
+              "reviewed": true,
+              "legacy_id": "rel-cliente-pedido"
+            }
+          ]
+        },
+        "columns": [
+          {
+            "name": "id",
+            "type": "serial",
+            "primary_key": true,
+            "foreign_key": false,
+            "description": "Identificador único do cliente",
+            "business_terms": ["identificador"],
+            "reviewed": true,
+            "status": "UNCHANGED",
+            "legacy_ordinal": 1
+          },
+          {
+            "name": "nome",
+            "type": "varchar(255)",
+            "primary_key": false,
+            "foreign_key": false,
+            "description": "Nome de exibição do cliente",
+            "business_terms": ["nome"],
+            "reviewed": false,
+            "status": "UNCHANGED"
+          }
+        ]
+      },
+      {
+        "name": "pedido",
+        "description": "Pedidos de venda",
+        "business_terms": ["venda"],
+        "reviewed": false,
+        "status": "UNCHANGED",
+        "relationships": {
+          "parents": [
+            {
+              "table": "cliente",
+              "local_columns": ["cliente_id"],
+              "referenced_columns": ["id"],
+              "constraint_name": "fk_pedido_cliente",
+              "description": "Pedido pertence ao cliente",
+              "reviewed": false
+            }
+          ],
+          "children": []
+        },
+        "columns": [
+          {
+            "name": "id",
+            "type": "serial",
+            "primary_key": true,
+            "foreign_key": false,
+            "description": "Identificador único do pedido",
+            "business_terms": [],
+            "reviewed": false,
+            "status": "UNCHANGED"
+          },
+          {
+            "name": "cliente_id",
+            "type": "int",
+            "primary_key": false,
+            "foreign_key": true,
+            "description": "Cliente que fez o pedido",
+            "business_terms": ["cliente"],
+            "reviewed": false,
+            "status": "UNCHANGED"
+          },
+          {
+            "name": "total",
+            "type": "numeric(12,2)",
+            "primary_key": false,
+            "foreign_key": false,
+            "description": "",
+            "business_terms": [],
+            "reviewed": false,
+            "status": "UNCHANGED"
+          }
+        ]
+      }
+    ]
+  }
+}

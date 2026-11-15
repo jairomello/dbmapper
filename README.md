@@ -196,10 +196,25 @@ Abra `http://localhost:5173`. O `bun run dev` sobe a API em `http://localhost:30
 O admin inicial vem de `DBMAPPER_ADMIN_EMAIL` (padrão `admin@dbmapper.local`) e
 `DBMAPPER_ADMIN_PASSWORD`; sem a senha, o seed gera uma e a imprime uma única vez.
 
-No workspace você pode criar um projeto vazio, criar a partir de um arquivo/pasted
-SQL (`CREATE TABLE`), documentar tabelas/colunas, aprovar descrições, rodar o wizard
-"Atualizar modelo" (prévia calculada pelo servidor, renomes explícitos e confirmação
-antes do apply), além de exportar/importar o JSON v1.
+Depois do login a rota `/` mostra a **galeria de projetos**: um card por projeto com
+nome, descrição e data de atualização. Clicar no card abre o workspace em
+`/project/{id}` (recarregar a página mantém o projeto); sem projetos, a galeria exibe
+um estado vazio com o CTA **Novo projeto**.
+
+O **Novo projeto** (na galeria e no workspace) importa um arquivo `.sql`, aceita SQL
+colado no editor ou abre um arquivo `.json` exportado pelo DBMapper. Os dois imports
+de arquivo são botões/áreas de arrastar explícitos (`Importar arquivo .sql` e
+`Importar arquivo .json`), não inputs nativos discretos: o arquivo é lido no cliente
+com `file.text()` e enviado como texto, então dumps grandes não são truncados. O Hono
+não impõe limite próprio de corpo; o servidor fixa `maxRequestBodySize` em **128 MiB**
+(`apps/api/src/index.ts`).
+
+Dentro do workspace você pode documentar tabelas/colunas, aprovar descrições, rodar o
+wizard "Atualizar modelo" (prévia calculada pelo servidor, renomes explícitos e
+confirmação antes do apply), além de exportar/importar o JSON v1. O import de JSON é
+compatível com arquivos do **DBMapper 1.0**: campos desconhecidos são descartados,
+campos ausentes recebem os mesmos defaults do `legacy/app.js` e apenas um payload sem
+`database` é rejeitado (atomicamente, com o envelope de erro).
 
 Testes da UI e smoke E2E (o Playwright não entra no `bun run check`):
 
@@ -211,8 +226,9 @@ bunx playwright install chromium
 bun run test:e2e
 ```
 
-O smoke sobe API + web em portas isoladas, cria o admin, faz login, cria um projeto
-a partir de `legacy/example.sql`, descreve/aprova uma coluna e valida o JSON exportado.
+O smoke sobe API + web em portas isoladas, cria o admin, faz login, abre a galeria,
+cria um projeto importando `legacy/example.sql`, descreve/aprova uma coluna e valida o
+JSON exportado.
 
 ## Quick start (v1)
 

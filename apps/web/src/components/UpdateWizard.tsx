@@ -1,7 +1,8 @@
 import type { DatabaseModel } from '@dbmapper/domain'
-import { type ChangeEvent, type FormEvent, useState } from 'react'
+import { type FormEvent, useState } from 'react'
 import { projectsApi } from '../api/projects'
 import type { ImportPlan, ProjectView, RenameMapping } from '../api/types'
+import { FileImportButton } from './FileImportButton'
 
 type WizardStep = 'upload' | 'tables' | 'columns' | 'relationships' | 'summary' | 'result'
 
@@ -67,11 +68,9 @@ export function UpdateWizard({ projectId, onClose, onApplied }: UpdateWizardProp
     if (nextPlan) setStep('tables')
   }
 
-  async function handleSqlFile(event: ChangeEvent<HTMLInputElement>) {
-    const file = event.target.files?.[0]
-    if (!file) return
+  async function handleSqlFile(file: File, text: string) {
     setFileName(file.name)
-    setSql(await file.text())
+    setSql(text)
     setError(null)
   }
 
@@ -163,15 +162,13 @@ export function UpdateWizard({ projectId, onClose, onApplied }: UpdateWizardProp
                   placeholder="Cole aqui o novo script SQL ou selecione um arquivo."
                 />
               </label>
-              <label className="block text-sm font-medium text-slate-700">
-                Arquivo SQL
-                <input
-                  className="mt-1 block w-full text-sm text-slate-600"
-                  type="file"
-                  accept=".sql,text/plain"
-                  onChange={handleSqlFile}
-                />
-              </label>
+              <FileImportButton
+                label="Importar arquivo .sql"
+                accept=".sql,text/plain"
+                description="Clique ou arraste o dump SQL com as mudanças do modelo"
+                disabled={isPreviewing}
+                onFile={handleSqlFile}
+              />
               {fileName ? <p className="text-xs text-slate-500">Arquivo selecionado: {fileName}</p> : null}
               <button
                 type="submit"

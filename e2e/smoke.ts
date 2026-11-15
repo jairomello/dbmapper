@@ -70,8 +70,6 @@ try {
   await waitForOk(`http://localhost:${apiPort}/health`, 'a API')
   await waitForOk(`http://localhost:${webPort}/`, 'o servidor web')
 
-  const sql = await readFile(exampleSqlPath, 'utf8')
-
   browser = await chromium.launch()
   const page = await browser.newPage({ acceptDownloads: true })
   page.setDefaultTimeout(20000)
@@ -80,14 +78,15 @@ try {
   await page.getByLabel('E-mail').fill(adminEmail)
   await page.getByLabel('Senha').fill(adminPassword)
   await page.getByRole('button', { name: 'Entrar' }).click()
-  await page.getByRole('button', { name: 'Sair' }).waitFor()
+  await page.getByRole('heading', { name: 'Seus projetos' }).waitFor()
 
-  await page.getByRole('button', { name: 'Novo projeto a partir de SQL' }).click()
+  await page.getByRole('button', { name: 'Novo projeto' }).first().click()
+  await page.getByLabel('Importar arquivo .sql').setInputFiles(exampleSqlPath)
   await page.getByRole('textbox', { name: 'Nome do projeto' }).fill('Smoke E2E')
-  await page.getByRole('textbox', { name: 'SQL' }).fill(sql)
-  await page.getByRole('button', { name: 'Criar a partir de SQL' }).click()
+  await page.getByRole('button', { name: 'Criar projeto' }).click()
 
   await page.getByTestId('table-row-users').waitFor()
+  await page.waitForURL(/\/project\/[^/]+$/)
   await page.getByTestId('column-row-users-username').click()
   await page.getByRole('textbox', { name: 'Descrição' }).fill('Nome de exibição do usuário')
   await page.getByRole('button', { name: 'Salvar' }).click()
