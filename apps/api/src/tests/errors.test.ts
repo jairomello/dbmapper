@@ -38,7 +38,7 @@ describe('envelope de erro', () => {
   test('JSON inválido retorna INVALID_JSON', async () => {
     const response = await context.app.request('/api/projects', {
       method: 'POST',
-      headers: { 'content-type': 'application/json' },
+      headers: { 'content-type': 'application/json', cookie: context.cookie },
       body: '{invalid',
     })
     const body = (await response.json()) as ErrorBody

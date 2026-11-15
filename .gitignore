@@ -21,3 +21,8 @@ dist/
 *.db
 *.db-shm
 *.db-wal
+
+# Local environment secrets (copy from .env.example).
+.env
+.env.*
+!.env.example

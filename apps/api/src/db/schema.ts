@@ -1,13 +1,39 @@
 import { sql } from 'drizzle-orm'
-import {
-  index,
-  integer,
-  sqliteTable,
-  text,
-  uniqueIndex,
-} from 'drizzle-orm/sqlite-core'
+import { check, index, integer, sqliteTable, text, uniqueIndex } from 'drizzle-orm/sqlite-core'
 
 const isoNow = sql`(strftime('%Y-%m-%dT%H:%M:%fZ','now'))`
+
+export const USER_ROLES = ['ADMIN', 'MEMBER', 'VIEWER'] as const
+
+export const users = sqliteTable(
+  'users',
+  {
+    id: text('id').primaryKey(),
+    email: text('email').notNull(),
+    passwordHash: text('password_hash').notNull(),
+    role: text('role', { enum: USER_ROLES }).notNull().default('MEMBER'),
+    createdAt: text('created_at').notNull().default(isoNow),
+    updatedAt: text('updated_at').notNull().default(isoNow),
+  },
+  (table) => ({
+    emailUq: uniqueIndex('users_email_uq').on(table.email),
+    roleCheck: check('users_role_check', sql`${table.role} in ('ADMIN', 'MEMBER', 'VIEWER')`),
+  }),
+)
+
+export const loginAttempts = sqliteTable(
+  'login_attempts',
+  {
+    id: text('id').primaryKey(),
+    identity: text('identity').notNull(),
+    ip: text('ip').notNull().default(''),
+    attemptedAt: text('attempted_at').notNull().default(isoNow),
+  },
+  (table) => ({
+    identityIdx: index('login_attempts_identity_idx').on(table.identity, table.attemptedAt),
+    attemptedAtIdx: index('login_attempts_attempted_at_idx').on(table.attemptedAt),
+  }),
+)
 
 export const projects = sqliteTable('projects', {
   id: text('id').primaryKey(),

@@ -12,6 +12,7 @@
     "dev:mcp": "bun run --cwd apps/mcp dev",
     "db:generate": "bun run --cwd apps/api db:generate",
     "db:migrate": "bun run --cwd apps/api db:migrate",
+    "db:seed": "bun run --cwd apps/api db:seed",
     "typecheck": "tsc --noEmit -p tsconfig.json && bun run --cwd packages/domain typecheck && bun run --cwd packages/contracts typecheck && bun run --cwd packages/sql-parser typecheck && bun run --cwd packages/model-diff typecheck && bun run --cwd apps/api typecheck && bun run --cwd apps/web typecheck && bun run --cwd apps/mcp typecheck",
     "lint": "biome lint .",
     "format": "biome format --write .",

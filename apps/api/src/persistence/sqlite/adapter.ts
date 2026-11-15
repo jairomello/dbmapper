@@ -1,22 +1,27 @@
 import { Database } from 'bun:sqlite'
 import { fileURLToPath } from 'node:url'
 import type { DatabaseModel, DescriptionSource, ReviewStatus } from '@dbmapper/domain'
-import { asc, eq, inArray } from 'drizzle-orm'
+import { and, asc, eq, gte, inArray, lt } from 'drizzle-orm'
 import { drizzle } from 'drizzle-orm/bun-sqlite'
 import { migrate } from 'drizzle-orm/bun-sqlite/migrator'
 import {
   columns as columnsTable,
   importRuns,
+  loginAttempts as loginAttemptsTable,
   projects,
   relationships as relationshipsTable,
   tables as tablesTable,
+  users as usersTable,
 } from '../../db/schema'
 import type {
   ApplyModelResult,
   ColumnRecord,
   CreateImportRunInput,
   CreateProjectInput,
+  CreateUserInput,
   ImportRunRecord,
+  LoginAttemptRepository,
+  MutationContext,
   Persistence,
   ProjectAggregate,
   ProjectRecord,
@@ -24,6 +29,9 @@ import type {
   ProjectSummary,
   RelationshipRecord,
   TableRecord,
+  UserRecord,
+  UserRepository,
+  UserRole,
 } from '../ports'
 
 const migrationsFolder = fileURLToPath(new URL('../../db/migrations', import.meta.url))
@@ -38,6 +46,17 @@ function parseStringArray(value: string): string[] {
     return Array.isArray(parsed) ? parsed.filter((item): item is string => typeof item === 'string') : []
   } catch {
     return []
+  }
+}
+
+function toUserRecord(row: typeof usersTable.$inferSelect): UserRecord {
+  return {
+    id: row.id,
+    email: row.email,
+    passwordHash: row.passwordHash,
+    role: row.role as UserRole,
+    createdAt: row.createdAt,
+    updatedAt: row.updatedAt,
   }
 }
 
@@ -159,19 +178,81 @@ export function createSqlitePersistence(
     }
   }
 
-  const writeModel = (tx: Tx, projectId: string, database: DatabaseModel, now: string): void => {
+  const writeModel = (
+    tx: Tx,
+    projectId: string,
+    database: DatabaseModel,
+    now: string,
+    actorUserId: string | null,
+  ): void => {
+    const previousProject = tx.select().from(projects).where(eq(projects.id, projectId)).get()
+
     const existing = tx
-      .select({ id: tablesTable.id })
+      .select({
+        id: tablesTable.id,
+        name: tablesTable.name,
+        reviewed: tablesTable.reviewed,
+        reviewedBy: tablesTable.reviewedBy,
+        reviewedAt: tablesTable.reviewedAt,
+      })
       .from(tablesTable)
       .where(eq(tablesTable.projectId, projectId))
       .all()
     const existingIds = existing.map((table) => table.id)
+    const previousTableByName = new Map(existing.map((table) => [table.name, table]))
+    const tableNameById = new Map(existing.map((table) => [table.id, table.name]))
+
+    const previousColumnByKey = new Map<
+      string,
+      { reviewed: boolean; reviewedBy: string | null; reviewedAt: string | null }
+    >()
+    const previousRelationshipByKey = new Map<
+      string,
+      { reviewed: boolean; reviewedBy: string | null; reviewedAt: string | null }
+    >()
 
     if (existingIds.length > 0) {
+      const columnRows = tx.select().from(columnsTable).where(inArray(columnsTable.tableId, existingIds)).all()
+      for (const column of columnRows) {
+        const tableName = tableNameById.get(column.tableId)
+        if (tableName) previousColumnByKey.set(`${tableName}\0${column.name}`, column)
+      }
+
+      const relationshipRows = tx
+        .select()
+        .from(relationshipsTable)
+        .where(inArray(relationshipsTable.tableId, existingIds))
+        .all()
+      for (const relationship of relationshipRows) {
+        const tableName = tableNameById.get(relationship.tableId)
+        if (!tableName) continue
+        const key = [
+          tableName,
+          relationship.targetTable,
+          relationship.constraintName,
+          relationship.localColumns,
+          relationship.referencedColumns,
+        ].join('\0')
+        previousRelationshipByKey.set(key, relationship)
+      }
+
       tx.delete(relationshipsTable).where(inArray(relationshipsTable.tableId, existingIds)).run()
       tx.delete(columnsTable).where(inArray(columnsTable.tableId, existingIds)).run()
       tx.delete(tablesTable).where(eq(tablesTable.projectId, projectId)).run()
     }
+
+    const attribute = (
+      reviewed: boolean,
+      previous: { reviewed: boolean; reviewedBy: string | null; reviewedAt: string | null } | undefined,
+    ): { reviewedBy: string | null; reviewedAt: string | null } => {
+      if (previous && previous.reviewed === reviewed) {
+        return { reviewedBy: previous.reviewedBy, reviewedAt: previous.reviewedAt }
+      }
+      if (!reviewed) return { reviewedBy: null, reviewedAt: null }
+      return { reviewedBy: actorUserId, reviewedAt: now }
+    }
+
+    const projectAttribution = attribute(database.reviewed ?? false, previousProject)
 
     tx.update(projects)
       .set({
@@ -179,6 +260,8 @@ export function createSqlitePersistence(
         description: database.description,
         businessTerms: JSON.stringify(database.business_terms ?? []),
         reviewed: database.reviewed ?? false,
+        reviewedBy: projectAttribution.reviewedBy,
+        reviewedAt: projectAttribution.reviewedAt,
         updatedAt: now,
       })
       .where(eq(projects.id, projectId))
@@ -186,6 +269,8 @@ export function createSqlitePersistence(
 
     database.tables.forEach((table, tableIndex) => {
       const tableId = crypto.randomUUID()
+      const tableReviewed = table.reviewed ?? false
+      const tableAttribution = attribute(tableReviewed, previousTableByName.get(table.name))
       tx.insert(tablesTable)
         .values({
           id: tableId,
@@ -194,10 +279,10 @@ export function createSqlitePersistence(
           description: table.description ?? '',
           businessTerms: JSON.stringify(table.business_terms ?? []),
           status: table.status ?? 'UNCHANGED',
-          reviewed: table.reviewed ?? false,
+          reviewed: tableReviewed,
           descriptionSource: 'human',
-          reviewedBy: null,
-          reviewedAt: null,
+          reviewedBy: tableAttribution.reviewedBy,
+          reviewedAt: tableAttribution.reviewedAt,
           position: tableIndex,
           createdAt: now,
           updatedAt: now,
@@ -205,6 +290,8 @@ export function createSqlitePersistence(
         .run()
 
       ;(table.columns ?? []).forEach((column, columnIndex) => {
+        const columnReviewed = column.reviewed ?? false
+        const columnAttribution = attribute(columnReviewed, previousColumnByKey.get(`${table.name}\0${column.name}`))
         tx.insert(columnsTable)
           .values({
             id: crypto.randomUUID(),
@@ -216,10 +303,10 @@ export function createSqlitePersistence(
             description: column.description ?? '',
             businessTerms: JSON.stringify(column.business_terms ?? []),
             status: column.status ?? 'UNCHANGED',
-            reviewed: column.reviewed ?? false,
+            reviewed: columnReviewed,
             descriptionSource: 'human',
-            reviewedBy: null,
-            reviewedAt: null,
+            reviewedBy: columnAttribution.reviewedBy,
+            reviewedAt: columnAttribution.reviewedAt,
             position: columnIndex,
             createdAt: now,
             updatedAt: now,
@@ -228,6 +315,15 @@ export function createSqlitePersistence(
       })
 
       ;(table.relationships?.parents || []).forEach((relationship, index) => {
+        const relationshipReviewed = relationship.reviewed ?? false
+        const key = [
+          table.name,
+          relationship.table,
+          relationship.constraint_name ?? '',
+          JSON.stringify(relationship.local_columns ?? []),
+          JSON.stringify(relationship.referenced_columns ?? []),
+        ].join('\0')
+        const relationshipAttribution = attribute(relationshipReviewed, previousRelationshipByKey.get(key))
         tx.insert(relationshipsTable)
           .values({
             id: crypto.randomUUID(),
@@ -237,10 +333,10 @@ export function createSqlitePersistence(
             referencedColumns: JSON.stringify(relationship.referenced_columns ?? []),
             constraintName: relationship.constraint_name ?? '',
             description: relationship.description ?? '',
-            reviewed: relationship.reviewed ?? false,
+            reviewed: relationshipReviewed,
             descriptionSource: 'human',
-            reviewedBy: null,
-            reviewedAt: null,
+            reviewedBy: relationshipAttribution.reviewedBy,
+            reviewedAt: relationshipAttribution.reviewedAt,
             position: index,
             createdAt: now,
             updatedAt: now,
@@ -301,11 +397,7 @@ export function createSqlitePersistence(
     },
 
     list(): ProjectSummary[] {
-      const rows = db
-        .select()
-        .from(projects)
-        .orderBy(asc(projects.createdAt), asc(projects.name))
-        .all()
+      const rows = db.select().from(projects).orderBy(asc(projects.createdAt), asc(projects.name)).all()
 
       return rows.map((project) => ({
         id: project.id,
@@ -318,25 +410,30 @@ export function createSqlitePersistence(
 
     get: getProject,
 
-    replaceModel(id: string, database: DatabaseModel): ProjectAggregate | null {
+    replaceModel(id: string, database: DatabaseModel, context: MutationContext = {}): ProjectAggregate | null {
       const now = new Date().toISOString()
       const changed = db.transaction((tx) => {
         const exists = tx.select({ id: projects.id }).from(projects).where(eq(projects.id, id)).get()
         if (!exists) return false
-        writeModel(tx, id, database, now)
+        writeModel(tx, id, database, now, context.actorUserId ?? null)
         return true
       })
 
       return changed ? getProject(id) : null
     },
 
-    applyModel(id: string, database: DatabaseModel, run: CreateImportRunInput): ApplyModelResult | null {
+    applyModel(
+      id: string,
+      database: DatabaseModel,
+      run: CreateImportRunInput,
+      context: MutationContext = {},
+    ): ApplyModelResult | null {
       const now = new Date().toISOString()
       const runId = crypto.randomUUID()
       const applied = db.transaction((tx) => {
         const exists = tx.select({ id: projects.id }).from(projects).where(eq(projects.id, id)).get()
         if (!exists) return false
-        writeModel(tx, id, database, now)
+        writeModel(tx, id, database, now, context.actorUserId ?? null)
         tx.insert(importRuns)
           .values({
             id: runId,
@@ -369,8 +466,93 @@ export function createSqlitePersistence(
     listImportRuns,
   }
 
+  const userRepository: UserRepository = {
+    create(input: CreateUserInput): UserRecord {
+      const now = new Date().toISOString()
+      const id = crypto.randomUUID()
+      db.insert(usersTable)
+        .values({
+          id,
+          email: input.email,
+          passwordHash: input.passwordHash,
+          role: input.role,
+          createdAt: now,
+          updatedAt: now,
+        })
+        .run()
+
+      return {
+        id,
+        email: input.email,
+        passwordHash: input.passwordHash,
+        role: input.role,
+        createdAt: now,
+        updatedAt: now,
+      }
+    },
+
+    findByEmail(email: string): UserRecord | null {
+      const row = db.select().from(usersTable).where(eq(usersTable.email, email)).get()
+      return row ? toUserRecord(row) : null
+    },
+
+    findById(id: string): UserRecord | null {
+      const row = db.select().from(usersTable).where(eq(usersTable.id, id)).get()
+      return row ? toUserRecord(row) : null
+    },
+
+    list(): UserRecord[] {
+      return db
+        .select()
+        .from(usersTable)
+        .orderBy(asc(usersTable.createdAt), asc(usersTable.email))
+        .all()
+        .map(toUserRecord)
+    },
+
+    updateRole(id: string, role: UserRole): UserRecord | null {
+      const updated = db
+        .update(usersTable)
+        .set({ role, updatedAt: new Date().toISOString() })
+        .where(eq(usersTable.id, id))
+        .returning()
+        .get()
+      return updated ? toUserRecord(updated) : null
+    },
+
+    countByRole(role: UserRole): number {
+      return db.select().from(usersTable).where(eq(usersTable.role, role)).all().length
+    },
+  }
+
+  const loginAttemptRepository: LoginAttemptRepository = {
+    record(identity: string, ip: string, attemptedAt: string): void {
+      db.insert(loginAttemptsTable).values({ id: crypto.randomUUID(), identity, ip, attemptedAt }).run()
+    },
+
+    listSince(identity: string, since: string): string[] {
+      return db
+        .select({ attemptedAt: loginAttemptsTable.attemptedAt })
+        .from(loginAttemptsTable)
+        .where(and(eq(loginAttemptsTable.identity, identity), gte(loginAttemptsTable.attemptedAt, since)))
+        .orderBy(asc(loginAttemptsTable.attemptedAt))
+        .all()
+        .map((row) => row.attemptedAt)
+    },
+
+    pruneBefore(before: string): void {
+      db.delete(loginAttemptsTable).where(lt(loginAttemptsTable.attemptedAt, before)).run()
+    },
+
+    clear(identity: string): void {
+      db.delete(loginAttemptsTable).where(eq(loginAttemptsTable.identity, identity)).run()
+    },
+  }
+
   return {
     projects: projectRepository,
+    users: userRepository,
+    loginAttempts: loginAttemptRepository,
     close(): void {
       sqlite.close()
     },

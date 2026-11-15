@@ -52,10 +52,33 @@ the repository root:
 - `bun run dev` — start the API (`apps/api`) and web (`apps/web`) dev servers.
 - `bun run check` — quality gate: `typecheck` → `lint` → `check:persistence` → `test`.
 - `bun run db:migrate` — apply pending SQLite migrations with the explicit runner.
+- `bun run db:seed` — create the initial `ADMIN` idempotently.
 
 Auxiliary commands: `bun run typecheck`, `bun run lint`, `bun run format`, `bun run check:persistence`,
 `bun test`, `bun run db:generate` and `bun run --cwd <workspace> typecheck`.
 Run `bun run db:generate` after changing `apps/api/src/db/schema.ts`.
+
+## Auth (v2 — Fase 2)
+
+The API is cookie-session protected: every `/api` route requires a valid
+`session` cookie except `POST /api/auth/login`; `GET /health` stays public.
+Sessions are JWT HS256 in an HttpOnly, SameSite=Lax cookie (24h TTL, sliding
+renewal at 50%).
+
+- `JWT_SECRET` comes from env. Development falls back to a warning secret;
+  `NODE_ENV=production` refuses to start without it. Document secrets in
+  `.env.example`; never create or commit `.env`.
+- Roles are global: `VIEWER` reads, `MEMBER` reads and mutates the dictionary,
+  `ADMIN` also manages `/api/users`. `401`/`403` always use the error envelope.
+- `bun run db:seed` creates the admin from `DBMAPPER_ADMIN_EMAIL` and
+  `DBMAPPER_ADMIN_PASSWORD`; without a password it prints a generated one once.
+  Re-running with the same email is a no-op.
+- Mutating routes receive the acting user and record `reviewed_by`/`reviewed_at`
+  when review state changes. User responses never include `password_hash`.
+
+API tests use a temp SQLite database per test and the shared helper in
+`apps/api/src/tests/helpers.ts`, which seeds a default user and attaches its
+session cookie. Pass `{ cookie: null }` to exercise unauthenticated `401`s.
 
 ## Coding Style & Naming Conventions (v1)
 

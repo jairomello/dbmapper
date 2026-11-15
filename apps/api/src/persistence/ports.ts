@@ -1,8 +1,4 @@
-import type {
-  DatabaseModel,
-  DescriptionSource,
-  ReviewStatus,
-} from '@dbmapper/domain'
+import type { DatabaseModel, DescriptionSource, ReviewStatus } from '@dbmapper/domain'
 
 export interface ProjectRecord {
   id: string
@@ -107,16 +103,61 @@ export interface ApplyModelResult {
   run: ImportRunRecord
 }
 
+export interface MutationContext {
+  actorUserId?: string | null
+}
+
+export const USER_ROLES = ['ADMIN', 'MEMBER', 'VIEWER'] as const
+export type UserRole = (typeof USER_ROLES)[number]
+
+export interface UserRecord {
+  id: string
+  email: string
+  passwordHash: string
+  role: UserRole
+  createdAt: string
+  updatedAt: string
+}
+
+export interface CreateUserInput {
+  email: string
+  passwordHash: string
+  role: UserRole
+}
+
+export interface UserRepository {
+  create(input: CreateUserInput): UserRecord
+  findByEmail(email: string): UserRecord | null
+  findById(id: string): UserRecord | null
+  list(): UserRecord[]
+  updateRole(id: string, role: UserRole): UserRecord | null
+  countByRole(role: UserRole): number
+}
+
+export interface LoginAttemptRepository {
+  record(identity: string, ip: string, attemptedAt: string): void
+  listSince(identity: string, since: string): string[]
+  pruneBefore(before: string): void
+  clear(identity: string): void
+}
+
 export interface ProjectRepository {
   create(input: CreateProjectInput): ProjectRecord
   list(): ProjectSummary[]
   get(id: string): ProjectAggregate | null
-  replaceModel(id: string, database: DatabaseModel): ProjectAggregate | null
-  applyModel(id: string, database: DatabaseModel, run: CreateImportRunInput): ApplyModelResult | null
+  replaceModel(id: string, database: DatabaseModel, context?: MutationContext): ProjectAggregate | null
+  applyModel(
+    id: string,
+    database: DatabaseModel,
+    run: CreateImportRunInput,
+    context?: MutationContext,
+  ): ApplyModelResult | null
   listImportRuns(projectId: string): ImportRunRecord[]
 }
 
 export interface Persistence {
   projects: ProjectRepository
+  users: UserRepository
+  loginAttempts: LoginAttemptRepository
   close(): void
 }

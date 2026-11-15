@@ -1,13 +1,10 @@
 import type { Hono } from 'hono'
 import { ApiError } from '../errors'
+import { requireRole } from '../middleware/session'
 import type { Persistence } from '../persistence/ports'
 import { databaseFromAggregate, projectView } from '../services/model-mapper'
-import {
-  applyImportPlan,
-  buildImportPlan,
-  emptyRenameMapping,
-  type ImportPlan,
-} from '../services/model-import'
+import { applyImportPlan, buildImportPlan, emptyRenameMapping, type ImportPlan } from '../services/model-import'
+import type { AppEnv } from '../types'
 import { applyImportSchema, parseJsonBody, sqlImportSchema } from '../validation'
 
 function parsePlanSnapshot(snapshot: string): ImportPlan | null {
@@ -18,24 +15,21 @@ function parsePlanSnapshot(snapshot: string): ImportPlan | null {
   }
 }
 
-export function registerImportRoutes(app: Hono, persistence: Persistence): void {
+export function registerImportRoutes(app: Hono<AppEnv>, persistence: Persistence): void {
   const repository = persistence.projects
+  const requireMember = requireRole('MEMBER')
 
-  app.post('/api/projects/:id/imports/preview', async (c) => {
+  app.post('/api/projects/:id/imports/preview', requireMember, async (c) => {
     const aggregate = repository.get(c.req.param('id'))
     if (!aggregate) throw new ApiError(404, 'NOT_FOUND', 'Projeto não encontrado.')
 
     const body = await parseJsonBody(c, sqlImportSchema)
-    const { plan } = buildImportPlan(
-      databaseFromAggregate(aggregate),
-      body.sql,
-      body.renames ?? emptyRenameMapping(),
-    )
+    const { plan } = buildImportPlan(databaseFromAggregate(aggregate), body.sql, body.renames ?? emptyRenameMapping())
 
     return c.json({ plan })
   })
 
-  app.post('/api/projects/:id/imports/apply', async (c) => {
+  app.post('/api/projects/:id/imports/apply', requireMember, async (c) => {
     const id = c.req.param('id')
     const aggregate = repository.get(id)
     if (!aggregate) throw new ApiError(404, 'NOT_FOUND', 'Projeto não encontrado.')
@@ -48,10 +42,15 @@ export function registerImportRoutes(app: Hono, persistence: Persistence): void 
       body.plan,
     )
 
-    const applied = repository.applyModel(id, database, {
-      sqlHash: plan.sqlHash,
-      planSnapshot: JSON.stringify(plan),
-    })
+    const applied = repository.applyModel(
+      id,
+      database,
+      {
+        sqlHash: plan.sqlHash,
+        planSnapshot: JSON.stringify(plan),
+      },
+      { actorUserId: c.get('user').sub },
+    )
     if (!applied) throw new ApiError(404, 'NOT_FOUND', 'Projeto não encontrado.')
 
     return c.json({

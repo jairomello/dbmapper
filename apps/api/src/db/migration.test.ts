@@ -31,7 +31,15 @@ describe('migração do domínio do dicionário', () => {
         name: string
       }>
       const tableNames = tables.map((table) => table.name)
-      for (const expected of ['projects', 'tables', 'columns', 'relationships', 'import_runs']) {
+      for (const expected of [
+        'projects',
+        'tables',
+        'columns',
+        'relationships',
+        'import_runs',
+        'users',
+        'login_attempts',
+      ]) {
         expect(tableNames).toContain(expected)
       }
 
@@ -111,6 +119,38 @@ describe('migração do domínio do dicionário', () => {
         'project_id',
         'sql_hash',
       ])
+
+      const userColumns = sqlite.query("PRAGMA table_info('users')").all() as Array<{ name: string }>
+      expect(userColumns.map((column) => column.name).sort()).toEqual([
+        'created_at',
+        'email',
+        'id',
+        'password_hash',
+        'role',
+        'updated_at',
+      ])
+
+      const loginAttemptColumns = sqlite.query("PRAGMA table_info('login_attempts')").all() as Array<{ name: string }>
+      expect(loginAttemptColumns.map((column) => column.name).sort()).toEqual(['attempted_at', 'id', 'identity', 'ip'])
+
+      const userIndexes = sqlite.query("PRAGMA index_list('users')").all() as Array<{
+        name: string
+        unique: number
+      }>
+      const emailIndex = userIndexes.find((indexRow) => indexRow.name === 'users_email_uq')
+      expect(emailIndex).toBeTruthy()
+      expect(emailIndex!.unique).toBe(1)
+      const emailIndexColumns = sqlite.query("PRAGMA index_info('users_email_uq')").all() as Array<{
+        name: string
+      }>
+      expect(emailIndexColumns.map((column) => column.name)).toEqual(['email'])
+
+      const insertUser = (id: string, email: string, role: string) =>
+        sqlite.run("INSERT INTO users (id, email, password_hash, role) VALUES (?, ?, 'hash', ?)", [id, email, role])
+
+      expect(() => insertUser('u1', 'admin@example.com', 'OWNER')).toThrow()
+      expect(() => insertUser('u1', 'admin@example.com', 'ADMIN')).not.toThrow()
+      expect(() => insertUser('u2', 'admin@example.com', 'MEMBER')).toThrow()
 
       const expectForeignKey = (table: string, from: string, to: string) => {
         const foreignKeys = sqlite.query(`PRAGMA foreign_key_list('${table}')`).all() as ForeignKeyRow[]

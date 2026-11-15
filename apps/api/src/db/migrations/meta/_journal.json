@@ -15,6 +15,13 @@
       "when": 1794706229446,
       "tag": "0001_high_pretty_boy",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1794707920936,
+      "tag": "0002_damp_master_mold",
+      "breakpoints": true
     }
   ]
 }

@@ -74,20 +74,69 @@ O JSON exportado segue o formato abaixo. Ele é o **contrato** entre o DBMapper 
 > Os valores possíveis de `status` são `NEW`, `UNCHANGED`, `REMOVED`, `RENAMED` e
 > `CHANGED` (gerados pelo wizard de atualização).
 
-## API v2 (Fase 1)
+## API v2 (Fases 1 e 2)
 
-A Fase 1 entrega o domínio do dicionário e a importação de SQL no servidor. A API
-roda em Bun + Hono + SQLite e usa o envelope de erro
+A Fase 1 entrega o domínio do dicionário e a importação de SQL no servidor. A
+Fase 2 adiciona identidade: login com cookie de sessão, papéis e rotas
+protegidas. A API roda em Bun + Hono + SQLite e usa o envelope de erro
 `{ "error": { "code", "message", "retryable", "details" } }` em todas as falhas.
 
 ```bash
 bun install            # dependências do workspace
+cp .env.example .env   # ajuste JWT_SECRET e as credenciais do admin inicial
 bun run db:migrate     # aplica as migrações SQLite (DATABASE_URL, padrão ./dev.db)
+bun run db:seed        # cria o ADMIN inicial (idempotente)
 bun run dev:api        # sobe a API em http://localhost:3000
 bun run check          # typecheck + lint + fronteiras de persistência + testes
 ```
 
-### Endpoints
+### Autenticação e papéis
+
+Toda rota `/api` exige um cookie de sessão `session`, exceto
+`POST /api/auth/login` e `GET /health`. O cookie é `HttpOnly`, `SameSite=Lax`,
+JWT HS256 com TTL de 24h e renovação deslizante na metade do prazo. O segredo
+vem de `JWT_SECRET`; em desenvolvimento há um fallback que emite aviso, mas ele
+é **recusado com `NODE_ENV=production`**.
+
+| Papel | Lê projetos | Salva/importa | Administra usuários |
+| --- | --- | --- | --- |
+| `VIEWER` | sim | não (`403`) | não (`403`) |
+| `MEMBER` | sim | sim | não (`403`) |
+| `ADMIN` | sim | sim | sim |
+
+Requisições sem sessão válida recebem `401`; papel insuficiente recebe `403`;
+login repetidamente inválido recebe `429` com `Retry-After` (5 falhas em 15
+minutos por identidade). O login sempre devolve a mesma mensagem para senha
+errada e email inexistente.
+
+| Método | Rota | Descrição |
+| --- | --- | --- |
+| `POST` | `/api/auth/login` | autentica (`email`, `password`) e define o cookie `session` |
+| `GET` | `/api/auth/me` | devolve `{ id, email, role }` da sessão |
+| `POST` | `/api/auth/logout` | limpa o cookie de sessão |
+| `POST` | `/api/users` | cria usuário (`ADMIN`; senha com no mínimo 8 caracteres) |
+| `GET` | `/api/users` | lista usuários sem `password_hash` (`ADMIN`) |
+| `PATCH` | `/api/users/{id}` | altera `role` (`ADMIN`; recusa rebaixar o último `ADMIN`) |
+
+O `db:seed` cria o admin a partir de `DBMAPPER_ADMIN_EMAIL` e
+`DBMAPPER_ADMIN_PASSWORD`; sem a senha, gera uma aleatória e a imprime uma única
+vez. Rodar de novo com o mesmo email é idempotente.
+
+```bash
+# login: guarda o cookie em cookies.txt
+curl -s -c cookies.txt -X POST http://localhost:3000/api/auth/login \
+  -H 'content-type: application/json' \
+  -d '{"email":"admin@example.com","password":"senha-inicial"}'
+
+# usa a sessão nas rotas protegidas
+curl -s -b cookies.txt http://localhost:3000/api/auth/me
+curl -s -b cookies.txt http://localhost:3000/api/projects
+```
+
+### Endpoints do dicionário
+
+Salvar o modelo, importar JSON e preview/apply de SQL exigem `MEMBER` ou
+`ADMIN`; as leituras aceitam qualquer sessão válida.
 
 | Método | Rota | Descrição |
 | --- | --- | --- |
