@@ -1,7 +1,7 @@
 # Proposta de evolução — DBMapper v2 (servidor, multi-usuário, agêntico)
 
 - **Data:** 2026-11-14
-- **Status:** proposta para aprovação do Jairo — nada implementado ainda.
+- **Status:** direcionamento aprovado e decisões registradas em 14/11/2026 (§8) — implementação ainda não iniciada; aguardando o pedido do Jairo para abrir o primeiro change OpenSpec.
 - **Base:** [`01-analise-dbmapper-v1.md`](./01-analise-dbmapper-v1.md) (codebase atual) e [`02-analise-azyboard-reaproveitamento.md`](./02-analise-azyboard-reaproveitamento.md) (padrões reaproveitáveis do Azy Board).
 - **Stack pedida:** Bun + React + SQLite (evoluindo para PostgreSQL depois).
 
@@ -42,12 +42,13 @@ opencode (na codebase do sistema alvo)
 DBMapper v2 ── tools: list_missing_descriptions, get_table, set_description…
    │
    ▼
-sugestão/descrição gravada com fonte='mcp' e reviewed=false
-   │
+descrição gravada na hora com fonte='mcp' e reviewed=false
+   │        (warning "sem ok humano" — nada é bloqueado)
    ▼
-humano abre o DBMapper → vê o que mudou → marca revisado/aprovado ✓
+dicionário sempre atualizado junto com o sistema;
+humano revisa quando quiser → marca aprovado ✓
 ```
-O opencode faz o que ele faz de melhor — **ler o código do sistema e deduzir a melhor descrição** — e o DBMapper fornece o mapa do que falta. O check humano de aprovação é inegociável e permanece.
+O opencode faz o que ele faz de melhor — **ler o código do sistema e deduzir a melhor descrição** — e o DBMapper fornece o mapa do que falta. A escrita é liberada sem aprovação: o dicionário **acompanha o sistema em construção** (decisão §8.1); o que fica é o warning de "sem ok humano" e o check de aprovação para quem quiser revisar depois.
 
 ---
 
@@ -130,13 +131,14 @@ Regra de segurança herdada do azyboard: o agente **nunca** altera `reviewed` �
 | `get_project_overview` | read | projeto + cobertura (% descrita/aprovada, pendentes) |
 | `list_missing_descriptions` | read | itens sem descrição (filtro: tabela, tipo `column`/`table`, ordenação) |
 | `get_table` / `get_column` | read | item + tipos + FKs + SQL de origem + descrições vizinhas |
-| `set_description` | write | grava descrição com `source='mcp'`, `reviewed=false` + evento |
+| `set_description` | write | grava **direto** com `source='mcp'`, `reviewed=false` + evento — sem bloqueio por aprovação, com warning de "não revisado" (decisão §8.1) |
 | `list_suggestions` / `apply_suggestion` / `reject_suggestion` | write | fecha o ciclo das sugestões do agente interno |
 | `get_export` | read | JSON do dicionário no formato v1 (contexto completo) |
 
 - **Auth:** API Key `dbmp_...` por usuário (hash SHA-256, escopos) — mesmo desenho das `azb_` do azyboard; header opcional de projeto.
 - **Conexão do opencode:** entrada `remote` no `opencode.json` apontando para `/mcp` (ou adaptador stdio local durante dev) — copiar o padrão de `opencode.json.example` do azyboard (**nunca** commitar chave real; o `opencode.json` do azyboard tem chave em claro, usar só o `.example` como modelo).
-- **Skill do opencode:** `skills/dbmapper/SKILL.md` adaptada da skill azyboard — descobrir o projeto, listar faltantes, analisar a codebase local, escrever descrições, reportar o que escreveu.
+- **Skill do opencode:** `skills/dbmapper/SKILL.md` adaptada da skill azyboard — descobrir o projeto, listar faltantes, analisar a codebase local, escrever descrições, reportar o que escreveu. **Entrega obrigatória junto com o MCP** (padrão azyboard: MCP + skill; a meta é ser ferramenta sempre conectada ao projeto, como o Playwright).
+- **Warnings de revisão:** toda escrita de IA sem ok humano fica sinalizada na UI (`description_source` + `reviewed=false` → badge "revisar" + origem) — visível, mas **nunca bloqueante** (decisão §8.1).
 - **Guarda de catálogo:** `check-mcp-catalog` (tool registrada ⇒ documentada ⇒ dispatcher ⇒ policy) — copiar o script.
 
 ### 5.3 Workflow humano — o check que você já usa, preservado
@@ -172,14 +174,15 @@ Fases 0–3 = produto utilizável sem IA (o v1 no servidor). Fases 4–5 = a par
 
 ---
 
-## 8. Decisões em aberto (preciso da sua palavra)
+## 8. Decisões tomadas (aprovadas por Jairo em 14/11/2026)
 
-1. **Escrita via MCP:** o `set_description` do opencode grava **direto** (com `source='mcp'`, `reviewed=false`, auditado) ou gera **sugestão pendente** que exige aplicar antes? — *Recomendo: grava direto com `reviewed=false`.* Fecha o ciclo do opencode sem fila extra, e o check humano continua decidindo o "aprovado". A fila `pending` fica só para o agente interno (lote).
-2. **Papéis:** só login, ou já `ADMIN`/`MEMBER`/`VIEWER` por projeto? — *Recomendo já os 3, é barato copiar do azyboard.*
-3. **Onde roda:** `labapps` (Docker), notebook, ou Proxmox? — afeta Dockerfile, domínio e backup do SQLite.
-4. **LLM do agente interno:** OpenRouter, OpenAI, ou outro? (mesmas chaves padrão do azyboard servem)
-5. **Drizzle ORM** está ok como escolha? (é o padrão do azyboard e o caminho natural p/ PostgreSQL)
-6. **Nome do pacote:** `@dbmapper/*` e manter o DBViewer como rota read-only do v2?
+1. **Escrita via MCP: liberada, sem aprovação humana.** O `set_description` grava **direto** (`source='mcp'`, `reviewed=false`, auditado) e **nada é bloqueado** por falta de ok humano — apenas **warnings** de que a descrição não foi revisada. *Contexto:* o MCP conecta em projeto **em andamento** — enquanto o sistema está sendo construído, o agente usa o MCP para entender o banco e cada alteração que ele faz já ajusta o dicionário ao mesmo tempo, tudo pelo próprio agente. O check humano continua existindo (revisar/aprovar quando quiser), mas não é requisito para gravar. A fila `pending` do agente interno (§5.1) mantém-se para revisão em lote — unificar para "gravar direto com warning" é ajuste de uma linha, se preferir.
+2. **Papéis:** `ADMIN`/`MEMBER`/`VIEWER` desde o início (padrão azyboard).
+3. **Deploy:** notebook (dev inicial) → `labapps` (Docker) → servidor Vultr (`jairo.tools`).
+4. **LLM do agente:** OpenRouter/OpenAI — mesmos padrões e chaves do azyboard.
+5. **Drizzle ORM:** confirmado.
+6. **Pacote `@dbmapper/*`** e DBViewer como rota read-only do v2: confirmado.
+7. **MCP + skill, sempre os dois** (padrão azyboard): além do servidor MCP, o dbmapper terá uma **skill oficial** para os agentes — a ideia é ser uma ferramenta sempre conectada ao projeto, como o Playwright e afins.
 
 ## 9. Non-goals / riscos
 
@@ -187,6 +190,12 @@ Fases 0–3 = produto utilizável sem IA (o v1 no servidor). Fases 4–5 = a par
 - **Risco:** refator de UI do zero — mitigado usando as 8 specs existentes como critérios de aceitação e os 5 testes como contrato executável.
 - As regras "sem framework/sem build" do `AGENTS.md`/`CONTRIBUTING.md` atuais valem para `legacy/` e foram escopadas na reorganização de 14/11/2026.
 
-## 10. Próximo passo
+## 10. Backlog aprovado (anotado em 14/11/2026 — fora desta etapa)
 
-Aprovado o direcionamento (e as decisões da §8): gero o primeiro change OpenSpec (`v2-scaffold` + domínio/import) e delego a implementação ao opencode, com revisão minha antes de aplicar no share.
+1. **Desenhador de modelo ER** — desenho visual do schema no app. Antes de implementar, pesquisar boa biblioteca open source já existente (tarefa de pesquisa própria; não decidir agora).
+2. **Versionamento do modelo** — manter versões/snapshots do dicionário no tempo, permitindo gerar **scripts de migration** e **scripts de rollback** de base a partir das diferenças entre versões. Entra no roadmap.
+3. **JSON do dicionário no repositório do sistema** — o MCP mantém o JSON sincronizado no repo do sistema documentado a cada modificação feita via MCP; assim o code agent consome o material local **sem bater no MCP toda hora**. Mantém o mesmo contrato JSON de sempre, só que versionado no repositório do cliente.
+
+## 11. Próximo passo
+
+Direcionamento e decisões (§8) aprovados por Jairo em 14/11/2026. Assim que ele pedir a implementação: gero o primeiro change OpenSpec (`v2-scaffold` + domínio) e delego a execução ao opencode, com revisão minha antes de aplicar no share.
