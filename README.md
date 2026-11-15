@@ -101,6 +101,13 @@ Fluxo mínimo de uso:
 
 ```text
 dbmapper/
+├── apps/
+│   ├── api/               # Hono + Drizzle + bun:sqlite (REST, auth, agente, /mcp)
+│   ├── web/               # React + Vite (UI do editor)
+│   └── mcp/               # adaptador stdio do MCP
+├── packages/
+│   ├── domain/            # tipos do dicionário (tabela/coluna/relacionamento/status)
+│   └── contracts/         # contratos de API (erro, JWT, health)
 ├── docs/
 │   └── analysis/          # diagnóstico da v1, análise do Azy Board e proposta da v2
 ├── legacy/                # v1 estático congelado (app + visualizador + testes)
@@ -113,7 +120,10 @@ dbmapper/
 ├── CONTRIBUTING.md
 ├── SECURITY.md
 ├── LICENSE / THIRD_PARTY_NOTICES
-└── (v2: apps/, packages/, package.json — a implementar via OpenSpec)
+├── biome.json             # lint + formatação (Biome)
+├── tsconfig.base.json     # TypeScript strict compartilhado
+├── package.json           # workspace Bun (apps/* e packages/*)
+└── .bun-version
 ```
 
 ## Testes

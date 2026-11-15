@@ -1,0 +1,13 @@
+{
+  "version": "7",
+  "dialect": "sqlite",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "6",
+      "when": 1794703256241,
+      "tag": "0000_flowery_morgan_stark",
+      "breakpoints": true
+    }
+  ]
+}

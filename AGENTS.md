@@ -14,6 +14,9 @@ Root:
 - `docs/analysis/` — v1 diagnosis (`01-`), Azy Board reuse analysis (`02-`),
   and the v2 evolution proposal (`03-proposta-evolucao-v2.md`).
 - `openspec/` — specs and change sets; cross-cutting changes are driven here.
+- `apps/` — v2 workspace: `api/` (Hono + Drizzle + bun:sqlite), `web/` (React + Vite) and `mcp/` (stdio adapter).
+- `packages/` — shared pure-TypeScript packages: `domain/` (dictionary types) and `contracts/` (API error/JWT/health contracts).
+- `package.json`, `tsconfig.base.json`, `biome.json`, `.bun-version` — root Bun workspace, strict TypeScript, lint/format and runtime version.
 
 `legacy/` (v1 — frozen static app):
 
@@ -40,14 +43,28 @@ There is no package manager or build step for the v1. Run it as a static site:
 
 Avoid adding tooling to `legacy/` unless it solves an immediate maintenance need.
 
+## Build, Test, and Development Commands (v2 — Bun workspace)
+
+The v2 lives in `apps/` and `packages/` and runs on Bun. Run every command from
+the repository root:
+
+- `bun install` — install workspace dependencies (Bun version in `.bun-version`).
+- `bun run dev` — start the API (`apps/api`) and web (`apps/web`) dev servers.
+- `bun run check` — quality gate: `typecheck` → `lint` → `test`.
+- `bun run db:migrate` — apply pending SQLite migrations with the explicit runner.
+
+Auxiliary commands: `bun run typecheck`, `bun run lint`, `bun run format`,
+`bun test`, `bun run db:generate` and `bun run --cwd <workspace> typecheck`.
+Run `bun run db:generate` after changing `apps/api/src/db/schema.ts`.
+
 ## Coding Style & Naming Conventions (v1)
 
 Use 4-space indentation in HTML, CSS, and JavaScript. JavaScript uses `camelCase` for functions and variables, `const`/`let`, and direct DOM APIs. Keep UI text in Portuguese unless changing a product label such as "DBMapper" or "Semantic Layer".
 
 CSS uses custom properties in `:root`, class selectors with kebab-case, and section comments. Reuse existing color, radius, shadow, and spacing variables before introducing new values.
 
-The v2 will use TypeScript strict + Biome + `bun test`; its conventions will be
-recorded here when implementation starts.
+The v2 uses TypeScript strict + Biome + `bun test`; see the sections above for
+its commands and workspace layout.
 
 ## Testing Guidelines
 

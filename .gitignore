@@ -13,3 +13,11 @@
 
 # Local screenshots dropped in for ad-hoc visual reference.
 modal*.png
+
+# v2 toolchain: dependencies, build output, Bun cache and local SQLite databases.
+node_modules/
+dist/
+.bun/
+*.db
+*.db-shm
+*.db-wal
