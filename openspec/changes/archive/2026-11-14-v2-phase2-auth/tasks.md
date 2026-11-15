@@ -44,7 +44,7 @@
 
 - [x] 9.1 Copy source only (never `node_modules` or build output) from `~/work/dbmapper/` to the share and commit with an imperative message
 - [x] 9.2 Mark Fase 2 as ✅ in `ROADMAP.md` and commit the roadmap update
-- [ ] 9.3 Run `openspec archive v2-phase2-auth --yes` to move the change under `openspec/changes/archive/` (including the promoted `auth` spec)
+- [x] 9.3 Run `openspec archive v2-phase2-auth --yes` to move the change under `openspec/changes/archive/` (including the promoted `auth` spec)
 
 ## Workflow follow-up
 
