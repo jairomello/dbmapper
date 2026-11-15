@@ -10,8 +10,15 @@ import * as schema from './schema'
 
 const migrationsFolder = fileURLToPath(new URL('./migrations', import.meta.url))
 
-describe('migração inicial do scaffold', () => {
-  test('aplica as migrações em um SQLite temporário e cria a tabela projects', async () => {
+interface ForeignKeyRow {
+  table: string
+  from: string
+  to: string
+  on_delete: string
+}
+
+describe('migração do domínio do dicionário', () => {
+  test('aplica as migrações em um SQLite temporário e cria todas as tabelas do domínio', async () => {
     const directory = await mkdtemp(join(tmpdir(), 'dbmapper-migrations-'))
     const databasePath = join(directory, 'test.db')
     const sqlite = new Database(databasePath, { create: true })
@@ -23,10 +30,100 @@ describe('migração inicial do scaffold', () => {
       const tables = sqlite.query("SELECT name FROM sqlite_master WHERE type = 'table'").all() as Array<{
         name: string
       }>
-      expect(tables.map((table) => table.name)).toContain('projects')
+      const tableNames = tables.map((table) => table.name)
+      for (const expected of ['projects', 'tables', 'columns', 'relationships', 'import_runs']) {
+        expect(tableNames).toContain(expected)
+      }
 
-      const columns = sqlite.query("PRAGMA table_info('projects')").all() as Array<{ name: string }>
-      expect(columns.map((column) => column.name).sort()).toEqual(['created_at', 'id', 'name'])
+      const projectColumns = sqlite.query("PRAGMA table_info('projects')").all() as Array<{ name: string }>
+      expect(projectColumns.map((column) => column.name).sort()).toEqual([
+        'business_terms',
+        'created_at',
+        'description',
+        'description_source',
+        'id',
+        'name',
+        'reviewed',
+        'reviewed_at',
+        'reviewed_by',
+        'updated_at',
+      ])
+
+      const tableColumns = sqlite.query("PRAGMA table_info('tables')").all() as Array<{ name: string }>
+      for (const expected of [
+        'id',
+        'project_id',
+        'name',
+        'description',
+        'business_terms',
+        'status',
+        'reviewed',
+        'description_source',
+        'reviewed_by',
+        'reviewed_at',
+        'created_at',
+        'updated_at',
+      ]) {
+        expect(tableColumns.map((column) => column.name)).toContain(expected)
+      }
+
+      const columnColumns = sqlite.query("PRAGMA table_info('columns')").all() as Array<{ name: string }>
+      for (const expected of [
+        'id',
+        'table_id',
+        'name',
+        'type',
+        'primary_key',
+        'foreign_key',
+        'description',
+        'business_terms',
+        'status',
+        'reviewed',
+        'description_source',
+        'reviewed_by',
+        'reviewed_at',
+      ]) {
+        expect(columnColumns.map((column) => column.name)).toContain(expected)
+      }
+
+      const relationshipColumns = sqlite.query("PRAGMA table_info('relationships')").all() as Array<{ name: string }>
+      for (const expected of [
+        'id',
+        'table_id',
+        'target_table',
+        'local_columns',
+        'referenced_columns',
+        'constraint_name',
+        'description',
+        'reviewed',
+        'description_source',
+        'reviewed_by',
+        'reviewed_at',
+      ]) {
+        expect(relationshipColumns.map((column) => column.name)).toContain(expected)
+      }
+
+      const importRunColumns = sqlite.query("PRAGMA table_info('import_runs')").all() as Array<{ name: string }>
+      expect(importRunColumns.map((column) => column.name).sort()).toEqual([
+        'created_at',
+        'id',
+        'plan_snapshot',
+        'project_id',
+        'sql_hash',
+      ])
+
+      const expectForeignKey = (table: string, from: string, to: string) => {
+        const foreignKeys = sqlite.query(`PRAGMA foreign_key_list('${table}')`).all() as ForeignKeyRow[]
+        const foreignKey = foreignKeys.find((row) => row.from === from)
+        expect(foreignKey).toBeTruthy()
+        expect(foreignKey!.table).toBe(to)
+        expect(foreignKey!.on_delete).toBe('CASCADE')
+      }
+
+      expectForeignKey('tables', 'project_id', 'projects')
+      expectForeignKey('columns', 'table_id', 'tables')
+      expectForeignKey('relationships', 'table_id', 'tables')
+      expectForeignKey('import_runs', 'project_id', 'projects')
     } finally {
       sqlite.close()
       await rm(directory, { recursive: true, force: true })

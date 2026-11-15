@@ -1,7 +1,12 @@
 {
   "extends": "./tsconfig.base.json",
   "compilerOptions": {
-    "types": ["bun-types"]
+    "types": [
+      "bun-types"
+    ]
   },
-  "include": ["smoke.test.ts"]
+  "include": [
+    "smoke.test.ts",
+    "scripts/**/*.ts"
+  ]
 }

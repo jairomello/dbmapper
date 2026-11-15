@@ -13,8 +13,13 @@
     "apps/api": {
       "name": "@dbmapper/api",
       "dependencies": {
+        "@dbmapper/contracts": "workspace:*",
+        "@dbmapper/domain": "workspace:*",
+        "@dbmapper/model-diff": "workspace:*",
+        "@dbmapper/sql-parser": "workspace:*",
         "drizzle-orm": "^0.36.0",
         "hono": "^4.6.0",
+        "zod": "^3.23.8",
       },
       "devDependencies": {
         "bun-types": "latest",
@@ -52,6 +57,27 @@
     "packages/domain": {
       "name": "@dbmapper/domain",
       "devDependencies": {
+        "typescript": "^5.6.0",
+      },
+    },
+    "packages/model-diff": {
+      "name": "@dbmapper/model-diff",
+      "dependencies": {
+        "@dbmapper/domain": "workspace:*",
+        "@dbmapper/sql-parser": "workspace:*",
+      },
+      "devDependencies": {
+        "bun-types": "latest",
+        "typescript": "^5.6.0",
+      },
+    },
+    "packages/sql-parser": {
+      "name": "@dbmapper/sql-parser",
+      "dependencies": {
+        "@dbmapper/domain": "workspace:*",
+      },
+      "devDependencies": {
+        "bun-types": "latest",
         "typescript": "^5.6.0",
       },
     },
@@ -124,6 +150,10 @@
     "@dbmapper/domain": ["@dbmapper/domain@workspace:packages/domain"],
 
     "@dbmapper/mcp": ["@dbmapper/mcp@workspace:apps/mcp"],
+
+    "@dbmapper/model-diff": ["@dbmapper/model-diff@workspace:packages/model-diff"],
+
+    "@dbmapper/sql-parser": ["@dbmapper/sql-parser@workspace:packages/sql-parser"],
 
     "@dbmapper/web": ["@dbmapper/web@workspace:apps/web"],
 
@@ -348,6 +378,8 @@
     "vite": ["vite@5.4.21", "", { "dependencies": { "esbuild": "^0.21.3", "postcss": "^8.4.43", "rollup": "^4.20.0" }, "optionalDependencies": { "fsevents": "~2.3.3" }, "peerDependencies": { "@types/node": "^18.0.0 || >=20.0.0", "less": "*", "lightningcss": "^1.21.0", "sass": "*", "sass-embedded": "*", "stylus": "*", "sugarss": "*", "terser": "^5.4.0" }, "optionalPeers": ["@types/node", "less", "lightningcss", "sass", "sass-embedded", "stylus", "sugarss", "terser"], "bin": { "vite": "bin/vite.js" } }, "sha512-o5a9xKjbtuhY6Bi5S3+HvbRERmouabWbyUcpXXUA1u+GNUKoROi9byOJ8M0nHbHYHkYICiMlqxkg1KkYmm25Sw=="],
 
     "yallist": ["yallist@3.1.1", "", {}, "sha512-a4UGQaWPH59mOXUYnAG2ewncQS4i4F43Tv3JoAM+s2VDAmS9NsK8GpDMLrCHPksFT7h3K6TOoUNn2pb7RoXx4g=="],
+
+    "zod": ["zod@3.25.76", "", {}, "sha512-gzUt/qt81nXsFGKIFcC3YnfEAx5NkunCfnDlvuBSSFS02bcXu4Lmea0AFIUwbLWxWPx3d9p8S5QoaujKcNQxcQ=="],
 
     "@esbuild-kit/core-utils/esbuild": ["esbuild@0.18.20", "", { "optionalDependencies": { "@esbuild/android-arm": "0.18.20", "@esbuild/android-arm64": "0.18.20", "@esbuild/android-x64": "0.18.20", "@esbuild/darwin-arm64": "0.18.20", "@esbuild/darwin-x64": "0.18.20", "@esbuild/freebsd-arm64": "0.18.20", "@esbuild/freebsd-x64": "0.18.20", "@esbuild/linux-arm": "0.18.20", "@esbuild/linux-arm64": "0.18.20", "@esbuild/linux-ia32": "0.18.20", "@esbuild/linux-loong64": "0.18.20", "@esbuild/linux-mips64el": "0.18.20", "@esbuild/linux-ppc64": "0.18.20", "@esbuild/linux-riscv64": "0.18.20", "@esbuild/linux-s390x": "0.18.20", "@esbuild/linux-x64": "0.18.20", "@esbuild/netbsd-x64": "0.18.20", "@esbuild/openbsd-x64": "0.18.20", "@esbuild/sunos-x64": "0.18.20", "@esbuild/win32-arm64": "0.18.20", "@esbuild/win32-ia32": "0.18.20", "@esbuild/win32-x64": "0.18.20" }, "hasInstallScript": true, "bin": { "esbuild": "bin/esbuild" } }, "sha512-ceqxoedUrcayh7Y7ZX6NdbbDzGROiyVBgC4PriJThBKSVPWnnFHZAkfI1lJT8QFkOwH4qOS2SJkS4wvpGl8BpA=="],
 

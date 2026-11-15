@@ -15,7 +15,7 @@ Root:
   and the v2 evolution proposal (`03-proposta-evolucao-v2.md`).
 - `openspec/` — specs and change sets; cross-cutting changes are driven here.
 - `apps/` — v2 workspace: `api/` (Hono + Drizzle + bun:sqlite), `web/` (React + Vite) and `mcp/` (stdio adapter).
-- `packages/` — shared pure-TypeScript packages: `domain/` (dictionary types) and `contracts/` (API error/JWT/health contracts).
+- `packages/` — shared pure-TypeScript packages: `domain/` (dictionary types), `contracts/` (API error/JWT/health contracts), `sql-parser/` (v1 SQL parser port) and `model-diff/` (v1 update-wizard diff port).
 - `package.json`, `tsconfig.base.json`, `biome.json`, `.bun-version` — root Bun workspace, strict TypeScript, lint/format and runtime version.
 
 `legacy/` (v1 — frozen static app):
@@ -50,10 +50,10 @@ the repository root:
 
 - `bun install` — install workspace dependencies (Bun version in `.bun-version`).
 - `bun run dev` — start the API (`apps/api`) and web (`apps/web`) dev servers.
-- `bun run check` — quality gate: `typecheck` → `lint` → `test`.
+- `bun run check` — quality gate: `typecheck` → `lint` → `check:persistence` → `test`.
 - `bun run db:migrate` — apply pending SQLite migrations with the explicit runner.
 
-Auxiliary commands: `bun run typecheck`, `bun run lint`, `bun run format`,
+Auxiliary commands: `bun run typecheck`, `bun run lint`, `bun run format`, `bun run check:persistence`,
 `bun test`, `bun run db:generate` and `bun run --cwd <workspace> typecheck`.
 Run `bun run db:generate` after changing `apps/api/src/db/schema.ts`.
 

@@ -74,6 +74,59 @@ O JSON exportado segue o formato abaixo. Ele é o **contrato** entre o DBMapper 
 > Os valores possíveis de `status` são `NEW`, `UNCHANGED`, `REMOVED`, `RENAMED` e
 > `CHANGED` (gerados pelo wizard de atualização).
 
+## API v2 (Fase 1)
+
+A Fase 1 entrega o domínio do dicionário e a importação de SQL no servidor. A API
+roda em Bun + Hono + SQLite e usa o envelope de erro
+`{ "error": { "code", "message", "retryable", "details" } }` em todas as falhas.
+
+```bash
+bun install            # dependências do workspace
+bun run db:migrate     # aplica as migrações SQLite (DATABASE_URL, padrão ./dev.db)
+bun run dev:api        # sobe a API em http://localhost:3000
+bun run check          # typecheck + lint + fronteiras de persistência + testes
+```
+
+### Endpoints
+
+| Método | Rota | Descrição |
+| --- | --- | --- |
+| `POST` | `/api/projects` | cria um projeto vazio (`{"name": "..."}`) |
+| `GET` | `/api/projects` | lista projetos (`id`, `name`, `description`, timestamps) |
+| `GET` | `/api/projects/{id}` | devolve o projeto com o modelo completo |
+| `PUT` | `/api/projects/{id}` | substitui o modelo (`{"database": {...}}`) |
+| `GET` | `/api/projects/{id}/export` | exporta no contrato JSON v1 (`{"database": {...}}`) |
+| `POST` | `/api/projects/import` | importa um JSON v1, preenchendo campos ausentes |
+| `POST` | `/api/projects/{id}/imports/preview` | parseia o SQL e devolve o plano sem gravar nada |
+| `POST` | `/api/projects/{id}/imports/apply` | aplica o plano confirmado e registra um `import_run` |
+| `GET` | `/api/projects/{id}/imports` | lista o histórico de importações aplicadas |
+
+Exemplo do fluxo de importação de SQL:
+
+```bash
+# 1. preview: parse + diff, sem mutação
+curl -s -X POST "http://localhost:3000/api/projects/$PROJECT_ID/imports/preview" \
+  -H 'content-type: application/json' \
+  -d '{"sql":"CREATE TABLE cliente (id int PRIMARY KEY);","renames":{"tables":[],"columns":[]}}'
+
+# 2. apply: reenvia o mesmo SQL, os renames explícitos e o plano devolvido no preview
+curl -s -X POST "http://localhost:3000/api/projects/$PROJECT_ID/imports/apply" \
+  -H 'content-type: application/json' \
+  -d '{"sql":"CREATE TABLE cliente (id int PRIMARY KEY);","renames":{"tables":[],"columns":[]},"plan":{ ... }}'
+```
+
+Regras do fluxo:
+
+- O preview é **somente leitura**: não altera o modelo e não cria `import_runs`.
+- Renomes só acontecem com mapeamento explícito do cliente (`renames.tables` e
+  `renames.columns`); o servidor nunca infere renomes.
+- O apply revalida o plano contra o modelo atual. Se o plano estiver
+  desatualizado, retorna `409` com `error.code = "STALE_PLAN"` e não grava nada.
+- Itens preservados mantêm `description`, `business_terms` e `reviewed`; itens
+  novos nascem vazios com `status: "NEW"`; mudanças de tipo recebem
+  `status: "CHANGED"`; remoções saem do modelo; relacionamentos passam a refletir
+  o SQL novo.
+
 ## Quick start (v1)
 
 Não há build. Sirva a pasta como site estático e abra o editor:

@@ -1,8 +1,7 @@
-import { Hono } from 'hono'
+import { createApp } from './app'
+import { createRuntimePersistence } from './persistence/runtime'
 
-export const app = new Hono()
-
-app.get('/health', (c) => c.json({ status: 'ok' }))
+export const app = createApp(createRuntimePersistence())
 
 if (import.meta.main) {
   const port = Number(process.env.PORT ?? 3000)

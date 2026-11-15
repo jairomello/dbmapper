@@ -11,8 +11,13 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@dbmapper/contracts": "workspace:*",
+    "@dbmapper/domain": "workspace:*",
+    "@dbmapper/model-diff": "workspace:*",
+    "@dbmapper/sql-parser": "workspace:*",
     "drizzle-orm": "^0.36.0",
-    "hono": "^4.6.0"
+    "hono": "^4.6.0",
+    "zod": "^3.23.8"
   },
   "devDependencies": {
     "bun-types": "latest",

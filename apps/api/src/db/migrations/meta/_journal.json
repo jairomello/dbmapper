@@ -8,6 +8,13 @@
       "when": 1794703256241,
       "tag": "0000_flowery_morgan_stark",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "6",
+      "when": 1794706229446,
+      "tag": "0001_high_pretty_boy",
+      "breakpoints": true
     }
   ]
 }
