@@ -5,15 +5,15 @@ Plano de evolução em **7 fases, uma de cada vez**. Regra combinada com Jairo e
 próxima** — sem pressa, vamos aos poucos. Design e decisões:
 [`docs/analysis/03-proposta-evolucao-v2.md`](./docs/analysis/03-proposta-evolucao-v2.md).
 
-| # | Fase | Entrega verificável | Change OpenSpec | Status |
-|---|------|---------------------|-----------------|--------|
-| 0 | **Scaffold** | Monorepo Bun (apps/api, apps/web, apps/mcp, packages/), Biome, Drizzle + primeira migração, gates `check`, `bun test` rodando | `v2-phase0-scaffold` | ✅ pronto para iniciar |
-| 1 | **Domínio + import** | Schema SQLite completo; parser e diff do v1 portados com testes; API de projeto + import SQL com preview/apply; export JSON v1-compatível | a criar ao liberar | ⏳ aguardando |
-| 2 | **Auth + multi-usuário** | Login/logout, usuários, papéis `ADMIN/MEMBER/VIEWER`, rotas protegidas | a criar ao liberar | ⏳ aguardando |
-| 3 | **UI React** | Árvore, editor de metadados, wizard de atualização, barra de status — specs v1 como critérios de aceitação | a criar ao liberar | ⏳ aguardando |
-| 4 | **Agente interno** | Provider LLM, geração em lote de sugestões, fila de aprovação na UI, auditoria | a criar ao liberar | ⏳ aguardando |
-| 5 | **MCP + opencode** | Tools MCP, API key, **skill**, documentação; teste ponta-a-ponta com opencode conectado | a criar ao liberar | ⏳ aguardando |
-| 6 | **Polish** | DBViewer como rota read-only, auditoria completa, preparação para deploy (notebook → labapps → Vultr `jairo.tools`) | a criar ao liberar | ⏳ aguardando |
+| #   | Fase                     | Entrega verificável                                                                                                                       | Change OpenSpec      | Status                 |
+| --- | ------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------- | -------------------- | ---------------------- |
+| 0 | **Scaffold** | Monorepo Bun (apps/api, apps/web, apps/mcp, packages/), Biome, Drizzle + primeira migração, gates `check`, `bun test` rodando | `v2-phase0-scaffold` | ✅ concluída em 14/11/2026 |
+| 1   | **Domínio + import**     | Schema SQLite completo; parser e diff do v1 portados com testes; API de projeto + import SQL com preview/apply; export JSON v1-compatível | a criar ao liberar   | ⏳ aguardando          |
+| 2   | **Auth + multi-usuário** | Login/logout, usuários, papéis `ADMIN/MEMBER/VIEWER`, rotas protegidas                                                                    | a criar ao liberar   | ⏳ aguardando          |
+| 3   | **UI React**             | Árvore, editor de metadados, wizard de atualização, barra de status — specs v1 como critérios de aceitação                                | a criar ao liberar   | ⏳ aguardando          |
+| 4   | **Agente interno**       | Provider LLM, geração em lote de sugestões, fila de aprovação na UI, auditoria                                                            | a criar ao liberar   | ⏳ aguardando          |
+| 5   | **MCP + opencode**       | Tools MCP, API key, **skill**, documentação; teste ponta-a-ponta com opencode conectado                                                   | a criar ao liberar   | ⏳ aguardando          |
+| 6   | **Polish**               | DBViewer como rota read-only, auditoria completa, preparação para deploy (notebook → labapps → Vultr `jairo.tools`)                       | a criar ao liberar   | ⏳ aguardando          |
 
 ## Como funciona
 
