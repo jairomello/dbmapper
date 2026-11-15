@@ -18,11 +18,13 @@
     "format": "biome format --write .",
     "test": "bun test",
     "check": "bun run typecheck && bun run lint && bun run check:persistence && bun run test",
-    "check:persistence": "bun run scripts/check-persistence-boundaries.ts"
+    "check:persistence": "bun run scripts/check-persistence-boundaries.ts",
+    "test:e2e": "bun run e2e/smoke.ts"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.5.14",
     "bun-types": "latest",
+    "playwright": "^1.65.1",
     "typescript": "^5.6.0"
   }
 }

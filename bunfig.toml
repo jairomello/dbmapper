@@ -1,2 +1,3 @@
 [test]
 pathIgnorePatterns = ["legacy/**"]
+preload = ["./apps/web/src/test/preload.ts"]

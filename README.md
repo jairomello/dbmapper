@@ -176,6 +176,44 @@ Regras do fluxo:
   `status: "CHANGED"`; remoções saem do modelo; relacionamentos passam a refletir
   o SQL novo.
 
+## UI web (Fase 3)
+
+A Fase 3 entrega a interface React: login por sessão, workspace com seleção/criação
+de projeto, árvore semântica, editor de metadados com revisão, barra de cobertura,
+wizard de atualização e export/import do JSON v1.
+
+Primeiro login (o `db:seed` é idempotente):
+
+```bash
+bun install
+bun run db:migrate
+bun run db:seed
+bun run dev
+```
+
+Abra `http://localhost:5173`. O `bun run dev` sobe a API em `http://localhost:3000`
+(respeita `PORT`) e o web em `http://localhost:5173`, com proxy de `/api` para a API.
+O admin inicial vem de `DBMAPPER_ADMIN_EMAIL` (padrão `admin@dbmapper.local`) e
+`DBMAPPER_ADMIN_PASSWORD`; sem a senha, o seed gera uma e a imprime uma única vez.
+
+No workspace você pode criar um projeto vazio, criar a partir de um arquivo/pasted
+SQL (`CREATE TABLE`), documentar tabelas/colunas, aprovar descrições, rodar o wizard
+"Atualizar modelo" (prévia calculada pelo servidor, renomes explícitos e confirmação
+antes do apply), além de exportar/importar o JSON v1.
+
+Testes da UI e smoke E2E (o Playwright não entra no `bun run check`):
+
+```bash
+bun run --cwd apps/web test
+bun run --cwd apps/web typecheck
+bun add -d playwright
+bunx playwright install chromium
+bun run test:e2e
+```
+
+O smoke sobe API + web em portas isoladas, cria o admin, faz login, cria um projeto
+a partir de `legacy/example.sql`, descreve/aprova uma coluna e valida o JSON exportado.
+
 ## Quick start (v1)
 
 Não há build. Sirva a pasta como site estático e abra o editor:

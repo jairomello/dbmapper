@@ -53,6 +53,7 @@ the repository root:
 - `bun run check` — quality gate: `typecheck` → `lint` → `check:persistence` → `test`.
 - `bun run db:migrate` — apply pending SQLite migrations with the explicit runner.
 - `bun run db:seed` — create the initial `ADMIN` idempotently.
+- `bun run test:e2e` — Playwright smoke (boots API + web, seeds an isolated admin); not part of `bun run check`.
 
 Auxiliary commands: `bun run typecheck`, `bun run lint`, `bun run format`, `bun run check:persistence`,
 `bun test`, `bun run db:generate` and `bun run --cwd <workspace> typecheck`.
@@ -79,6 +80,28 @@ renewal at 50%).
 API tests use a temp SQLite database per test and the shared helper in
 `apps/api/src/tests/helpers.ts`, which seeds a default user and attaches its
 session cookie. Pass `{ cookie: null }` to exercise unauthenticated `401`s.
+
+## Web UI (v2 — Fase 3)
+
+`apps/web` is the React UI (login, workspace, semantic tree, metadata editor,
+coverage bar, update wizard, SQL create and JSON export/import). It talks to the
+API through the typed client in `apps/web/src/api` with `credentials: 'include'`;
+React Query owns cache invalidation after mutations.
+
+- `bun run dev` starts API (`:3000`, `PORT` honored) and web (`:5173`) with Vite
+  proxying `/api` and `/health`. Open `http://localhost:5173`.
+- First login: run `bun run db:migrate` and `bun run db:seed`; use
+  `DBMAPPER_ADMIN_EMAIL` / `DBMAPPER_ADMIN_PASSWORD` (the seed prints a generated
+  password once when the password env is empty).
+- Web component tests: `bun run --cwd apps/web test`; typecheck:
+  `bun run --cwd apps/web typecheck`. The root `bun test`/`bun run check` already
+  include the web suites.
+- E2E smoke: install Playwright once in the work dir (`bun add -d playwright` and
+  `bunx playwright install chromium`) then run `bun run test:e2e`. It uses an
+  isolated temp SQLite DB and ports, and must stay out of `bun run check`.
+- The update wizard renders the server preview plan only: no diff/classification
+  logic in the client. Renames are explicit selectors passed to `apply`; nothing
+  is written before the final confirmation.
 
 ## Coding Style & Naming Conventions (v1)
 
