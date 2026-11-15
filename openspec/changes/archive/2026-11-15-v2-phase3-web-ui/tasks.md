@@ -58,7 +58,7 @@
 
 - [x] 12.1 Copy source only (never `node_modules`, `dist`, browsers or build output) from `~/work/dbmapper/` to the share and commit with an imperative message
 - [x] 12.2 Mark Fase 3 as ✅ in `ROADMAP.md` and commit the roadmap update
-- [ ] 12.3 Run `openspec archive v2-phase3-web-ui --yes` to move the change under `openspec/changes/archive/` (including the promoted `web-editor` and `web-import-wizard` specs)
+- [x] 12.3 Run `openspec archive v2-phase3-web-ui --yes` to move the change under `openspec/changes/archive/` (including the promoted `web-editor` and `web-import-wizard` specs)
 
 ## Workflow follow-up
 
