@@ -2,26 +2,26 @@
 
 ## 1. Schema, migração e repositórios
 
-- [ ] 1.1 Add `agent_jobs`, `ai_suggestions` and `events` tables to `apps/api/src/db/schema.ts` (text enums + checks, indexes, one-pending-per-item invariant via partial unique index or transactional-replace design note) and verify `bun run db:generate` produces a migration that applies cleanly via `bun run db:migrate` on a fresh DB, with `bun test` still green.
-- [ ] 1.2 Extend the `Persistence` port and SQLite runtime with job, suggestion and event repositories (insert/get/list, conditional-CAS updates, job claim with lease; events insert+list only) and verify API tests cover insert/list, CAS transition semantics and append-only events.
+- [x] 1.1 Add `agent_jobs`, `ai_suggestions` and `events` tables to `apps/api/src/db/schema.ts` (text enums + checks, indexes, one-pending-per-item invariant via partial unique index or transactional-replace design note) and verify `bun run db:generate` produces a migration that applies cleanly via `bun run db:migrate` on a fresh DB, with `bun test` still green.
+- [x] 1.2 Extend the `Persistence` port and SQLite runtime with job, suggestion and event repositories (insert/get/list, conditional-CAS updates, job claim with lease; events insert+list only) and verify API tests cover insert/list, CAS transition semantics and append-only events.
 
 ## 2. Provider LLM
 
-- [ ] 2.1 Implement the simplified `ModelProvider` interface with OpenAI and OpenRouter adapters (`openai` SDK, env-driven baseURL/model/key, timeout, safe error mapping that never echoes secrets) plus the in-memory fake provider, wired through `createApp` options, and verify unit tests: empty env → `LLM_NOT_CONFIGURED` path, adapter config from env, fake selectable via `DBMAPPER_LLM_PROVIDER=fake`, zero network calls in tests.
+- [x] 2.1 Implement the simplified `ModelProvider` interface with OpenAI and OpenRouter adapters (`openai` SDK, env-driven baseURL/model/key, timeout, safe error mapping that never echoes secrets) plus the in-memory fake provider, wired through `createApp` options, and verify unit tests: empty env → `LLM_NOT_CONFIGURED` path, adapter config from env, fake selectable via `DBMAPPER_LLM_PROVIDER=fake`, zero network calls in tests.
 
 ## 3. Contexto, prompt e parser
 
-- [ ] 3.1 Build the context collector (project/table scope → target tables and columns with empty descriptions, types, PK/FK flags, described neighbours, FK targets) and the PT-BR system prompt with the strict-JSON contract, and verify unit tests for scope filtering (only empty descriptions are targeted) and context shape.
-- [ ] 3.2 Implement the tolerant response parser (code-fence stripping, balanced-JSON extraction, zod validation, exact-name mapping, skip-invalid accounting) and verify unit tests with valid, malformed, partial and empty responses.
+- [x] 3.1 Build the context collector (project/table scope → target tables and columns with empty descriptions, types, PK/FK flags, described neighbours, FK targets) and the PT-BR system prompt with the strict-JSON contract, and verify unit tests for scope filtering (only empty descriptions are targeted) and context shape.
+- [x] 3.2 Implement the tolerant response parser (code-fence stripping, balanced-JSON extraction, zod validation, exact-name mapping, skip-invalid accounting) and verify unit tests with valid, malformed, partial and empty responses.
 
 ## 4. Worker e jobs
 
-- [ ] 4.1 Implement the in-process worker (unref'd interval loop, conditional claim with lease + attempts, heartbeat, per-table provider batches, transactional replace of pending rows, `succeeded`/`failed` transitions with `stats_json`) and verify API tests: successful run, provider failure mid-run keeps written suggestions and fails the job, expired lease is reclaimed with incremented attempts, regeneration replaces the pending suggestion for the same item.
+- [x] 4.1 Implement the in-process worker (unref'd interval loop, conditional claim with lease + attempts, heartbeat, per-table provider batches, transactional replace of pending rows, `succeeded`/`failed` transitions with `stats_json`) and verify API tests: successful run, provider failure mid-run keeps written suggestions and fails the job, expired lease is reclaimed with incremented attempts, regeneration replaces the pending suggestion for the same item.
 
 ## 5. Rotas e auditoria
 
-- [ ] 5.1 Register the agent routes (POST generate, GET job, GET pending list, PATCH edit, POST apply/reject single and bulk) with role gating and verify tests for every endpoint: 401 unauthenticated, 403 VIEWER, 202 generate, 409 CAS conflicts on stale apply/edit/reject, bulk response with `applied` + `skipped`, `LLM_NOT_CONFIGURED` when no provider.
-- [ ] 5.2 Record audit events for generate/apply/edit/reject inside the mutation transaction and verify tests assert an `events` row with actor and payload for each action, and that apply never leaves `reviewed=true` (approved target reopens to `false`).
+- [x] 5.1 Register the agent routes (POST generate, GET job, GET pending list, PATCH edit, POST apply/reject single and bulk) with role gating and verify tests for every endpoint: 401 unauthenticated, 403 VIEWER, 202 generate, 409 CAS conflicts on stale apply/edit/reject, bulk response with `applied` + `skipped`, `LLM_NOT_CONFIGURED` when no provider.
+- [x] 5.2 Record audit events for generate/apply/edit/reject inside the mutation transaction and verify tests assert an `events` row with actor and payload for each action, and that apply never leaves `reviewed=true` (approved target reopens to `false`).
 
 ## 6. UI — client e hooks
 

@@ -1,9 +1,10 @@
+import { createModelProvider } from './agent/provider'
 import { createApp } from './app'
 import { createRuntimePersistence } from './persistence/runtime'
 
 export const MAX_REQUEST_BODY_BYTES = 128 * 1024 * 1024
 
-export const app = createApp(createRuntimePersistence())
+export const app = createApp(createRuntimePersistence(), { agent: { provider: createModelProvider() } })
 
 if (import.meta.main) {
   const port = Number(process.env.PORT ?? 3000)

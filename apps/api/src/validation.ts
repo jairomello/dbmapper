@@ -153,6 +153,30 @@ export const applyImportSchema = z
   })
   .strict()
 
+export const agentGenerateSchema = z.discriminatedUnion('scope', [
+  z.object({ scope: z.literal('project') }).strict(),
+  z
+    .object({
+      scope: z.literal('table'),
+      tableId: z.string().trim().min(1),
+    })
+    .strict(),
+])
+
+export const agentSuggestionIdsSchema = z
+  .object({
+    ids: z.array(z.string().trim().min(1)).min(1).max(200),
+  })
+  .strict()
+
+export const agentEditSuggestionSchema = z
+  .object({
+    text: z.string().trim().min(1).max(20000),
+  })
+  .strict()
+
+export const aiSuggestionStatusSchema = z.enum(['pending', 'applied', 'rejected'])
+
 export async function parseJsonBody<S extends z.ZodTypeAny>(c: Context, schema: S): Promise<z.output<S>> {
   let body: unknown
 

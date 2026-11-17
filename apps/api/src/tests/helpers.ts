@@ -3,6 +3,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import type { DatabaseModel } from '@dbmapper/domain'
 import type { Hono } from 'hono'
+import type { AgentAppOptions } from '../app'
 import { createApp } from '../app'
 import type { Persistence, UserRecord, UserRole } from '../persistence/ports'
 import { createSqlitePersistence } from '../persistence/sqlite/adapter'
@@ -47,12 +48,15 @@ export async function createUser(
   return { user, cookie: await createSessionCookie(user) }
 }
 
-export async function createTestContext(
-  options: { user?: { email: string; password: string; role: UserRole } } = {},
-): Promise<TestContext> {
+export interface TestContextOptions {
+  user?: { email: string; password: string; role: UserRole }
+  agent?: AgentAppOptions
+}
+
+export async function createTestContext(options: TestContextOptions = {}): Promise<TestContext> {
   const directory = await mkdtemp(join(tmpdir(), 'dbmapper-api-'))
   const persistence = createSqlitePersistence(join(directory, 'test.db'), { migrate: true })
-  const app = createApp(persistence, { auth: TEST_AUTH })
+  const app = createApp(persistence, { auth: TEST_AUTH, agent: options.agent })
 
   const seed = options.user ?? DEFAULT_TEST_USER
   const defaultUser = persistence.users.create({

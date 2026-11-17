@@ -1,11 +1,14 @@
 import { Database } from 'bun:sqlite'
 import { fileURLToPath } from 'node:url'
 import type { DatabaseModel, DescriptionSource, ReviewStatus } from '@dbmapper/domain'
-import { and, asc, eq, gte, inArray, lt } from 'drizzle-orm'
+import { and, asc, eq, gte, inArray, lt, or, sql } from 'drizzle-orm'
 import { drizzle } from 'drizzle-orm/bun-sqlite'
 import { migrate } from 'drizzle-orm/bun-sqlite/migrator'
 import {
+  agentJobs as agentJobsTable,
+  aiSuggestions as aiSuggestionsTable,
   columns as columnsTable,
+  events as eventsTable,
   importRuns,
   loginAttempts as loginAttemptsTable,
   projects,
@@ -14,12 +17,27 @@ import {
   users as usersTable,
 } from '../../db/schema'
 import type {
+  AgentJobRecord,
+  AgentJobRepository,
+  AgentJobStatus,
+  AgentRepositories,
+  AgentJobScope,
+  AiSuggestionRecord,
+  AiSuggestionStatus,
+  AiSuggestionItemType,
   ApplyModelResult,
   ColumnRecord,
+  CreateAgentJobOptions,
+  CreateAgentJobInput,
+  CreateAiSuggestionInput,
   CreateImportRunInput,
   CreateProjectInput,
   CreateUserInput,
+  DecisionAudit,
+  EventRecord,
+  EventRepository,
   ImportRunRecord,
+  InsertEventInput,
   LoginAttemptRepository,
   MutationContext,
   Persistence,
@@ -28,6 +46,8 @@ import type {
   ProjectRepository,
   ProjectSummary,
   RelationshipRecord,
+  SuggestionDecisionResult,
+  SuggestionRepository,
   TableRecord,
   UserRecord,
   UserRepository,
@@ -49,6 +69,17 @@ function parseStringArray(value: string): string[] {
   }
 }
 
+function parseJsonObject(value: string): Record<string, unknown> {
+  try {
+    const parsed: unknown = JSON.parse(value)
+    return parsed !== null && typeof parsed === 'object' && !Array.isArray(parsed)
+      ? (parsed as Record<string, unknown>)
+      : {}
+  } catch {
+    return {}
+  }
+}
+
 function toUserRecord(row: typeof usersTable.$inferSelect): UserRecord {
   return {
     id: row.id,
@@ -57,6 +88,55 @@ function toUserRecord(row: typeof usersTable.$inferSelect): UserRecord {
     role: row.role as UserRole,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
+  }
+}
+
+function toAgentJobRecord(row: typeof agentJobsTable.$inferSelect): AgentJobRecord {
+  return {
+    id: row.id,
+    projectId: row.projectId,
+    scope: row.scope as AgentJobScope,
+    tableId: row.tableId,
+    status: row.status as AgentJobStatus,
+    attempts: row.attempts,
+    leaseExpiresAt: row.leaseExpiresAt,
+    requestedBy: row.requestedBy,
+    error: row.error,
+    stats: parseJsonObject(row.statsJson),
+    createdAt: row.createdAt,
+    updatedAt: row.updatedAt,
+  }
+}
+
+function toSuggestionRecord(row: typeof aiSuggestionsTable.$inferSelect): AiSuggestionRecord {
+  return {
+    id: row.id,
+    projectId: row.projectId,
+    jobId: row.jobId,
+    itemType: row.itemType as AiSuggestionItemType,
+    itemId: row.itemId,
+    tableId: row.tableId,
+    suggestedDescription: row.suggestedDescription,
+    context: parseJsonObject(row.contextJson),
+    status: row.status as AiSuggestionStatus,
+    requestedBy: row.requestedBy,
+    decidedBy: row.decidedBy,
+    decidedAt: row.decidedAt,
+    createdAt: row.createdAt,
+    updatedAt: row.updatedAt,
+  }
+}
+
+function toEventRecord(row: typeof eventsTable.$inferSelect): EventRecord {
+  return {
+    id: row.id,
+    projectId: row.projectId,
+    actorUserId: row.actorUserId,
+    action: row.action,
+    subjectType: row.subjectType,
+    subjectId: row.subjectId,
+    payload: parseJsonObject(row.payloadJson),
+    createdAt: row.createdAt,
   }
 }
 
@@ -74,6 +154,31 @@ export function createSqlitePersistence(
 
   type Db = typeof db
   type Tx = Parameters<Parameters<Db['transaction']>[0]>[0]
+
+  const insertEventRow = (tx: Tx, input: InsertEventInput, now: string): EventRecord => {
+    const createdAt = input.createdAt ?? now
+    const row = {
+      id: crypto.randomUUID(),
+      projectId: input.projectId,
+      actorUserId: input.actorUserId ?? null,
+      action: input.action,
+      subjectType: input.subjectType,
+      subjectId: input.subjectId,
+      payloadJson: JSON.stringify(input.payload ?? {}),
+      createdAt,
+    }
+    tx.insert(eventsTable).values(row).run()
+    return {
+      id: row.id,
+      projectId: row.projectId,
+      actorUserId: row.actorUserId,
+      action: row.action,
+      subjectType: row.subjectType,
+      subjectId: row.subjectId,
+      payload: input.payload ?? {},
+      createdAt,
+    }
+  }
 
   const getProject = (id: string): ProjectAggregate | null => {
     const project = db.select().from(projects).where(eq(projects.id, id)).get()
@@ -549,10 +654,385 @@ export function createSqlitePersistence(
     },
   }
 
+  const agentJobRepository: AgentJobRepository = {
+    create(input: CreateAgentJobInput, options: CreateAgentJobOptions = {}): AgentJobRecord {
+      const now = options.now ?? new Date().toISOString()
+      const row = {
+        id: input.id ?? crypto.randomUUID(),
+        projectId: input.projectId,
+        scope: input.scope,
+        tableId: input.tableId ?? null,
+        status: 'queued' as const,
+        attempts: 0,
+        leaseExpiresAt: null,
+        requestedBy: input.requestedBy,
+        error: null,
+        statsJson: JSON.stringify(input.stats ?? {}),
+        createdAt: now,
+        updatedAt: now,
+      }
+
+      return db.transaction((tx) => {
+        tx.insert(agentJobsTable).values(row).run()
+        if (options.audit) insertEventRow(tx, options.audit, now)
+        return toAgentJobRecord(row)
+      })
+    },
+
+    get(id: string): AgentJobRecord | null {
+      const row = db.select().from(agentJobsTable).where(eq(agentJobsTable.id, id)).get()
+      return row ? toAgentJobRecord(row) : null
+    },
+
+    listByProject(projectId: string): AgentJobRecord[] {
+      return db
+        .select()
+        .from(agentJobsTable)
+        .where(eq(agentJobsTable.projectId, projectId))
+        .orderBy(asc(agentJobsTable.createdAt), asc(agentJobsTable.id))
+        .all()
+        .map(toAgentJobRecord)
+    },
+
+    claimNext(now: string, leaseExpiresAt: string): AgentJobRecord | null {
+      return db.transaction((tx) => {
+        const claimable = or(
+          eq(agentJobsTable.status, 'queued'),
+          and(
+            eq(agentJobsTable.status, 'running'),
+            sql`${agentJobsTable.leaseExpiresAt} is not null and ${agentJobsTable.leaseExpiresAt} < ${now}`,
+          ),
+        )
+
+        const candidate = tx
+          .select({ id: agentJobsTable.id })
+          .from(agentJobsTable)
+          .where(claimable)
+          .orderBy(asc(agentJobsTable.createdAt), asc(agentJobsTable.id))
+          .get()
+
+        if (!candidate) return null
+
+        const updated = tx
+          .update(agentJobsTable)
+          .set({
+            status: 'running',
+            leaseExpiresAt,
+            attempts: sql`${agentJobsTable.attempts} + 1`,
+            error: null,
+            updatedAt: now,
+          })
+          .where(and(eq(agentJobsTable.id, candidate.id), claimable))
+          .returning()
+          .get()
+
+        return updated ? toAgentJobRecord(updated) : null
+      })
+    },
+
+    heartbeat(id: string, leaseExpiresAt: string, now: string): void {
+      db.update(agentJobsTable)
+        .set({ leaseExpiresAt, updatedAt: now })
+        .where(and(eq(agentJobsTable.id, id), eq(agentJobsTable.status, 'running')))
+        .run()
+    },
+
+    succeed(id: string, stats: Record<string, unknown>, now: string): AgentJobRecord | null {
+      const updated = db
+        .update(agentJobsTable)
+        .set({
+          status: 'succeeded',
+          statsJson: JSON.stringify(stats),
+          error: null,
+          leaseExpiresAt: null,
+          updatedAt: now,
+        })
+        .where(and(eq(agentJobsTable.id, id), eq(agentJobsTable.status, 'running')))
+        .returning()
+        .get()
+      return updated ? toAgentJobRecord(updated) : null
+    },
+
+    fail(id: string, error: string, stats: Record<string, unknown>, now: string): AgentJobRecord | null {
+      const updated = db
+        .update(agentJobsTable)
+        .set({
+          status: 'failed',
+          statsJson: JSON.stringify(stats),
+          error,
+          leaseExpiresAt: null,
+          updatedAt: now,
+        })
+        .where(and(eq(agentJobsTable.id, id), eq(agentJobsTable.status, 'running')))
+        .returning()
+        .get()
+      return updated ? toAgentJobRecord(updated) : null
+    },
+  }
+
+  const suggestionRepository: SuggestionRepository = {
+    replacePending(inputs: CreateAiSuggestionInput[], now: string): AiSuggestionRecord[] {
+      if (inputs.length === 0) return []
+
+      return db.transaction((tx) => {
+        const created: AiSuggestionRecord[] = []
+
+        for (const input of inputs) {
+          tx.delete(aiSuggestionsTable)
+            .where(
+              and(
+                eq(aiSuggestionsTable.itemType, input.itemType),
+                eq(aiSuggestionsTable.itemId, input.itemId),
+                eq(aiSuggestionsTable.status, 'pending'),
+              ),
+            )
+            .run()
+
+          const row = {
+            id: crypto.randomUUID(),
+            projectId: input.projectId,
+            jobId: input.jobId,
+            itemType: input.itemType,
+            itemId: input.itemId,
+            tableId: input.tableId ?? null,
+            suggestedDescription: input.suggestedDescription,
+            contextJson: JSON.stringify(input.context ?? {}),
+            status: 'pending' as const,
+            requestedBy: input.requestedBy,
+            decidedBy: null,
+            decidedAt: null,
+            createdAt: now,
+            updatedAt: now,
+          }
+          tx.insert(aiSuggestionsTable).values(row).run()
+          created.push(toSuggestionRecord(row))
+        }
+
+        return created
+      })
+    },
+
+    get(id: string): AiSuggestionRecord | null {
+      const row = db.select().from(aiSuggestionsTable).where(eq(aiSuggestionsTable.id, id)).get()
+      return row ? toSuggestionRecord(row) : null
+    },
+
+    list(projectId: string, status: AiSuggestionStatus = 'pending'): AiSuggestionRecord[] {
+      return db
+        .select()
+        .from(aiSuggestionsTable)
+        .where(and(eq(aiSuggestionsTable.projectId, projectId), eq(aiSuggestionsTable.status, status)))
+        .orderBy(asc(aiSuggestionsTable.createdAt), asc(aiSuggestionsTable.id))
+        .all()
+        .map(toSuggestionRecord)
+    },
+
+    editPending(
+      projectId: string,
+      id: string,
+      text: string,
+      actorUserId: string,
+      now: string,
+      audit: DecisionAudit,
+    ): AiSuggestionRecord | null {
+      return db.transaction((tx) => {
+        const updated = tx
+          .update(aiSuggestionsTable)
+          .set({ suggestedDescription: text, updatedAt: now })
+          .where(
+            and(
+              eq(aiSuggestionsTable.id, id),
+              eq(aiSuggestionsTable.projectId, projectId),
+              eq(aiSuggestionsTable.status, 'pending'),
+            ),
+          )
+          .returning()
+          .get()
+
+        if (!updated) return null
+
+        insertEventRow(
+          tx,
+          {
+            ...audit,
+            actorUserId,
+            payload: {
+              ...audit.payload,
+              suggestionId: updated.id,
+              itemId: updated.itemId,
+              itemType: updated.itemType,
+            },
+            createdAt: now,
+          },
+          now,
+        )
+
+        return toSuggestionRecord(updated)
+      })
+    },
+
+    apply(
+      projectId: string,
+      ids: string[],
+      actorUserId: string,
+      now: string,
+      audit: DecisionAudit,
+    ): SuggestionDecisionResult {
+      return db.transaction((tx) => {
+        const decided: AiSuggestionRecord[] = []
+        const skipped: string[] = []
+
+        for (const id of ids) {
+          const updated = tx
+            .update(aiSuggestionsTable)
+            .set({ status: 'applied', decidedBy: actorUserId, decidedAt: now, updatedAt: now })
+            .where(
+              and(
+                eq(aiSuggestionsTable.id, id),
+                eq(aiSuggestionsTable.projectId, projectId),
+                eq(aiSuggestionsTable.status, 'pending'),
+              ),
+            )
+            .returning()
+            .get()
+
+          if (!updated) {
+            skipped.push(id)
+            continue
+          }
+
+          if (updated.itemType === 'table') {
+            tx.update(tablesTable)
+              .set({
+                description: updated.suggestedDescription,
+                descriptionSource: 'agent',
+                reviewed: false,
+                reviewedBy: null,
+                reviewedAt: null,
+                updatedAt: now,
+              })
+              .where(eq(tablesTable.id, updated.itemId))
+              .run()
+          } else {
+            tx.update(columnsTable)
+              .set({
+                description: updated.suggestedDescription,
+                descriptionSource: 'agent',
+                reviewed: false,
+                reviewedBy: null,
+                reviewedAt: null,
+                updatedAt: now,
+              })
+              .where(eq(columnsTable.id, updated.itemId))
+              .run()
+          }
+
+          decided.push(toSuggestionRecord(updated))
+        }
+
+        if (decided.length > 0) {
+          insertEventRow(
+            tx,
+            {
+              ...audit,
+              actorUserId,
+              payload: {
+                ...audit.payload,
+                suggestionIds: decided.map((suggestion) => suggestion.id),
+                itemIds: decided.map((suggestion) => suggestion.itemId),
+              },
+              createdAt: now,
+            },
+            now,
+          )
+        }
+
+        return { decided, skipped }
+      })
+    },
+
+    reject(
+      projectId: string,
+      ids: string[],
+      actorUserId: string,
+      now: string,
+      audit: DecisionAudit,
+    ): SuggestionDecisionResult {
+      return db.transaction((tx) => {
+        const decided: AiSuggestionRecord[] = []
+        const skipped: string[] = []
+
+        for (const id of ids) {
+          const updated = tx
+            .update(aiSuggestionsTable)
+            .set({ status: 'rejected', decidedBy: actorUserId, decidedAt: now, updatedAt: now })
+            .where(
+              and(
+                eq(aiSuggestionsTable.id, id),
+                eq(aiSuggestionsTable.projectId, projectId),
+                eq(aiSuggestionsTable.status, 'pending'),
+              ),
+            )
+            .returning()
+            .get()
+
+          if (!updated) {
+            skipped.push(id)
+            continue
+          }
+
+          decided.push(toSuggestionRecord(updated))
+        }
+
+        if (decided.length > 0) {
+          insertEventRow(
+            tx,
+            {
+              ...audit,
+              actorUserId,
+              payload: {
+                ...audit.payload,
+                suggestionIds: decided.map((suggestion) => suggestion.id),
+                itemIds: decided.map((suggestion) => suggestion.itemId),
+              },
+              createdAt: now,
+            },
+            now,
+          )
+        }
+
+        return { decided, skipped }
+      })
+    },
+  }
+
+  const eventRepository: EventRepository = {
+    insert(input: InsertEventInput): EventRecord {
+      return db.transaction((tx) => insertEventRow(tx, input, new Date().toISOString()))
+    },
+
+    list(projectId: string): EventRecord[] {
+      return db
+        .select()
+        .from(eventsTable)
+        .where(eq(eventsTable.projectId, projectId))
+        .orderBy(asc(eventsTable.createdAt), asc(eventsTable.id))
+        .all()
+        .map(toEventRecord)
+    },
+  }
+
+  const agentRepositories: AgentRepositories = {
+    jobs: agentJobRepository,
+    suggestions: suggestionRepository,
+    events: eventRepository,
+  }
+
   return {
     projects: projectRepository,
     users: userRepository,
     loginAttempts: loginAttemptRepository,
+    agent: agentRepositories,
     close(): void {
       sqlite.close()
     },

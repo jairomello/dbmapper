@@ -142,3 +142,95 @@ export const importRuns = sqliteTable(
     createdIdx: index('import_runs_created_idx').on(table.createdAt),
   }),
 )
+
+export const AGENT_JOB_SCOPES = ['project', 'table'] as const
+export const AGENT_JOB_STATUSES = ['queued', 'running', 'succeeded', 'failed'] as const
+export const AI_SUGGESTION_ITEM_TYPES = ['table', 'column'] as const
+export const AI_SUGGESTION_STATUSES = ['pending', 'applied', 'rejected'] as const
+
+export const agentJobs = sqliteTable(
+  'agent_jobs',
+  {
+    id: text('id').primaryKey(),
+    projectId: text('project_id')
+      .notNull()
+      .references(() => projects.id, { onDelete: 'cascade' }),
+    scope: text('scope', { enum: AGENT_JOB_SCOPES }).notNull(),
+    tableId: text('table_id').references(() => tables.id, { onDelete: 'cascade' }),
+    status: text('status', { enum: AGENT_JOB_STATUSES }).notNull().default('queued'),
+    attempts: integer('attempts').notNull().default(0),
+    leaseExpiresAt: text('lease_expires_at'),
+    requestedBy: text('requested_by')
+      .notNull()
+      .references(() => users.id),
+    error: text('error'),
+    statsJson: text('stats_json').notNull().default('{}'),
+    createdAt: text('created_at').notNull().default(isoNow),
+    updatedAt: text('updated_at').notNull().default(isoNow),
+  },
+  (table) => ({
+    projectCreatedIdx: index('agent_jobs_project_created_idx').on(table.projectId, table.createdAt),
+    statusIdx: index('agent_jobs_status_idx').on(table.status),
+    scopeCheck: check('agent_jobs_scope_check', sql`${table.scope} in ('project', 'table')`),
+    statusCheck: check(
+      'agent_jobs_status_check',
+      sql`${table.status} in ('queued', 'running', 'succeeded', 'failed')`,
+    ),
+  }),
+)
+
+export const aiSuggestions = sqliteTable(
+  'ai_suggestions',
+  {
+    id: text('id').primaryKey(),
+    projectId: text('project_id')
+      .notNull()
+      .references(() => projects.id, { onDelete: 'cascade' }),
+    jobId: text('job_id')
+      .notNull()
+      .references(() => agentJobs.id, { onDelete: 'cascade' }),
+    itemType: text('item_type', { enum: AI_SUGGESTION_ITEM_TYPES }).notNull(),
+    itemId: text('item_id').notNull(),
+    tableId: text('table_id').references(() => tables.id, { onDelete: 'cascade' }),
+    suggestedDescription: text('suggested_description').notNull(),
+    contextJson: text('context_json').notNull().default('{}'),
+    status: text('status', { enum: AI_SUGGESTION_STATUSES }).notNull().default('pending'),
+    requestedBy: text('requested_by')
+      .notNull()
+      .references(() => users.id),
+    decidedBy: text('decided_by').references(() => users.id),
+    decidedAt: text('decided_at'),
+    createdAt: text('created_at').notNull().default(isoNow),
+    updatedAt: text('updated_at').notNull().default(isoNow),
+  },
+  (table) => ({
+    projectStatusIdx: index('ai_suggestions_project_status_idx').on(table.projectId, table.status),
+    pendingUq: uniqueIndex('ai_suggestions_pending_uq')
+      .on(table.itemType, table.itemId)
+      .where(sql`${table.status} = 'pending'`),
+    itemTypeCheck: check('ai_suggestions_item_type_check', sql`${table.itemType} in ('table', 'column')`),
+    statusCheck: check(
+      'ai_suggestions_status_check',
+      sql`${table.status} in ('pending', 'applied', 'rejected')`,
+    ),
+  }),
+)
+
+export const events = sqliteTable(
+  'events',
+  {
+    id: text('id').primaryKey(),
+    projectId: text('project_id')
+      .notNull()
+      .references(() => projects.id, { onDelete: 'cascade' }),
+    actorUserId: text('actor_user_id').references(() => users.id),
+    action: text('action').notNull(),
+    subjectType: text('subject_type').notNull(),
+    subjectId: text('subject_id').notNull(),
+    payloadJson: text('payload_json').notNull().default('{}'),
+    createdAt: text('created_at').notNull().default(isoNow),
+  },
+  (table) => ({
+    projectCreatedIdx: index('events_project_created_idx').on(table.projectId, table.createdAt),
+  }),
+)
