@@ -105,6 +105,36 @@ invalidation after mutations.
   logic in the client. Renames are explicit selectors passed to `apply`; nothing
   is written before the final confirmation.
 
+## Agente (v2 — Fase 4)
+
+The embedded agent generates PT-BR description suggestions in batches for human
+approval. The API side is done: env-configured LLM provider, `agent_jobs` with an
+in-process lease worker, `ai_suggestions` with CAS decisions and append-only
+`events`. The web side lives in `apps/web/src/agent` (typed client + React Query
+hooks) and `apps/web/src/components/SuggestionPanel.tsx`, wired into the
+workspace behind the "Sugestões IA" entry with a pending-count badge.
+
+- Provider env only: `DBMAPPER_LLM_PROVIDER` (`openai` / `openrouter` / `fake`),
+  `OPENAI_API_KEY`/`OPENAI_MODEL`, `OPENROUTER_API_KEY`/`OPENROUTER_MODEL`.
+  Missing provider → `LLM_NOT_CONFIGURED` on generation; never store or return
+  keys. `fake` is test/e2e only and must never hit the network.
+- Routes under `/api/projects/:id/agent` are session-protected: reads for any
+  role, generation/edit/apply/reject for `MEMBER`+ (`VIEWER` gets `403`).
+  Decisions are CAS from `pending` (`409` otherwise).
+- Apply writes the suggestion text as `description`, sets
+  `description_source='agent'` and `reviewed=false`; the agent never approves.
+  It also invalidates the project query so the coverage bar and editor refresh.
+- UI: `usePendingSuggestions`, `useAgentJob` (polling every 2 s while
+  `queued|running`), and generate/edit/apply/reject mutations. The panel shows a
+  side-by-side preview, inline edit, bulk Aplicar/Rejeitar and an empty state;
+  actions are hidden for `VIEWER`.
+- Tests: web component tests mock `fetch` (loading, empty, error, polling
+  transition, bulk, edit-then-apply, role visibility). E2E runs the full agent
+  flow with `DBMAPPER_LLM_PROVIDER=fake`. `bun run check` and
+  `bun run test:e2e` cover both; neither performs real LLM calls.
+- The worker is in-process (single-instance deploy). `bun run test:e2e` stays out
+  of `bun run check`.
+
 ## Coding Style & Naming Conventions (v1)
 
 Use 4-space indentation in HTML, CSS, and JavaScript. JavaScript uses `camelCase` for functions and variables, `const`/`let`, and direct DOM APIs. Keep UI text in Portuguese unless changing a product label such as "DBMapper" or "Semantic Layer".

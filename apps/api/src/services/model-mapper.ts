@@ -102,6 +102,7 @@ export interface ProjectView {
   reviewed: boolean
   createdAt: string
   updatedAt: string
+  table_ids: Record<string, string>
   database: DatabaseModel
 }
 
@@ -115,6 +116,7 @@ export function projectView(aggregate: ProjectAggregate): ProjectView {
     reviewed: project.reviewed,
     createdAt: project.createdAt,
     updatedAt: project.updatedAt,
+    table_ids: Object.fromEntries(aggregate.tables.map((table) => [table.name, table.id])),
     database: databaseFromAggregate(aggregate),
   }
 }

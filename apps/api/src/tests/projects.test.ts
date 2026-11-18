@@ -17,6 +17,7 @@ interface ProjectViewBody {
   reviewed: boolean
   createdAt: string
   updatedAt: string
+  table_ids: Record<string, string>
   database: DatabaseModel
 }
 
@@ -50,6 +51,7 @@ describe('project-api: CRUD de projetos', () => {
     expect(body.name).toBe('Novo Banco')
     expect(body.createdAt).toBeTruthy()
     expect(body.updatedAt).toBeTruthy()
+    expect(body.table_ids).toEqual({})
     expect(body.database.tables).toEqual([])
   })
 
@@ -71,6 +73,11 @@ describe('project-api: CRUD de projetos', () => {
     expect(response.status).toBe(200)
     expect(body.id).toBe(id)
     expect(body.database.tables.map((table) => table.name)).toEqual(['cliente', 'pedido'])
+
+    const internalTables = context.persistence.projects.get(id)!.tables
+    expect(body.table_ids).toEqual(
+      Object.fromEntries(internalTables.map((table) => [table.name, table.id])),
+    )
 
     const pedido = body.database.tables.find((table) => table.name === 'pedido')!
     const cliente = body.database.tables.find((table) => table.name === 'cliente')!
@@ -99,6 +106,11 @@ describe('project-api: CRUD de projetos', () => {
     const saved = await apiRequest<ProjectViewBody>(context, `/api/projects/${id}`, 'PUT', { database })
     expect(saved.response.status).toBe(200)
     expect(saved.body.database.description).toBe('Modelo atualizado')
+    expect(saved.body.table_ids).toEqual(
+      Object.fromEntries(
+        context.persistence.projects.get(id)!.tables.map((table) => [table.name, table.id]),
+      ),
+    )
 
     const pedido = saved.body.database.tables.find((table) => table.name === 'pedido')!
     const cliente = saved.body.database.tables.find((table) => table.name === 'cliente')!

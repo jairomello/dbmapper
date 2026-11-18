@@ -77,6 +77,52 @@ describe('WorkspacePage', () => {
     await waitFor(() => expect(within(reviewedColumn).getByText('aprovado')).toBeTruthy())
   })
 
+  test('exibe o badge de sugestões pendentes e abre o painel do agente', async () => {
+    const project = sampleProject()
+
+    restoreCallbacks.push(
+      installFetch((url) => {
+        if (url === '/api/auth/me') return jsonResponse(sampleUser)
+        if (url === `/api/projects/${project.id}`) return jsonResponse(project)
+        if (url === `/api/projects/${project.id}/agent/suggestions?status=pending`) {
+          return jsonResponse({
+            suggestions: [
+              {
+                id: 'sug-1',
+                projectId: project.id,
+                jobId: 'job-1',
+                itemType: 'column',
+                itemId: 'col-email',
+                tableId: 'table-users',
+                suggestedDescription: 'Campo email da tabela users.',
+                context: {
+                  table: { id: 'table-users', name: 'users' },
+                  item: { type: 'column', id: 'col-email', name: 'email' },
+                },
+                status: 'pending',
+                requestedBy: 'user-1',
+                decidedBy: null,
+                decidedAt: null,
+                createdAt: '2026-01-01T00:00:00.000Z',
+                updatedAt: '2026-01-01T00:00:00.000Z',
+              },
+            ],
+          })
+        }
+        return errorResponse('NOT_FOUND', 'Recurso não encontrado.', 404)
+      }),
+    )
+
+    renderApp(['/project/projeto-1'])
+
+    const badge = await screen.findByTestId('agent-pending-badge')
+    expect(badge.textContent).toBe('1')
+
+    fireEvent.click(screen.getByRole('button', { name: 'Sugestões IA' }))
+    expect(await screen.findByRole('dialog', { name: 'Sugestões IA' })).toBeTruthy()
+    expect(await screen.findByTestId('suggestion-row-users-email')).toBeTruthy()
+  })
+
   test('rota de projeto inexistente volta para a galeria', async () => {
     restoreCallbacks.push(
       installFetch((url) => {

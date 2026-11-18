@@ -20,8 +20,15 @@ const env = {
   DATABASE_URL: databasePath,
   DBMAPPER_ADMIN_EMAIL: adminEmail,
   DBMAPPER_ADMIN_PASSWORD: adminPassword,
+  DBMAPPER_LLM_PROVIDER: 'fake',
   JWT_SECRET: 'dbmapper-e2e-secret',
   NODE_ENV: 'development',
+}
+
+function reviewedColumnCount(label: string): number {
+  const match = label.match(/·\s*(\d+)\/(\d+)\s*campos/)
+  if (!match) throw new Error(`Não foi possível ler a cobertura revisada: ${label}`)
+  return Number(match[1])
 }
 
 function runOnce(cmd: string[]): void {
@@ -49,6 +56,17 @@ async function waitForOk(url: string, label: string, timeoutMs = 30000): Promise
   throw new Error(`Tempo esgotado esperando ${label} em ${url}: ${String(lastError)}`)
 }
 
+async function waitUntil(predicate: () => boolean, label: string, timeoutMs = 10000): Promise<void> {
+  const deadline = Date.now() + timeoutMs
+
+  while (Date.now() < deadline) {
+    if (predicate()) return
+    await Bun.sleep(50)
+  }
+
+  throw new Error(`Tempo esgotado esperando ${label}.`)
+}
+
 runOnce(['bun', 'run', '--cwd', 'apps/api', 'db:seed'])
 
 const api = Bun.spawn(['bun', 'run', '--cwd', 'apps/api', 'start'], {
@@ -74,6 +92,16 @@ try {
   const page = await browser.newPage({ acceptDownloads: true })
   page.setDefaultTimeout(20000)
 
+  const generateRequests: Array<{ scope?: string; tableId?: string }> = []
+  page.on('request', (request) => {
+    if (request.method() !== 'POST' || !request.url().endsWith('/agent/suggestions')) return
+    try {
+      generateRequests.push(JSON.parse(request.postData() ?? '{}') as { scope?: string; tableId?: string })
+    } catch {
+      generateRequests.push({})
+    }
+  })
+
   await page.goto(`http://localhost:${webPort}/login`)
   await page.getByLabel('E-mail').fill(adminEmail)
   await page.getByLabel('Senha').fill(adminPassword)
@@ -93,6 +121,55 @@ try {
   await page.getByText('Alterações salvas.').waitFor()
   await page.getByRole('button', { name: 'Aprovar Descrição' }).click()
   await page.getByRole('button', { name: 'Reabrir Revisão' }).waitFor()
+
+  const reviewedBefore = reviewedColumnCount((await page.getByTestId('coverage-reviewed').textContent()) ?? '')
+
+  await page.getByRole('button', { name: 'Sugestões IA' }).click()
+  const agentPanel = page.getByRole('dialog', { name: 'Sugestões IA' })
+  await agentPanel.getByRole('button', { name: 'Sugerir descrições' }).first().click()
+  const scopeDialog = page.getByRole('dialog', { name: 'Sugerir descrições' })
+  await scopeDialog.getByLabel('Projeto inteiro').check()
+  await scopeDialog.getByRole('button', { name: 'Gerar sugestões' }).click()
+  await waitUntil(() => generateRequests.length >= 1, 'a geração do projeto inteiro')
+  if (generateRequests[0]?.scope !== 'project') {
+    throw new Error(`Escopo inesperado na primeira geração: ${String(generateRequests[0]?.scope)}`)
+  }
+
+  const emailSuggestion = page.getByTestId('suggestion-row-users-email')
+  await emailSuggestion.waitFor({ timeout: 30000 })
+  await emailSuggestion.getByRole('button', { name: 'Aplicar' }).click()
+  await emailSuggestion.waitFor({ state: 'detached', timeout: 20000 })
+  await agentPanel.getByRole('button', { name: 'Fechar' }).click()
+
+  await page.getByTestId('column-row-users-email').click()
+  await page.waitForFunction(() => {
+    const textarea = document.querySelector<HTMLTextAreaElement>('textarea')
+    return Boolean(textarea && textarea.value.trim().length > 0)
+  })
+  await page.getByRole('button', { name: 'Aprovar Descrição' }).click()
+  await page.getByRole('button', { name: 'Reabrir Revisão' }).waitFor()
+
+  const reviewedAfter = reviewedColumnCount((await page.getByTestId('coverage-reviewed').textContent()) ?? '')
+  if (reviewedAfter <= reviewedBefore) {
+    throw new Error(`A cobertura revisada não refletiu a sugestão aplicada (${reviewedBefore} -> ${reviewedAfter}).`)
+  }
+
+  await page.getByRole('button', { name: 'Sugestões IA' }).click()
+  const tableScopePanel = page.getByRole('dialog', { name: 'Sugestões IA' })
+  await tableScopePanel.getByRole('button', { name: 'Sugerir descrições' }).first().click()
+  const tableScopeDialog = page.getByRole('dialog', { name: 'Sugerir descrições' })
+  await tableScopeDialog.getByLabel(/Esta tabela/).check()
+  await tableScopeDialog.getByRole('button', { name: 'Gerar sugestões' }).click()
+  await tableScopeDialog.waitFor({ state: 'detached', timeout: 20000 })
+  await waitUntil(() => generateRequests.length >= 2, 'a geração do escopo de tabela')
+
+  const tableRequest = generateRequests[1]
+  if (tableRequest?.scope !== 'table' || !tableRequest.tableId) {
+    throw new Error(
+      `A geração por tabela não enviou scope=table com tableId (${JSON.stringify(tableRequest)}).`,
+    )
+  }
+  await tableScopePanel.getByRole('button', { name: 'Fechar' }).click()
 
   const downloadPromise = page.waitForEvent('download')
   await page.getByRole('button', { name: 'Exportar JSON' }).click()
@@ -118,7 +195,9 @@ try {
   }
   if (username.reviewed !== true) throw new Error('A revisão aprovada não foi preservada no export.')
 
-  console.log('E2E smoke ok: login, projeto via SQL, descrição, aprovação e export JSON.')
+  console.log(
+    'E2E smoke ok: login, projeto via SQL, descrição, aprovação, agente (fake, projeto e tabela) e export JSON.',
+  )
 } finally {
   await browser?.close()
   web.kill()

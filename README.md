@@ -230,6 +230,63 @@ O smoke sobe API + web em portas isoladas, cria o admin, faz login, abre a galer
 cria um projeto importando `legacy/example.sql`, descreve/aprova uma coluna e valida o
 JSON exportado.
 
+## Agente de sugestões (Fase 4)
+
+A Fase 4 adiciona o agente embutido: geração em lote de sugestões de descrição
+pelo LLM, enfileiradas para decisão humana no workspace, com auditoria. O agente
+**nunca** aprova uma descrição: aplicar grava `description`, define
+`description_source='agent'` e `reviewed=false` (aplicar sobre um item aprovado
+reabre a revisão).
+
+### Configuração do provider
+
+O provider é configurado somente por variáveis de ambiente (nunca no banco nem
+nas respostas). Copie os valores desejados de `.env.example`:
+
+| Variável | Descrição |
+| --- | --- |
+| `DBMAPPER_LLM_PROVIDER` | `openai`, `openrouter` ou `fake` (opcional; sem ele vale a primeira chave presente) |
+| `OPENAI_API_KEY` / `OPENAI_MODEL` | chave e modelo da OpenAI (padrão `gpt-4o-mini`) |
+| `OPENROUTER_API_KEY` / `OPENROUTER_MODEL` | chave e modelo do OpenRouter (padrão `openai/gpt-4o-mini`) |
+
+Sem provider/chave, uma solicitação de geração falha com o envelope de erro e
+`error.code = "LLM_NOT_CONFIGURED"` (sem criar job). O provider `fake` é
+**somente para testes/e2e**: gera sugestões determinísticas em pt-BR sem acesso
+à rede.
+
+### Fluxo de geração e decisão
+
+1. No workspace, abra **Sugestões IA** e clique em **Sugerir descrições**.
+2. Escolha o escopo **Projeto inteiro** ou **Esta tabela** (apenas itens sem
+   descrição são alvo).
+3. A API cria um `agent_jobs` com status `queued`; um worker in-process com lease
+   processa o job em lotes por tabela e grava sugestões `pending`.
+4. O painel faz polling do job enquanto `queued`/`running` e mostra a prévia lado
+   a lado: caminho e contexto do item × texto sugerido.
+5. `MEMBER`/`ADMIN` podem editar antes de aplicar, aplicar/rejeitar uma sugestão
+   ou uma seleção em lote. Decisões usam CAS: uma sugestão já decidida retorna
+   `409`. `VIEWER` só visualiza a fila (as ações ficam ocultas e a API responde
+   `403`).
+6. Cada geração, edição, aplicação e rejeição grava um evento em `events`
+   (append-only) com o ator e o payload.
+
+| Método | Rota | Papel | Descrição |
+| --- | --- | --- | --- |
+| `POST` | `/api/projects/{id}/agent/suggestions` | `MEMBER`+ | solicita geração (`{ "scope": "project" }` ou `{ "scope": "table", "tableId": "..." }`) e devolve `202` com o job |
+| `GET` | `/api/projects/{id}/agent/jobs/{jobId}` | qualquer sessão | status, tentativas, erro e estatísticas do job |
+| `GET` | `/api/projects/{id}/agent/suggestions?status=pending` | qualquer sessão | fila pendente com o contexto enviado ao modelo |
+| `PATCH` | `/api/projects/{id}/agent/suggestions/{suggestionId}` | `MEMBER`+ | edita o texto de uma sugestão pendente |
+| `POST` | `/api/projects/{id}/agent/suggestions/{suggestionId}/apply` | `MEMBER`+ | aplica uma sugestão (`409` se não estiver pendente) |
+| `POST` | `/api/projects/{id}/agent/suggestions/{suggestionId}/reject` | `MEMBER`+ | rejeita uma sugestão |
+| `POST` | `/api/projects/{id}/agent/suggestions/apply` | `MEMBER`+ | aplica em lote (`{ "ids": [...] }`; devolve `applied` e `skipped`) |
+| `POST` | `/api/projects/{id}/agent/suggestions/reject` | `MEMBER`+ | rejeita em lote (`{ "ids": [...] }`; devolve `rejected` e `skipped`) |
+
+O worker roda no próprio processo da API: o deploy é de instância única. Em
+múltiplas instâncias seria necessário um runner/queue externo (fora do escopo da
+Fase 4). O smoke E2E exercita o fluxo completo com `DBMAPPER_LLM_PROVIDER=fake`
+(gerar → aguardar job → aplicar → aprovar → cobertura), sem chamadas de rede ao
+LLM.
+
 ## Quick start (v1)
 
 Não há build. Sirva a pasta como site estático e abra o editor:

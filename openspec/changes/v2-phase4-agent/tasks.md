@@ -25,30 +25,30 @@
 
 ## 6. UI — client e hooks
 
-- [ ] 6.1 Add the agent API client and React Query hooks (pending list, job query with `refetchInterval` while `queued|running`, generate/apply/reject/edit mutations with cache invalidation) and verify component tests with mocked fetch cover loading, empty and error states plus the polling transition.
+- [x] 6.1 Add the agent API client and React Query hooks (pending list, job query with `refetchInterval` while `queued|running`, generate/apply/reject/edit mutations with cache invalidation) and verify component tests with mocked fetch cover loading, empty and error states plus the polling transition.
 
 ## 7. UI — painel Sugestões IA
 
-- [ ] 7.1 Build `SuggestionPanel` (pending rows with side-by-side preview of context × suggested text, empty state, job progress banner) and verify component tests for list rendering, preview content and progress refresh.
-- [ ] 7.2 Add selection checkboxes with bulk Aplicar/Rejeitar, inline edit-before-apply, the "Sugerir descrições" entry with scope dialog (projeto inteiro / esta tabela), pending-count badge and VIEWER-hidden actions in the workspace, and verify component tests cover bulk actions, edit-then-apply, entry flow and role visibility.
+- [x] 7.1 Build `SuggestionPanel` (pending rows with side-by-side preview of context × suggested text, empty state, job progress banner) and verify component tests for list rendering, preview content and progress refresh.
+- [x] 7.2 Add selection checkboxes with bulk Aplicar/Rejeitar, inline edit-before-apply, the "Sugerir descrições" entry with scope dialog (projeto inteiro / esta tabela), pending-count badge and VIEWER-hidden actions in the workspace, and verify component tests cover bulk actions, edit-then-apply, entry flow and role visibility.
 
 ## 8. E2E
 
-- [ ] 8.1 Extend `e2e/smoke.ts` with the agent flow under `DBMAPPER_LLM_PROVIDER=fake` (generate → wait for job → apply one suggestion → approve item → coverage reflects it) and verify `bun run test:e2e` passes.
+- [x] 8.1 Extend `e2e/smoke.ts` with the agent flow under `DBMAPPER_LLM_PROVIDER=fake` (generate → wait for job → apply one suggestion → approve item → coverage reflects it) and verify `bun run test:e2e` passes.
 
 ## 9. Documentação
 
-- [ ] 9.1 Document the LLM env vars in `.env.example`, the generation flow and roles in `README.md`, and the new behavior/commands in `AGENTS.md`, and verify every documented command runs as written.
+- [x] 9.1 Document the LLM env vars in `.env.example`, the generation flow and roles in `README.md`, and the new behavior/commands in `AGENTS.md`, and verify every documented command runs as written.
 
 ## 10. Gates
 
-- [ ] 10.1 Run `bun run check` and verify it exits 0.
-- [ ] 10.2 Verify `legacy/` is untouched (`git status legacy/` clean) and the five `node tests/*.test.js` still print `ok` from `legacy/`.
+- [x] 10.1 Run `bun run check` and verify it exits 0.
+- [x] 10.2 Verify `legacy/` is untouched (`git status legacy/` clean) and the five `node tests/*.test.js` still print `ok` from `legacy/`.
 
 ## 11. Validate
 
-- [ ] 11.1 Run `openspec validate v2-phase4-agent --strict` and confirm it exits 0.
-- [ ] 11.2 Run `bun run check` one final time and confirm it exits 0.
+- [x] 11.1 Run `openspec validate v2-phase4-agent --strict` and confirm it exits 0.
+- [x] 11.2 Run `bun run check` one final time and confirm it exits 0.
 
 ## 12. Archive
 

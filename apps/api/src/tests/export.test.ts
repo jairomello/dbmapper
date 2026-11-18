@@ -60,6 +60,8 @@ describe('project-api: export no contrato v1', () => {
 
     expect(response.status).toBe(200)
     expect(Object.keys(body)).toEqual(['database'])
+    expect('table_ids' in body).toBe(false)
+    expect(JSON.stringify(body)).not.toContain('table_ids')
     expect(Object.keys(body.database).sort()).toEqual([
       'business_terms',
       'description',

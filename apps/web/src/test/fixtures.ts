@@ -89,6 +89,7 @@ export function sampleProject(overrides: Partial<ProjectView> = {}): ProjectView
     reviewed: false,
     createdAt: '2026-01-01T00:00:00.000Z',
     updatedAt: '2026-01-01T00:00:00.000Z',
+    table_ids: { cliente: 'table-cliente', pedido: 'table-pedido' },
     database: sampleDatabase(),
     ...overrides,
   }

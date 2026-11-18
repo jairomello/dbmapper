@@ -29,6 +29,7 @@ export interface ProjectView {
   reviewed: boolean
   createdAt: string
   updatedAt: string
+  table_ids: Record<string, string>
   database: DatabaseModel
 }
 
