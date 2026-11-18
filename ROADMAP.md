@@ -12,7 +12,7 @@ próxima** — sem pressa, vamos aos poucos. Design e decisões:
 | 2   | **Auth + multi-usuário** | Login/logout, usuários, papéis `ADMIN/MEMBER/VIEWER`, rotas protegidas                                                                    | `v2-phase2-auth` | ✅ concluída em 14/11/2026 |
 | 3   | **UI React**             | Árvore, editor de metadados, wizard de atualização, barra de status — specs v1 como critérios de aceitação                                | `v2-phase3-web-ui` | ✅ concluída em 14/11/2026 |
 | 3.5 | **Ajustes pós-teste**    | Galeria multiprojeto, import de JSON v1 legado, import de arquivo proeminente                                                             | `v2-gallery-and-import-fixes` | ✅ concluída em 15/11/2026 |
-| 4   | **Agente interno**       | Provider LLM, geração em lote de sugestões, fila de aprovação na UI, auditoria                                                            | a criar ao liberar   | ⏳ aguardando          |
+| 4   | **Agente interno**       | Provider LLM, geração em lote de sugestões, fila de aprovação na UI, auditoria                                                            | `v2-phase4-agent`    | ✅ concluída em 17/11/2026 |
 | 5   | **MCP + opencode**       | Tools MCP, API key, **skill**, documentação; teste ponta-a-ponta com opencode conectado                                                   | a criar ao liberar   | ⏳ aguardando          |
 | 6   | **Polish**               | DBViewer como rota read-only, auditoria completa, preparação para deploy (notebook → labapps → Vultr `jairo.tools`)                       | a criar ao liberar   | ⏳ aguardando          |
 
