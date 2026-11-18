@@ -59,4 +59,4 @@
 
 - [x] 14.1 Run the secrets check, commit with an imperative message and push to `origin` (GitHub é a fonte da verdade).
 - [x] 14.2 Mark Fase 5 as ✅ in `ROADMAP.md` and commit.
-- [ ] 14.3 Run `openspec archive v2-phase5-mcp --yes` and stage the promoted specs if the archive commit comes out incomplete.
+- [x] 14.3 Run `openspec archive v2-phase5-mcp --yes` and stage the promoted specs if the archive commit comes out incomplete.
