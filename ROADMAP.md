@@ -1,8 +1,8 @@
 # Roadmap — DBMapper v2
 
-Plano de evolução em **7 fases, uma de cada vez**. Regra combinada com Jairo em
-14/11/2026: **ao terminar cada fase, parar e esperar o ok para iniciar a
-próxima** — sem pressa, vamos aos poucos. Design e decisões:
+Plano de evolução em **fases de 0 a 9, uma de cada vez**. Regra combinada com
+Jairo em 14/11/2026: **ao terminar cada fase, parar e esperar o ok para iniciar
+a próxima** — sem pressa, vamos aos poucos. Design e decisões:
 [`docs/analysis/03-proposta-evolucao-v2.md`](./docs/analysis/03-proposta-evolucao-v2.md).
 
 | #   | Fase                     | Entrega verificável                                                                                                                       | Change OpenSpec      | Status                 |
@@ -15,21 +15,32 @@ próxima** — sem pressa, vamos aos poucos. Design e decisões:
 | 4   | **Agente interno**       | Provider LLM, geração em lote de sugestões, fila de aprovação na UI, auditoria                                                            | `v2-phase4-agent`    | ✅ concluída em 17/11/2026 |
 | 5   | **MCP + opencode**       | Tools MCP, API key, **skill**, documentação; teste ponta-a-ponta com opencode conectado                                                   | `v2-phase5-mcp`     | ✅ concluída em 18/11/2026 |
 | 6   | **Polish**               | DBViewer como rota read-only, auditoria completa, preparação para deploy (notebook → labapps → Vultr `jairo.tools`)                       | `v2-phase6-polish`  | ✅ concluída em 18/11/2026 |
+| 7   | **Canvas ER visual**     | React Flow no workspace (toggle Diagrama), cards/arestas, seleção sincronizada, busca com destaque, layout persistido por nome + evento de auditoria | `v2-phase7-diagram` | 📋 especificada em 18/11/2026 (aguardando liberação) |
+| 8   | **Edição no canvas**     | Criar/excluir tabela e coluna, relacionamentos com coluna FK auto-criada no mesmo PUT, popover de coluna, fila de comandos com undo/redo e indicador de save | `v2-phase8-edit` | 📋 especificada em 18/11/2026 (aguardando liberação) |
+| 9   | **Zonas/abas + polish**  | Abas `Principal`/`+`, atribuição e movimentação de tabelas, "Chaves entre modelos" derivada, export PNG/SVG, contagem de tabelas           | `v2-phase9-zones` | 📋 especificada em 18/11/2026 (aguardando liberação) |
 
 ## Como funciona
 
 - Este roadmap é o plano-mãe. Cada fase vira **um change OpenSpec** com seus
-  artefatos (`proposal.md`, `design.md`, `specs/`, `tasks.md`) — criado **quando
-  a fase for liberada**, para não especular design de fases futuras.
+  artefatos (`proposal.md`, `design.md`, `specs/`, `tasks.md`) — em regra,
+  criado **quando a fase for liberada**. Exceção: as Fases 7–9 (modelador
+  visual) foram especificadas juntas em 18/11/2026 a pedido do Jairo
+  (`docs/analysis/04`–`09`); a implementação segue uma fase por vez, com ok
+  entre elas.
 - Implementação delegada ao opencode, com revisão antes de aplicar no share
   (fluxo da skill `trabalhar-projetos`).
 - Ao terminar a fase: marcar ✅ nesta tabela, commit de encerramento, **parar e
   esperar o ok** do Jairo para a próxima.
-- Fora do roadmap (backlog pós-v2): desenhador de modelo ER, versionamento do
-  modelo com scripts de migration/rollback, JSON do dicionário sincronizado no
-  repositório do sistema — ver §10 da proposta.
+- Fora do roadmap (backlog pós-v2): versionamento do modelo com scripts de
+  migration/rollback, JSON do dicionário sincronizado no repositório do
+  sistema — ver §10 da proposta. Modelador visual: backlog §10.1 — agora
+  coberto pelas Fases 7–9 acima.
 
 ## Histórico
 
 - 14/11/2026 — análise da v1, análise do Azy Board e proposta aprovadas;
   reorganização do repositório (`legacy/`); roadmap e change da Fase 0 criados.
+- 18/11/2026 — modelador visual especificado (Fases 7–9): análise das
+  referências do Mad.Builder (docs 04–06), revisão contra a implementação
+  (docs 07–09) e os changes `v2-phase7-diagram`, `v2-phase8-edit` e
+  `v2-phase9-zones` criados com artefatos completos e validados em strict.
