@@ -287,6 +287,65 @@ Fase 4). O smoke E2E exercita o fluxo completo com `DBMAPPER_LLM_PROVIDER=fake`
 (gerar → aguardar job → aplicar → aprovar → cobertura), sem chamadas de rede ao
 LLM.
 
+## MCP (Fase 5)
+
+A Fase 5 conecta o dicionário ao opencode por um servidor MCP stdio
+(`apps/mcp`). As nove tools leem o modelo e gravam descrições pela API usando
+uma **API key**; a identidade vem sempre do servidor (dono da chave), nunca dos
+argumentos. A referência completa de nomes, argumentos e respostas está em
+[`docs/TOOLS-DBMAPPER.md`](./docs/TOOLS-DBMAPPER.md), e o fluxo de trabalho em
+[`skills/dbmapper/SKILL.md`](./skills/dbmapper/SKILL.md).
+
+### 1. Criar a chave
+
+Com a API rodando e uma sessão de `MEMBER`/`ADMIN` em `cookies.txt`, crie a
+chave (o texto puro aparece **uma única vez**):
+
+```bash
+curl -s -b cookies.txt -X POST http://localhost:3000/api/keys \
+  -H 'content-type: application/json' \
+  -d '{"name":"opencode","projectScope":"'"$PROJECT_ID"'"}'
+```
+
+A resposta traz `key` (a chave `dbmp_...`) e `apiKey` (prefixo, status e
+`last_used_at`). Para listar sem revelar o segredo use `GET /api/keys`; para
+revogar, `DELETE /api/keys/{id}`. O escopo de projeto é opcional: sem ele a chave
+vale para qualquer projeto acessível ao dono.
+
+### 2. Configurar o ambiente do cliente
+
+Exporte as variáveis no ambiente do opencode (nunca em arquivo versionado):
+
+| Variável | Descrição |
+| --- | --- |
+| `DBMAPPER_API_KEY` | chave criada acima (somente `{env:...}` na config) |
+| `DBMAPPER_URL` | URL da API (ex.: `http://localhost:3000`) |
+| `DBMAPPER_PROJECT_ID` | opcional; projeto padrão quando a tool omite `projectId` |
+
+Sem `DBMAPPER_API_KEY`/`DBMAPPER_URL` o servidor sobe, mas toda chamada de tool
+retorna `MCP_CONFIG_ERROR`.
+
+### 3. Conectar o opencode
+
+Copie o exemplo (o arquivo real é gitignored) e abra o opencode na raiz do
+repositório:
+
+```bash
+cp opencode.json.example opencode.json
+opencode
+```
+
+O `opencode.json.example` registra o servidor local (`bun run
+apps/mcp/src/index.ts`) com os placeholders `{env:...}` e uma entrada remota
+desabilitada. A skill `dbmapper` conduz o fluxo discover project →
+`list_missing_descriptions` → analisar a codebase local → `set_description` →
+reportar. Toda descrição gravada via MCP fica como **não revisada**
+(`description_source='mcp'`, `reviewed=false`); a aprovação é exclusivamente
+humana.
+
+O guard de catálogo (`bun run test:mcp-catalog`, dentro de `bun run check`)
+garante que toda tool registrada está documentada e roteada.
+
 ## Quick start (v1)
 
 Não há build. Sirva a pasta como site estático e abra o editor:

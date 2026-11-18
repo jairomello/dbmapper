@@ -135,6 +135,41 @@ workspace behind the "Sugestões IA" entry with a pending-count badge.
 - The worker is in-process (single-instance deploy). `bun run test:e2e` stays out
   of `bun run check`.
 
+## MCP (v2 — Fase 5)
+
+The stdio MCP server in `apps/mcp` makes the dictionary usable from opencode:
+nine tools read the model and write descriptions through the API with an API
+key. The key acts as its owner on the MCP surface only; identity always comes
+from the server, never from tool arguments.
+
+- Keys: `POST /api/keys` (session, `MEMBER`+) returns the plaintext once; `GET`
+  lists prefix/status/`last_used_at`; `DELETE /api/keys/:id` revokes. Scope is
+  optional per project. Only `POST/GET/DELETE /api/keys` and the session routes
+  stay session-only.
+- Bearer is accepted only on the exported `KEY_ENABLED` surface: project
+  `GET`/`export`, `/api/projects/:id/agent/*` and
+  `PATCH /api/projects/:id/items/:itemType/:itemId/description`. Any other route
+  ignores the Bearer and requires a session cookie.
+- `set_description` writes through that PATCH: `description_source` becomes
+  `mcp`, a real change reopens review (`reviewed=false`) and an
+  `item.description_written` event is appended in the same transaction. The
+  agent never approves; `reviewed` is human-only.
+- `apps/mcp/src/catalog.ts` is the single source for tool names, arguments and
+  dispatch; `docs/TOOLS-DBMAPPER.md` documents all nine tools and the catalog
+  guard reads both. `bun run test:mcp-catalog` (inside `bun run check`) fails when
+  a tool is undocumented, lacks a dispatcher/schema or accepts identity
+  arguments, and when `opencode.json.example` contains a literal key.
+- Client env only: `DBMAPPER_API_KEY`, `DBMAPPER_URL`, optional
+  `DBMAPPER_PROJECT_ID` (documented, commented, in `.env.example`). Missing env
+  starts the server but every tool call returns `MCP_CONFIG_ERROR`.
+- Config and skill: `opencode.json.example` has a local stdio entry
+  (`bun run apps/mcp/src/index.ts`) with `{env:...}` placeholders and a disabled
+  remote entry; `/opencode.json` is gitignored. `skills/dbmapper/SKILL.md` covers
+  discover project → list missing → analyze local codebase → set descriptions →
+  report. Never commit a literal key.
+- API tests seed a temp SQLite DB; MCP tests mock `fetch`. `bun run check` and
+  the catalog guard cover the contract; `bun run test:e2e` stays out.
+
 ## Coding Style & Naming Conventions (v1)
 
 Use 4-space indentation in HTML, CSS, and JavaScript. JavaScript uses `camelCase` for functions and variables, `const`/`let`, and direct DOM APIs. Keep UI text in Portuguese unless changing a product label such as "DBMapper" or "Semantic Layer".

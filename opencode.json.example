@@ -1,0 +1,28 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "permission": {
+    "skill": {
+      "dbmapper": "allow"
+    }
+  },
+  "mcp": {
+    "dbmapper": {
+      "type": "local",
+      "command": ["bun", "run", "apps/mcp/src/index.ts"],
+      "enabled": true,
+      "environment": {
+        "DBMAPPER_API_KEY": "{env:DBMAPPER_API_KEY}",
+        "DBMAPPER_URL": "{env:DBMAPPER_URL}",
+        "DBMAPPER_PROJECT_ID": "{env:DBMAPPER_PROJECT_ID}"
+      }
+    },
+    "dbmapper-remoto": {
+      "type": "remote",
+      "url": "https://dbmapper.exemplo.com/mcp",
+      "enabled": false,
+      "headers": {
+        "Authorization": "Bearer {env:DBMAPPER_API_KEY}"
+      }
+    }
+  }
+}
