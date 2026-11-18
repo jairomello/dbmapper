@@ -17,8 +17,9 @@
     "lint": "biome lint .",
     "format": "biome format --write .",
     "test": "bun test",
-    "check": "bun run typecheck && bun run lint && bun run check:persistence && bun run test",
+    "check": "bun run typecheck && bun run lint && bun run check:persistence && bun run test:mcp-catalog && bun run test",
     "check:persistence": "bun run scripts/check-persistence-boundaries.ts",
+    "test:mcp-catalog": "bun run scripts/check-mcp-catalog.ts",
     "test:e2e": "bun run e2e/smoke.ts"
   },
   "devDependencies": {

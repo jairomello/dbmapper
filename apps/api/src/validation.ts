@@ -177,6 +177,20 @@ export const agentEditSuggestionSchema = z
 
 export const aiSuggestionStatusSchema = z.enum(['pending', 'applied', 'rejected'])
 
+export const descriptionItemTypes = ['table', 'column', 'relationship'] as const
+
+export const itemDescriptionSchema = z.object({
+  description: z.string().max(20000),
+})
+
+export const createApiKeySchema = z
+  .object({
+    name: z.string().trim().min(1).max(200),
+    projectScope: z.string().trim().min(1).max(200).nullish(),
+    expiresAt: z.string().datetime({ offset: true }).nullish(),
+  })
+  .strict()
+
 export async function parseJsonBody<S extends z.ZodTypeAny>(c: Context, schema: S): Promise<z.output<S>> {
   let body: unknown
 

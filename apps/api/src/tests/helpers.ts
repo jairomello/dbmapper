@@ -85,6 +85,7 @@ export interface ApiResponse<T> {
 
 export interface RequestOptions {
   cookie?: string | null
+  bearer?: string
 }
 
 export async function apiRequest<T>(
@@ -103,6 +104,7 @@ export async function apiRequest<T>(
 
   const cookie = options.cookie === undefined ? context.cookie : options.cookie
   if (cookie) headers.cookie = cookie
+  if (options.bearer) headers.authorization = `Bearer ${options.bearer}`
   init.headers = headers
 
   const response = await context.app.request(path, init)

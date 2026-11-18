@@ -141,6 +141,30 @@ export interface LoginAttemptRepository {
   clear(identity: string): void
 }
 
+export const DESCRIPTION_ITEM_TYPES = ['table', 'column', 'relationship'] as const
+export type DescriptionItemType = (typeof DESCRIPTION_ITEM_TYPES)[number]
+
+export interface SetItemDescriptionInput {
+  projectId: string
+  itemType: DescriptionItemType
+  itemId: string
+  description: string
+  source: DescriptionSource
+  actorUserId?: string | null
+  now?: string
+}
+
+export interface SetItemDescriptionResult {
+  projectId: string
+  itemType: DescriptionItemType
+  itemId: string
+  description: string
+  descriptionSource: DescriptionSource
+  reviewed: boolean
+  changed: boolean
+  updatedAt: string
+}
+
 export interface ProjectRepository {
   create(input: CreateProjectInput): ProjectRecord
   list(): ProjectSummary[]
@@ -153,6 +177,38 @@ export interface ProjectRepository {
     context?: MutationContext,
   ): ApplyModelResult | null
   listImportRuns(projectId: string): ImportRunRecord[]
+  setItemDescription(input: SetItemDescriptionInput): SetItemDescriptionResult | null
+}
+
+export interface ApiKeyRecord {
+  id: string
+  ownerId: string
+  name: string
+  keyHash: string
+  keyPrefix: string
+  projectScope: string | null
+  expiresAt: string | null
+  revokedAt: string | null
+  createdAt: string
+  lastUsedAt: string | null
+}
+
+export interface CreateApiKeyInput {
+  ownerId: string
+  name: string
+  keyHash: string
+  keyPrefix: string
+  projectScope?: string | null
+  expiresAt?: string | null
+}
+
+export interface ApiKeyRepository {
+  create(input: CreateApiKeyInput, options?: { now?: string; audit?: InsertEventInput }): ApiKeyRecord
+  listByOwner(ownerId: string): ApiKeyRecord[]
+  findByHash(hash: string): ApiKeyRecord | null
+  findUsableByHash(hash: string, now: string): ApiKeyRecord | null
+  revoke(ownerId: string, id: string, options?: { now?: string; audit?: InsertEventInput }): ApiKeyRecord | null
+  touchLastUsed(id: string, now: string): void
 }
 
 export const AGENT_JOB_SCOPES = ['project', 'table'] as const
@@ -201,7 +257,7 @@ export interface AiSuggestionRecord {
 
 export interface EventRecord {
   id: string
-  projectId: string
+  projectId: string | null
   actorUserId: string | null
   action: string
   subjectType: string
@@ -211,7 +267,7 @@ export interface EventRecord {
 }
 
 export interface InsertEventInput {
-  projectId: string
+  projectId?: string | null
   actorUserId?: string | null
   action: string
   subjectType: string
@@ -299,6 +355,7 @@ export interface SuggestionRepository {
 export interface EventRepository {
   insert(input: InsertEventInput): EventRecord
   list(projectId: string): EventRecord[]
+  listAll(): EventRecord[]
 }
 
 export interface AgentRepositories {
@@ -310,6 +367,7 @@ export interface AgentRepositories {
 export interface Persistence {
   projects: ProjectRepository
   users: UserRepository
+  apiKeys: ApiKeyRepository
   loginAttempts: LoginAttemptRepository
   agent: AgentRepositories
   close(): void

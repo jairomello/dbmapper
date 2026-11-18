@@ -7,6 +7,7 @@ import { migrate } from 'drizzle-orm/bun-sqlite/migrator'
 import {
   agentJobs as agentJobsTable,
   aiSuggestions as aiSuggestionsTable,
+  apiKeys as apiKeysTable,
   columns as columnsTable,
   events as eventsTable,
   importRuns,
@@ -25,15 +26,19 @@ import type {
   AiSuggestionRecord,
   AiSuggestionStatus,
   AiSuggestionItemType,
+  ApiKeyRecord,
+  ApiKeyRepository,
   ApplyModelResult,
   ColumnRecord,
   CreateAgentJobOptions,
   CreateAgentJobInput,
   CreateAiSuggestionInput,
+  CreateApiKeyInput,
   CreateImportRunInput,
   CreateProjectInput,
   CreateUserInput,
   DecisionAudit,
+  DescriptionItemType,
   EventRecord,
   EventRepository,
   ImportRunRecord,
@@ -46,6 +51,8 @@ import type {
   ProjectRepository,
   ProjectSummary,
   RelationshipRecord,
+  SetItemDescriptionInput,
+  SetItemDescriptionResult,
   SuggestionDecisionResult,
   SuggestionRepository,
   TableRecord,
@@ -127,6 +134,21 @@ function toSuggestionRecord(row: typeof aiSuggestionsTable.$inferSelect): AiSugg
   }
 }
 
+function toApiKeyRecord(row: typeof apiKeysTable.$inferSelect): ApiKeyRecord {
+  return {
+    id: row.id,
+    ownerId: row.ownerId,
+    name: row.name,
+    keyHash: row.keyHash,
+    keyPrefix: row.keyPrefix,
+    projectScope: row.projectScope,
+    expiresAt: row.expiresAt,
+    revokedAt: row.revokedAt,
+    createdAt: row.createdAt,
+    lastUsedAt: row.lastUsedAt,
+  }
+}
+
 function toEventRecord(row: typeof eventsTable.$inferSelect): EventRecord {
   return {
     id: row.id,
@@ -159,7 +181,7 @@ export function createSqlitePersistence(
     const createdAt = input.createdAt ?? now
     const row = {
       id: crypto.randomUUID(),
-      projectId: input.projectId,
+      projectId: input.projectId ?? null,
       actorUserId: input.actorUserId ?? null,
       action: input.action,
       subjectType: input.subjectType,
@@ -569,6 +591,177 @@ export function createSqlitePersistence(
     },
 
     listImportRuns,
+
+    setItemDescription(input: SetItemDescriptionInput): SetItemDescriptionResult | null {
+      const now = input.now ?? new Date().toISOString()
+
+      return db.transaction((tx) => {
+        let current: { description: string; reviewed: boolean } | null = null
+
+        if (input.itemType === 'table') {
+          const row = tx
+            .select({ description: tablesTable.description, reviewed: tablesTable.reviewed })
+            .from(tablesTable)
+            .where(and(eq(tablesTable.id, input.itemId), eq(tablesTable.projectId, input.projectId)))
+            .get()
+          current = row ?? null
+        } else if (input.itemType === 'column') {
+          const row = tx
+            .select({ description: columnsTable.description, reviewed: columnsTable.reviewed })
+            .from(columnsTable)
+            .innerJoin(tablesTable, eq(columnsTable.tableId, tablesTable.id))
+            .where(and(eq(columnsTable.id, input.itemId), eq(tablesTable.projectId, input.projectId)))
+            .get()
+          current = row ?? null
+        } else {
+          const row = tx
+            .select({ description: relationshipsTable.description, reviewed: relationshipsTable.reviewed })
+            .from(relationshipsTable)
+            .innerJoin(tablesTable, eq(relationshipsTable.tableId, tablesTable.id))
+            .where(and(eq(relationshipsTable.id, input.itemId), eq(tablesTable.projectId, input.projectId)))
+            .get()
+          current = row ?? null
+        }
+
+        if (!current) return null
+
+        const changed = current.description !== input.description
+        const reviewed = changed ? false : current.reviewed
+        const patch = {
+          description: input.description,
+          descriptionSource: input.source,
+          reviewed,
+          ...(changed ? { reviewedBy: null, reviewedAt: null } : {}),
+          updatedAt: now,
+        }
+
+        if (input.itemType === 'table') {
+          tx.update(tablesTable).set(patch).where(eq(tablesTable.id, input.itemId)).run()
+        } else if (input.itemType === 'column') {
+          tx.update(columnsTable).set(patch).where(eq(columnsTable.id, input.itemId)).run()
+        } else {
+          tx.update(relationshipsTable).set(patch).where(eq(relationshipsTable.id, input.itemId)).run()
+        }
+
+        insertEventRow(
+          tx,
+          {
+            projectId: input.projectId,
+            actorUserId: input.actorUserId ?? null,
+            action: 'item.description_written',
+            subjectType: input.itemType,
+            subjectId: input.itemId,
+            payload: {
+              itemType: input.itemType,
+              itemId: input.itemId,
+              descriptionSource: input.source,
+              changed,
+            },
+            createdAt: now,
+          },
+          now,
+        )
+
+        return {
+          projectId: input.projectId,
+          itemType: input.itemType as DescriptionItemType,
+          itemId: input.itemId,
+          description: input.description,
+          descriptionSource: input.source,
+          reviewed,
+          changed,
+          updatedAt: now,
+        }
+      })
+    },
+  }
+
+  const apiKeyRepository: ApiKeyRepository = {
+    create(input: CreateApiKeyInput, options: { now?: string; audit?: InsertEventInput } = {}): ApiKeyRecord {
+      const now = options.now ?? new Date().toISOString()
+      const row = {
+        id: crypto.randomUUID(),
+        ownerId: input.ownerId,
+        name: input.name,
+        keyHash: input.keyHash,
+        keyPrefix: input.keyPrefix,
+        projectScope: input.projectScope ?? null,
+        expiresAt: input.expiresAt ?? null,
+        revokedAt: null,
+        createdAt: now,
+        lastUsedAt: null,
+      }
+
+      return db.transaction((tx) => {
+        tx.insert(apiKeysTable).values(row).run()
+        if (options.audit) {
+          insertEventRow(
+            tx,
+            { ...options.audit, subjectId: row.id, actorUserId: input.ownerId, createdAt: now },
+            now,
+          )
+        }
+        return toApiKeyRecord(row)
+      })
+    },
+
+    listByOwner(ownerId: string): ApiKeyRecord[] {
+      return db
+        .select()
+        .from(apiKeysTable)
+        .where(eq(apiKeysTable.ownerId, ownerId))
+        .orderBy(asc(apiKeysTable.createdAt), asc(apiKeysTable.id))
+        .all()
+        .map(toApiKeyRecord)
+    },
+
+    findByHash(hash: string): ApiKeyRecord | null {
+      const row = db.select().from(apiKeysTable).where(eq(apiKeysTable.keyHash, hash)).get()
+      return row ? toApiKeyRecord(row) : null
+    },
+
+    findUsableByHash(hash: string, now: string): ApiKeyRecord | null {
+      const row = db.select().from(apiKeysTable).where(eq(apiKeysTable.keyHash, hash)).get()
+      if (!row) return null
+      if (row.revokedAt) return null
+      if (row.expiresAt && row.expiresAt <= now) return null
+      return toApiKeyRecord(row)
+    },
+
+    revoke(
+      ownerId: string,
+      id: string,
+      options: { now?: string; audit?: InsertEventInput } = {},
+    ): ApiKeyRecord | null {
+      const now = options.now ?? new Date().toISOString()
+
+      return db.transaction((tx) => {
+        const existing = tx
+          .select()
+          .from(apiKeysTable)
+          .where(and(eq(apiKeysTable.id, id), eq(apiKeysTable.ownerId, ownerId)))
+          .get()
+        if (!existing) return null
+
+        const revokedAt = existing.revokedAt ?? now
+        const updated = tx
+          .update(apiKeysTable)
+          .set({ revokedAt })
+          .where(and(eq(apiKeysTable.id, id), eq(apiKeysTable.ownerId, ownerId)))
+          .returning()
+          .get()
+        if (!updated) return null
+
+        if (options.audit) {
+          insertEventRow(tx, { ...options.audit, actorUserId: ownerId, createdAt: now }, now)
+        }
+        return toApiKeyRecord(updated)
+      })
+    },
+
+    touchLastUsed(id: string, now: string): void {
+      db.update(apiKeysTable).set({ lastUsedAt: now }).where(eq(apiKeysTable.id, id)).run()
+    },
   }
 
   const userRepository: UserRepository = {
@@ -1020,6 +1213,15 @@ export function createSqlitePersistence(
         .all()
         .map(toEventRecord)
     },
+
+    listAll(): EventRecord[] {
+      return db
+        .select()
+        .from(eventsTable)
+        .orderBy(asc(eventsTable.createdAt), asc(eventsTable.id))
+        .all()
+        .map(toEventRecord)
+    },
   }
 
   const agentRepositories: AgentRepositories = {
@@ -1031,6 +1233,7 @@ export function createSqlitePersistence(
   return {
     projects: projectRepository,
     users: userRepository,
+    apiKeys: apiKeyRepository,
     loginAttempts: loginAttemptRepository,
     agent: agentRepositories,
     close(): void {

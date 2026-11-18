@@ -103,11 +103,26 @@ export interface ProjectView {
   createdAt: string
   updatedAt: string
   table_ids: Record<string, string>
+  column_ids: Record<string, Record<string, string>>
+  relationship_ids: Record<string, string[]>
   database: DatabaseModel
 }
 
 export function projectView(aggregate: ProjectAggregate): ProjectView {
   const project: ProjectRecord = aggregate.project
+  const context = buildProjectContext(aggregate)
+
+  const columnIds: Record<string, Record<string, string>> = {}
+  const relationshipIds: Record<string, string[]> = {}
+  for (const table of aggregate.tables) {
+    columnIds[table.name] = Object.fromEntries(
+      (context.columnsByTableId.get(table.id) ?? []).map((column) => [column.name, column.id]),
+    )
+    relationshipIds[table.name] = (context.relationshipsByTableId.get(table.id) ?? []).map(
+      (relationship) => relationship.id,
+    )
+  }
+
   return {
     id: project.id,
     name: project.name,
@@ -117,6 +132,8 @@ export function projectView(aggregate: ProjectAggregate): ProjectView {
     createdAt: project.createdAt,
     updatedAt: project.updatedAt,
     table_ids: Object.fromEntries(aggregate.tables.map((table) => [table.name, table.id])),
+    column_ids: columnIds,
+    relationship_ids: relationshipIds,
     database: databaseFromAggregate(aggregate),
   }
 }

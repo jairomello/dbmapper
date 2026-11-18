@@ -261,7 +261,7 @@ describe('repositório do agente (SQLite)', () => {
       expect(actions).toContain('agent.suggestions_applied')
       expect(actions).toContain('agent.suggestions_rejected')
 
-      expect(Object.keys(persistence.agent.events).sort()).toEqual(['insert', 'list'])
+      expect(Object.keys(persistence.agent.events).sort()).toEqual(['insert', 'list', 'listAll'])
     } finally {
       persistence.close()
     }

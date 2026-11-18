@@ -21,6 +21,28 @@ export const users = sqliteTable(
   }),
 )
 
+export const apiKeys = sqliteTable(
+  'api_keys',
+  {
+    id: text('id').primaryKey(),
+    ownerId: text('owner_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    name: text('name').notNull(),
+    keyHash: text('key_hash').notNull(),
+    keyPrefix: text('key_prefix').notNull(),
+    projectScope: text('project_scope'),
+    expiresAt: text('expires_at'),
+    revokedAt: text('revoked_at'),
+    createdAt: text('created_at').notNull().default(isoNow),
+    lastUsedAt: text('last_used_at'),
+  },
+  (table) => ({
+    hashUq: uniqueIndex('api_keys_hash_uq').on(table.keyHash),
+    ownerIdx: index('api_keys_owner_idx').on(table.ownerId),
+  }),
+)
+
 export const loginAttempts = sqliteTable(
   'login_attempts',
   {
@@ -220,9 +242,7 @@ export const events = sqliteTable(
   'events',
   {
     id: text('id').primaryKey(),
-    projectId: text('project_id')
-      .notNull()
-      .references(() => projects.id, { onDelete: 'cascade' }),
+    projectId: text('project_id').references(() => projects.id, { onDelete: 'cascade' }),
     actorUserId: text('actor_user_id').references(() => users.id),
     action: text('action').notNull(),
     subjectType: text('subject_type').notNull(),

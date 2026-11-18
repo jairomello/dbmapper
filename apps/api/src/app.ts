@@ -2,11 +2,13 @@ import { Hono } from 'hono'
 import type { ModelProvider } from './agent/provider'
 import { createAgentWorker } from './agent/worker'
 import { errorHandler, notFoundHandler } from './errors'
-import { requireSession } from './middleware/session'
+import { requireCredential } from './middleware/credential'
 import type { Persistence } from './persistence/ports'
 import { registerAgentRoutes } from './routes/agent'
 import { registerAuthRoutes } from './routes/auth'
 import { registerImportRoutes } from './routes/imports'
+import { registerItemRoutes } from './routes/items'
+import { registerApiKeyRoutes } from './routes/keys'
 import { registerProjectRoutes } from './routes/projects'
 import { registerUserRoutes } from './routes/users'
 import { createAuthConfig, type AuthConfig } from './services/auth'
@@ -33,10 +35,12 @@ export function createApp(persistence: Persistence, options: CreateAppOptions = 
   app.notFound(notFoundHandler)
   app.get('/health', (c) => c.json({ status: 'ok' }))
 
-  app.use('/api/*', requireSession(auth))
+  app.use('/api/*', requireCredential(auth, persistence))
 
   registerAuthRoutes(app, persistence, auth)
+  registerApiKeyRoutes(app, persistence)
   registerProjectRoutes(app, persistence)
+  registerItemRoutes(app, persistence)
   registerImportRoutes(app, persistence)
   registerUserRoutes(app, persistence)
   registerAgentRoutes(app, persistence, { provider: agent.provider })
