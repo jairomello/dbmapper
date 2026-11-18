@@ -54,4 +54,4 @@
 
 - [x] 12.1 Run the secrets check, commit with an imperative message and push to `origin` (GitHub é a fonte da verdade).
 - [x] 12.2 Mark Fase 4 as ✅ in `ROADMAP.md` and commit.
-- [ ] 12.3 Run `openspec archive v2-phase4-agent --yes` and stage the promoted `agent-suggestions` spec if the archive commit comes out incomplete.
+- [x] 12.3 Run `openspec archive v2-phase4-agent --yes` and stage the promoted `agent-suggestions` spec if the archive commit comes out incomplete.
