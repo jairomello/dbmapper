@@ -46,4 +46,4 @@
 
 - [x] 11.1 Run the secrets check, commit with an imperative message and push to `origin` (GitHub é a fonte da verdade).
 - [x] 11.2 Mark Fase 6 as ✅ in `ROADMAP.md` and commit.
-- [ ] 11.3 Run `openspec archive v2-phase6-polish --yes` and stage the promoted specs if the archive commit comes out incomplete.
+- [x] 11.3 Run `openspec archive v2-phase6-polish --yes` and stage the promoted specs if the archive commit comes out incomplete.
