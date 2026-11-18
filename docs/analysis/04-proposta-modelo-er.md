@@ -1,9 +1,12 @@
 # Proposta — Modelador ER visual para o DBMapper (canvas + abas/zonas)
 
 > Análise das referências em `~/shared/modelo/` (5 PNG + 2 MP4, 18/11/2026).
-> Sistema de referência: editor de "Modelo de dados" da plataforma **Builder Ensino**
-> (low-code PT-BR). Vídeos analisados por extração de frames (ffmpeg); áudio não
-> transcrito — não há ASR nesta VM.
+> Sistema de referência: editor de "Modelo de dados" do **Mad.Builder**
+> (`app.madbuilder.com.br`, v4.2, framework Adianti — identificado pelo HTML
+> salvo; ver `05-avaliacao-madbuilder-html.md`). As capturas tinham sido
+> atribuídas a "Builder Ensino", provavelmente o mesmo produto white-label.
+> Vídeos analisados por extração de frames (ffmpeg); áudio não transcrito —
+> não há ASR nesta VM.
 
 ## 1. O que o sistema de referência faz (detalhado)
 
