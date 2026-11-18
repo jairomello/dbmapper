@@ -5,8 +5,10 @@
 > (`app.madbuilder.com.br`, v4.2, framework Adianti — identificado pelo HTML
 > salvo; ver `05-avaliacao-madbuilder-html.md`). As capturas tinham sido
 > atribuídas a "Builder Ensino", provavelmente o mesmo produto white-label.
-> Vídeos analisados por extração de frames (ffmpeg); áudio não transcrito —
-> não há ASR nesta VM.
+> Vídeos analisados por extração de frames (ffmpeg) + **transcrições completas
+> dos 2 vídeos** (`~/shared/modelo/*.txt`, 18/11) — ver
+> `06-avaliacao-transcricoes-videos.md`; avaliação do HTML salvo em
+> `05-avaliacao-madbuilder-html.md`.
 
 ## 1. O que o sistema de referência faz (detalhado)
 
@@ -112,6 +114,13 @@ diagram_layouts(id, project_id FK, zone_name, positions_json /* {table: {x,y}} *
 - Zona = agrupamento nomeado de tabelas (default `Principal`), com próprio
   layout. Atribuição tabela→zona persistida junto do layout
   (`positions_json` por zona + `members` ou campo `zone` na tabela).
+- **Semântica (transcrição 1):** no produto de referência cada aba é um
+  **banco de dados separado** ("cada um desses quadrados é uma base de dados
+  separada") e o modelo de template entra somente-leitura até ser
+  "incorporado". **Para nós a zona é agrupamento lógico dentro de um único
+  modelo** (importamos um SQL por projeto) — a "Chaves entre modelos" é
+  derivada (origem/destino em zonas diferentes), sem schema novo.
+  Detalhes: `06-avaliacao-transcricoes-videos.md` §1.
 - A aba mostra as tabelas da zona; relacionamentos **entre zonas** aparecem
   como "Chaves entre modelos" (faixa do rodapé) — ligação direta com o vídeo.
 - Criação de zona pelo `+` na barra de abas; mover tabela entre zonas pelo
@@ -128,6 +137,11 @@ diagram_layouts(id, project_id FK, zone_name, positions_json /* {table: {x,y}} *
   nome, tipo/tamanho, PK, FK (via relationship), descrição, termos, revisão.
   As flags `NN/UQ/AI/UUID/Coluna visualizável` **não existem** no contrato v1 —
   ver perguntas abaixo.
+- **Criar relacionamento auto-cria a coluna FK** (transcrição 2, fala 30:
+  *"automaticamente a ferramenta já adiciona aqui estado ID"*): diálogo com
+  checkbox pré-marcado **"criar coluna `<tabela_destino>_id`"** (nome
+  editável); coluna + relationship no mesmo `PUT`. Criação é **só 1:N**
+  (botão `1:n`); cardinalidade fina vive no popover de propriedades.
 - Undo/redo: fila local no cliente (comandos sobre o modelo em memória).
 
 ### 3.5 Encaixe na UI
@@ -142,7 +156,7 @@ diagram_layouts(id, project_id FK, zone_name, positions_json /* {table: {x,y}} *
 | # | Fase | Entrega verificável |
 |---|---|---|
 | **7** | **Canvas ER visual** | React Flow no workspace; cards com header/colunas/rodapé de chaves; arestas crow's-foot das relationships existentes; zoom/pan/minimapa/grid; busca lateral com highlight; arrasto persiste layout (`diagram_layouts` + evento); sync seleção árvore↔canvas; e2e |
-| **8** | **Edição no canvas** | Popover de coluna (campos v1), criar/excluir tabela e coluna, criar/editar/excluir relacionamento por handle + diálogo de cardinalidade, menu de contexto, undo/redo, validações inline |
+| **8** | **Edição no canvas** | Popover de coluna (campos v1), criar/excluir tabela e coluna, criar/editar/excluir relacionamento por handle ou modo `1:n` **com auto-criação da coluna FK** (`<tabela>_id`, nome editável, mesmo PUT) + popover de propriedades/cardinalidade, menu de contexto, undo/redo, validações inline |
 | **9** | **Zonas/abas + polish** | Abas `Principal`/`+` com zonas, "Chaves entre modelos", mover tabela entre zonas, export PNG/SVG do diagrama, contagem no breadcrumb |
 
 Estimativa de delegações (opencode, como sempre): Fase 7 ≈ 2 runs
