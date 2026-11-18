@@ -170,6 +170,31 @@ from the server, never from tool arguments.
 - API tests seed a temp SQLite DB; MCP tests mock `fetch`. `bun run check` and
   the catalog guard cover the contract; `bun run test:e2e` stays out.
 
+## Deploy (v2 — Fase 6)
+
+Deploy artifacts live in `docker/` and are documented in `docs/DEPLOY.md`
+(notebook → labapps → Vultr `jairo.tools`). They are single-tenant: a `web`
+nginx container serves the Vite build and proxies `/api` and `/health` to the
+`api` container.
+
+- `docker/Dockerfile.api` — `oven/bun` image, `bun install --frozen-lockfile`,
+  entrypoint runs `db:migrate`, `db:seed` only when `DBMAPPER_ADMIN_PASSWORD` is
+  set, then `apps/api start`.
+- `docker/Dockerfile.web` — Bun/Vite build stage, then `nginx:alpine` serving
+  `dist` with `/api` and `/health` proxied to `http://api:3000`.
+- `docker/docker-compose.yml` — services `api` + `web`; SQLite named volume
+  `dbmapper-data` at `/data` with `DATABASE_URL=/data/dbmapper.db`; ports
+  `DBMAPPER_API_PORT`/`DBMAPPER_WEB_PORT`. Secrets only via `.env`
+  interpolation (no literals); `JWT_SECRET` is required.
+- `.dockerignore` (root, used by the build context) and `docker/.dockerignore`
+  exclude `node_modules`, `.git`, `*.db` and `.env`. Always bump
+  `ARG BUN_VERSION` to match `.bun-version`.
+- Docker is **not** installed on this VM: verify with
+  `python3 -c 'import yaml,sys; yaml.safe_load(open(sys.argv[1]))' docker/docker-compose.yml`,
+  path existence and a secrets grep; `docker build`/`up` happen in the deploy
+  environment. Scroll back/rollback uses the previous image tag — migrations are
+  additive, so `db:migrate` stays idempotent.
+
 ## Coding Style & Naming Conventions (v1)
 
 Use 4-space indentation in HTML, CSS, and JavaScript. JavaScript uses `camelCase` for functions and variables, `const`/`let`, and direct DOM APIs. Keep UI text in Portuguese unless changing a product label such as "DBMapper" or "Semantic Layer".

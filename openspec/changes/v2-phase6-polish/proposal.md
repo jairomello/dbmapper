@@ -6,7 +6,7 @@ Fases 0–5 entregaram o produto (editor multi-usuário, agente interno, MCP). F
 
 ## What Changes
 
-- **Rota DBViewer read-only**: `/viewer/:id` na web app, alimentada por `GET /api/projects/:id/export` (contrato v1), reusando `SemanticTree`/`StatusBar` em visualização, busca no cliente e painel de detalhe **sem** controles de mutação; qualquer papel autenticado; a rota emite apenas GETs.
+- **Rota DBViewer read-only**: `/viewer/:id` na web app, alimentada pela visão do projeto `GET /api/projects/:id` (o contrato de export v1 permanece **intocado**), reusando `SemanticTree`/`StatusBar` em visualização, busca no cliente e painel de detalhe **sem** controles de mutação; qualquer papel autenticado; a rota emite apenas GETs.
 - **Auditoria completa**: eventos `events` em toda rota mutante — lacunas hoje: projeto criar/salvar/importar (JSON e apply de SQL) e usuários (criar/mudança de papel); convenção `project.*`, `model.*`, `user.*` somada às famílias já existentes `item.*`, `agent.*`, `api_key.*`; evento na mesma transação da mutação (rollback não audita).
 - **Consulta de auditoria**: `GET /api/events` (ADMIN, filtros por prefixo de ação/projeto/limite, ator resolvido) + página `/audit` na web (ADMIN): ator, ação, assunto, quando.
 - **Deploy**: `Dockerfile.api`, `Dockerfile.web` (nginx), `docker-compose.yml` com volume SQLite, entrypoint com migrate/seed opcional, `.dockerignore` e `docs/DEPLOY.md` (labapps → Vultr) + checklist de produção; padrões adaptados do azyboard, sem segredos copiados.

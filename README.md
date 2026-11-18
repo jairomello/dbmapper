@@ -346,6 +346,25 @@ humana.
 O guard de catálogo (`bun run test:mcp-catalog`, dentro de `bun run check`)
 garante que toda tool registrada está documentada e roteada.
 
+## Deploy (Fase 6)
+
+Os artefatos de deploy ficam em [`docker/`](./docker/): `Dockerfile.api` (Bun +
+SQLite), `Dockerfile.web` (build Vite + nginx com proxy de `/api` e `/health`),
+`docker-compose.yml` (serviços `api` e `web`, volume `dbmapper-data`,
+`DATABASE_URL=/data/dbmapper.db`), `entrypoint-api.sh` (migrate + seed opcional) e
+os `.dockerignore`. Segredos vêm apenas de variáveis de ambiente/`.env`; não há
+valor literal nos arquivos.
+
+```bash
+cp .env.example docker/.env   # JWT_SECRET forte e DBMAPPER_ADMIN_PASSWORD
+docker compose -f docker/docker-compose.yml --env-file docker/.env up -d --build
+```
+
+O fluxo completo notebook → labapps → Vultr (`jairo.tools`), o checklist de
+produção, backup/restore do SQLite e o rollback por imagem anterior estão em
+[`docs/DEPLOY.md`](./docs/DEPLOY.md). Docker não está disponível na VM de
+desenvolvimento: o build real é validado no ambiente de deploy.
+
 ## Quick start (v1)
 
 Não há build. Sirva a pasta como site estático e abra o editor:

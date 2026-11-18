@@ -8,7 +8,7 @@ The read-only DBViewer route: any authenticated user inspects a project's dictio
 
 ### Requirement: Viewer loads export data
 
-`/viewer/:id` MUST render the project from `GET /api/projects/:id/export` for any authenticated role, including `VIEWER`. An unknown project id MUST show a friendly not-found state with a link back to the gallery; an unauthenticated visitor MUST be redirected to login.
+`/viewer/:id` MUST render the project from `GET /api/projects/:id` (the project view carrying the model plus review/source metadata) for any authenticated role, including `VIEWER`. An unknown project id MUST show a friendly not-found state with a link back to the gallery; an unauthenticated visitor MUST be redirected to login.
 
 #### Scenario: Viewer renders the dictionary
 

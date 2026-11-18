@@ -14,7 +14,7 @@ próxima** — sem pressa, vamos aos poucos. Design e decisões:
 | 3.5 | **Ajustes pós-teste**    | Galeria multiprojeto, import de JSON v1 legado, import de arquivo proeminente                                                             | `v2-gallery-and-import-fixes` | ✅ concluída em 15/11/2026 |
 | 4   | **Agente interno**       | Provider LLM, geração em lote de sugestões, fila de aprovação na UI, auditoria                                                            | `v2-phase4-agent`    | ✅ concluída em 17/11/2026 |
 | 5   | **MCP + opencode**       | Tools MCP, API key, **skill**, documentação; teste ponta-a-ponta com opencode conectado                                                   | `v2-phase5-mcp`     | ✅ concluída em 18/11/2026 |
-| 6   | **Polish**               | DBViewer como rota read-only, auditoria completa, preparação para deploy (notebook → labapps → Vultr `jairo.tools`)                       | a criar ao liberar   | ⏳ aguardando          |
+| 6   | **Polish**               | DBViewer como rota read-only, auditoria completa, preparação para deploy (notebook → labapps → Vultr `jairo.tools`)                       | `v2-phase6-polish`  | ✅ concluída em 18/11/2026 |
 
 ## Como funciona
 

@@ -1,0 +1,17 @@
+# Docker só lê o .dockerignore a partir da raiz do contexto (o compose usa
+# `context: ..`). Mantenha em sincronia com docker/.dockerignore.
+node_modules
+.git
+*.db
+*.db-shm
+*.db-wal
+.env
+.env.*
+!.env.example
+dist
+.bun
+.claude
+.codex
+.gemini
+.opencode
+.DS_Store

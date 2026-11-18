@@ -1,0 +1,41 @@
+# Web do DBMapper — SPA estático + proxy de /api e /health para a API.
+#
+# ${DBMAPPER_API_UPSTREAM} é substituído pelo entrypoint oficial do nginx
+# (envsubst em /etc/nginx/templates). Variáveis do próprio nginx ($uri, $host...)
+# são preservadas.
+server {
+  listen 80;
+  server_name _;
+  root /usr/share/nginx/html;
+  index index.html;
+
+  add_header X-Content-Type-Options "nosniff" always;
+  add_header X-Frame-Options "DENY" always;
+  add_header Referrer-Policy "no-referrer" always;
+
+  gzip on;
+  gzip_types text/css application/javascript application/json image/svg+xml;
+
+  location /api/ {
+    proxy_pass ${DBMAPPER_API_UPSTREAM};
+    proxy_http_version 1.1;
+    proxy_set_header Host $host;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;
+  }
+
+  # Health público da API, montado fora de /api (senão cairia no SPA).
+  location = /health {
+    proxy_pass ${DBMAPPER_API_UPSTREAM};
+    proxy_http_version 1.1;
+    proxy_set_header Host $host;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;
+  }
+
+  location / {
+    try_files $uri $uri/ /index.html;
+  }
+}

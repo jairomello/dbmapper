@@ -1,0 +1,58 @@
+# Deploy do DBMapper v2: API (Bun + SQLite) e web (nginx).
+#
+# Uso (a partir da raiz do repositório):
+#   cp .env.example docker/.env   # ajuste JWT_SECRET e o admin inicial
+#   docker compose -f docker/docker-compose.yml --env-file docker/.env up -d --build
+#
+# Segredos vêm SOMENTE do ambiente/.env interpolado; nunca há valor literal aqui.
+# O SQLite vive no volume nomeado `dbmapper-data` (DATABASE_URL=/data/dbmapper.db).
+# A API aplica as migrações e faz o seed opcional no entrypoint (ver
+# docker/entrypoint-api.sh). Rollback/backup/TLS: docs/DEPLOY.md.
+name: dbmapper
+
+services:
+  api:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.api
+    image: dbmapper-api:${DBMAPPER_IMAGE_TAG:-local}
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      PORT: "3000"
+      DATABASE_URL: /data/dbmapper.db
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET obrigatório — gere com openssl rand -hex 32}
+      DBMAPPER_ADMIN_EMAIL: ${DBMAPPER_ADMIN_EMAIL:-admin@dbmapper.local}
+      DBMAPPER_ADMIN_PASSWORD: ${DBMAPPER_ADMIN_PASSWORD:-}
+      DBMAPPER_LLM_PROVIDER: ${DBMAPPER_LLM_PROVIDER:-}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      OPENAI_MODEL: ${OPENAI_MODEL:-gpt-4o-mini}
+      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
+      OPENROUTER_MODEL: ${OPENROUTER_MODEL:-openai/gpt-4o-mini}
+    volumes:
+      - dbmapper-data:/data
+    ports:
+      - "${DBMAPPER_API_PORT:-3000}:3000"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3000/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+
+  web:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.web
+    image: dbmapper-web:${DBMAPPER_IMAGE_TAG:-local}
+    restart: unless-stopped
+    ports:
+      - "${DBMAPPER_WEB_PORT:-8080}:80"
+    environment:
+      DBMAPPER_API_UPSTREAM: http://api:3000
+    depends_on:
+      api:
+        condition: service_healthy
+
+volumes:
+  dbmapper-data:

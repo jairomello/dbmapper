@@ -1,0 +1,36 @@
+# syntax=docker/dockerfile:1
+# Imagem web do DBMapper: build estático do Vite servido por nginx, com /api e
+# /health encaminhados ao serviço `api`.
+#
+# A versão do Bun DEVE espelhar o arquivo `.bun-version` da raiz. O build real
+# roda no ambiente de deploy; esta VM de desenvolvimento não tem Docker — ver
+# docs/DEPLOY.md.
+ARG BUN_VERSION=1.4.4
+
+# --- Build do frontend -------------------------------------------------------
+FROM oven/bun:${BUN_VERSION}-alpine AS build
+WORKDIR /app
+COPY package.json bun.lock ./
+COPY apps/api/package.json apps/api/
+COPY apps/web/package.json apps/web/
+COPY apps/mcp/package.json apps/mcp/
+COPY packages/domain/package.json packages/domain/
+COPY packages/contracts/package.json packages/contracts/
+COPY packages/sql-parser/package.json packages/sql-parser/
+COPY packages/model-diff/package.json packages/model-diff/
+# O build do web usa TypeScript/Vite (devDependencies), então a instalação é
+# completa e congelada.
+RUN bun install --frozen-lockfile
+COPY . .
+WORKDIR /app/apps/web
+RUN bun run build
+
+# --- Runtime nginx -----------------------------------------------------------
+FROM nginx:alpine
+COPY docker/nginx-web.conf.template /etc/nginx/templates/default.conf.template
+COPY --from=build /app/apps/web/dist /usr/share/nginx/html
+# DBMAPPER_API_UPSTREAM é substituído pelo entrypoint oficial do nginx (envsubst
+# em /etc/nginx/templates). Só variáveis definidas são trocadas; as variáveis do
+# próprio nginx ($uri, $http_upgrade...) são preservadas.
+ENV DBMAPPER_API_UPSTREAM=http://api:3000
+EXPOSE 80

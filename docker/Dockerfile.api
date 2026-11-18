@@ -1,0 +1,42 @@
+# syntax=docker/dockerfile:1
+# Imagem da API do DBMapper (Bun + Hono + SQLite).
+#
+# A versão do Bun DEVE espelhar o arquivo `.bun-version` da raiz. O build real
+# roda no ambiente de deploy (labapps/Vultr); esta VM de desenvolvimento não tem
+# Docker — ver docs/DEPLOY.md.
+ARG BUN_VERSION=1.4.4
+
+# --- Dependências do workspace (cacheável) ---------------------------------
+FROM oven/bun:${BUN_VERSION}-alpine AS deps
+WORKDIR /app
+COPY package.json bun.lock ./
+COPY apps/api/package.json apps/api/
+COPY apps/web/package.json apps/web/
+COPY apps/mcp/package.json apps/mcp/
+COPY packages/domain/package.json packages/domain/
+COPY packages/contracts/package.json packages/contracts/
+COPY packages/sql-parser/package.json packages/sql-parser/
+COPY packages/model-diff/package.json packages/model-diff/
+# A API roda o TypeScript direto no Bun (`apps/api start`); só as dependências
+# de produção são necessárias em runtime. Lockfile congelado: builds reprodutíveis.
+RUN bun install --frozen-lockfile --production
+
+# --- Runtime ----------------------------------------------------------------
+FROM oven/bun:${BUN_VERSION}-alpine AS runtime
+WORKDIR /app
+ENV NODE_ENV=production \
+    PORT=3000 \
+    DATABASE_URL=/data/dbmapper.db
+# Os symlinks dos workspaces usam caminhos relativos para node_modules/.bun;
+# copiar a árvore do estágio de deps mantém as resoluções válidas.
+COPY --from=deps /app ./
+COPY . .
+COPY docker/entrypoint-api.sh /usr/local/bin/entrypoint-api.sh
+RUN chmod +x /usr/local/bin/entrypoint-api.sh \
+  && mkdir -p /data \
+  && chown -R bun:bun /app /data
+USER bun
+EXPOSE 3000
+# Migra (idempotente), faz o seed do admin só quando DBMAPPER_ADMIN_PASSWORD
+# está definido e então sobe o servidor.
+ENTRYPOINT ["/usr/local/bin/entrypoint-api.sh"]

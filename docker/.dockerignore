@@ -1,0 +1,18 @@
+# Contexto de build do DBMapper. Este arquivo fica ao lado dos Dockerfiles e é
+# espelhado no `.dockerignore` da raiz: o Docker lê o ignore somente a partir da
+# raiz do contexto (o compose usa `context: ..`).
+node_modules
+.git
+*.db
+*.db-shm
+*.db-wal
+.env
+.env.*
+!.env.example
+dist
+.bun
+.claude
+.codex
+.gemini
+.opencode
+.DS_Store

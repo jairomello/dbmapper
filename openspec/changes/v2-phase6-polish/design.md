@@ -4,7 +4,7 @@
 
 A infra de auditoria já existe: `insertEventRow` no adapter SQLite, parâmetro `audit` nas portas (usado por `keys`, `item.description` e `agent`), tabela `events` com índice `(project_id, created_at)` desde a Fase 4. **Lacuna real:** das ~18 rotas mutantes, só keys/item/agent auditan — `routes/projects.ts` (criar/salvar/importar) e `routes/users.ts` (criar/papel) não passam `audit`; `replaceModel` já aceita `options.audit` e é só plugá-lo.
 
-Na web: rotas em `App.tsx` com `RequireSession`/`RequireProject`; `SemanticTree` é puramente display+seleção (`onSelect`) e `StatusBar` é display — reuso seguro para uma página read-only. O endpoint `GET /api/projects/:id/export` (contrato v1) é a fonte do viewer.
+Na web: rotas em `App.tsx` com `RequireSession`/`RequireProject`; `SemanticTree` é puramente display+seleção (`onSelect`) e `StatusBar` é display — reuso seguro para uma página read-only. **Decisão de contrato (revisão do orquestrador):** o viewer lê `GET /api/projects/:id` (o `projectView`, que já expõe `table_ids`/`column_ids`/`relationship_ids` e ganha `sources` — contrato interno nosso) e **não** o `GET /export`, que permanece byte-idêntico ao contrato v1 (guarda estabelecida na Fase 5; a spec `project-api` exige `{"database": {...}}`).
 
 Referências de deploy: azyboard tem `docker/Dockerfile*`, `docker-compose.*`, `docker/entrypoint-api.sh`, templates nginx/Caddy e docs `DEPLOY*.md` (produção real) — adaptar single-tenant, **sem copiar segredos/caminhos daquela máquina**. **Docker não existe nesta VM** (`docker: comando não encontrado`).
 
@@ -42,7 +42,7 @@ Já existentes (mantidos): `item.description_written`, `agent.generate_requested
 ### 3. Rota viewer (`/viewer/:id`)
 
 - Nova rota em `App.tsx` **dentro de `RequireSession` mas fora de `RequireProject`** (viewer não edita; qualquer papel serve).
-- `ViewerPage` (novo, `apps/web/src/pages/`): busca `GET export` via client tipado → estado loading/404 amigável (link p/ galeria)/vazio.
+- `ViewerPage` (novo, `apps/web/src/pages/`): busca `GET /api/projects/:id` (projectView, que ganha `sources` aditivo — `database` + mapa de fontes) → estado loading/404 amigável (link p/ galeria)/vazio; **nunca** o endpoint de export.
 - Composição: campo de busca (filtra o modelo no cliente antes de passar à árvore), `SemanticTree` em reuso puro, `StatusBar` (display), novo `ViewerDetail` (descrição, termos, badge de fonte humano/IA/MCP + "revisar", tudo em texto — sem textarea/botões).
 - **Regra de ferro:** a página não usa nenhuma mutation hook do React Query — só `useQuery`; teste espiona `fetch` e exige só GETs.
 - Entry points: link "Somente leitura" no card da galeria + link no header do workspace → `/viewer/:id`.
