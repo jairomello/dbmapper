@@ -1,7 +1,7 @@
 import { Database } from 'bun:sqlite'
 import { fileURLToPath } from 'node:url'
 import type { DatabaseModel, DescriptionSource, ReviewStatus } from '@dbmapper/domain'
-import { and, asc, eq, gte, inArray, lt, or, sql } from 'drizzle-orm'
+import { and, asc, desc, eq, gte, inArray, like, lt, or, sql } from 'drizzle-orm'
 import { drizzle } from 'drizzle-orm/bun-sqlite'
 import { migrate } from 'drizzle-orm/bun-sqlite/migrator'
 import {
@@ -36,11 +36,14 @@ import type {
   CreateApiKeyInput,
   CreateImportRunInput,
   CreateProjectInput,
+  CreateProjectOptions,
   CreateUserInput,
   DecisionAudit,
   DescriptionItemType,
+  EventListFilters,
   EventRecord,
   EventRepository,
+  EventWithActor,
   ImportRunRecord,
   InsertEventInput,
   LoginAttemptRepository,
@@ -56,6 +59,7 @@ import type {
   SuggestionDecisionResult,
   SuggestionRepository,
   TableRecord,
+  UserMutationOptions,
   UserRecord,
   UserRepository,
   UserRole,
@@ -491,25 +495,10 @@ export function createSqlitePersistence(
   }
 
   const projectRepository: ProjectRepository = {
-    create(input: CreateProjectInput): ProjectRecord {
-      const now = new Date().toISOString()
+    create(input: CreateProjectInput, options: CreateProjectOptions = {}): ProjectRecord {
+      const now = options.now ?? new Date().toISOString()
       const id = crypto.randomUUID()
-      db.insert(projects)
-        .values({
-          id,
-          name: input.name,
-          description: input.description ?? '',
-          businessTerms: '[]',
-          reviewed: false,
-          descriptionSource: 'human',
-          reviewedBy: null,
-          reviewedAt: null,
-          createdAt: now,
-          updatedAt: now,
-        })
-        .run()
-
-      return {
+      const record: ProjectRecord = {
         id,
         name: input.name,
         description: input.description ?? '',
@@ -521,6 +510,39 @@ export function createSqlitePersistence(
         createdAt: now,
         updatedAt: now,
       }
+
+      db.transaction((tx) => {
+        tx.insert(projects)
+          .values({
+            id,
+            name: record.name,
+            description: record.description,
+            businessTerms: '[]',
+            reviewed: false,
+            descriptionSource: 'human',
+            reviewedBy: null,
+            reviewedAt: null,
+            createdAt: now,
+            updatedAt: now,
+          })
+          .run()
+
+        if (options.audit) {
+          insertEventRow(
+            tx,
+            {
+              ...options.audit,
+              projectId: id,
+              subjectId: id,
+              payload: { ...options.audit.payload, projectId: id },
+              createdAt: now,
+            },
+            now,
+          )
+        }
+      })
+
+      return record
     },
 
     list(): ProjectSummary[] {
@@ -543,6 +565,18 @@ export function createSqlitePersistence(
         const exists = tx.select({ id: projects.id }).from(projects).where(eq(projects.id, id)).get()
         if (!exists) return false
         writeModel(tx, id, database, now, context.actorUserId ?? null)
+        if (context.audit) {
+          insertEventRow(
+            tx,
+            {
+              ...context.audit,
+              projectId: id,
+              subjectId: context.audit.subjectId || id,
+              createdAt: now,
+            },
+            now,
+          )
+        }
         return true
       })
 
@@ -570,6 +604,18 @@ export function createSqlitePersistence(
             createdAt: now,
           })
           .run()
+        if (context.audit) {
+          insertEventRow(
+            tx,
+            {
+              ...context.audit,
+              projectId: id,
+              subjectId: context.audit.subjectId || id,
+              createdAt: now,
+            },
+            now,
+          )
+        }
         return true
       })
 
@@ -695,11 +741,7 @@ export function createSqlitePersistence(
       return db.transaction((tx) => {
         tx.insert(apiKeysTable).values(row).run()
         if (options.audit) {
-          insertEventRow(
-            tx,
-            { ...options.audit, subjectId: row.id, actorUserId: input.ownerId, createdAt: now },
-            now,
-          )
+          insertEventRow(tx, { ...options.audit, subjectId: row.id, actorUserId: input.ownerId, createdAt: now }, now)
         }
         return toApiKeyRecord(row)
       })
@@ -728,11 +770,7 @@ export function createSqlitePersistence(
       return toApiKeyRecord(row)
     },
 
-    revoke(
-      ownerId: string,
-      id: string,
-      options: { now?: string; audit?: InsertEventInput } = {},
-    ): ApiKeyRecord | null {
+    revoke(ownerId: string, id: string, options: { now?: string; audit?: InsertEventInput } = {}): ApiKeyRecord | null {
       const now = options.now ?? new Date().toISOString()
 
       return db.transaction((tx) => {
@@ -765,21 +803,10 @@ export function createSqlitePersistence(
   }
 
   const userRepository: UserRepository = {
-    create(input: CreateUserInput): UserRecord {
-      const now = new Date().toISOString()
+    create(input: CreateUserInput, options: UserMutationOptions = {}): UserRecord {
+      const now = options.now ?? new Date().toISOString()
       const id = crypto.randomUUID()
-      db.insert(usersTable)
-        .values({
-          id,
-          email: input.email,
-          passwordHash: input.passwordHash,
-          role: input.role,
-          createdAt: now,
-          updatedAt: now,
-        })
-        .run()
-
-      return {
+      const record: UserRecord = {
         id,
         email: input.email,
         passwordHash: input.passwordHash,
@@ -787,6 +814,34 @@ export function createSqlitePersistence(
         createdAt: now,
         updatedAt: now,
       }
+
+      db.transaction((tx) => {
+        tx.insert(usersTable)
+          .values({
+            id,
+            email: input.email,
+            passwordHash: input.passwordHash,
+            role: input.role,
+            createdAt: now,
+            updatedAt: now,
+          })
+          .run()
+
+        if (options.audit) {
+          insertEventRow(
+            tx,
+            {
+              ...options.audit,
+              subjectId: id,
+              payload: { ...options.audit.payload, userId: id },
+              createdAt: now,
+            },
+            now,
+          )
+        }
+      })
+
+      return record
     },
 
     findByEmail(email: string): UserRecord | null {
@@ -808,14 +863,33 @@ export function createSqlitePersistence(
         .map(toUserRecord)
     },
 
-    updateRole(id: string, role: UserRole): UserRecord | null {
-      const updated = db
-        .update(usersTable)
-        .set({ role, updatedAt: new Date().toISOString() })
-        .where(eq(usersTable.id, id))
-        .returning()
-        .get()
-      return updated ? toUserRecord(updated) : null
+    updateRole(id: string, role: UserRole, options: UserMutationOptions = {}): UserRecord | null {
+      const now = options.now ?? new Date().toISOString()
+
+      return db.transaction((tx) => {
+        const updated = tx
+          .update(usersTable)
+          .set({ role, updatedAt: now })
+          .where(eq(usersTable.id, id))
+          .returning()
+          .get()
+        if (!updated) return null
+
+        if (options.audit) {
+          insertEventRow(
+            tx,
+            {
+              ...options.audit,
+              subjectId: id,
+              payload: { ...options.audit.payload, userId: id },
+              createdAt: now,
+            },
+            now,
+          )
+        }
+
+        return toUserRecord(updated)
+      })
     },
 
     countByRole(role: UserRole): number {
@@ -1221,6 +1295,45 @@ export function createSqlitePersistence(
         .orderBy(asc(eventsTable.createdAt), asc(eventsTable.id))
         .all()
         .map(toEventRecord)
+    },
+
+    listEvents(filters: EventListFilters = {}): EventWithActor[] {
+      const conditions = []
+      if (filters.action) conditions.push(like(eventsTable.action, `${filters.action}%`))
+      if (filters.projectId) conditions.push(eq(eventsTable.projectId, filters.projectId))
+
+      const limit = Math.min(Math.max(filters.limit ?? 100, 1), 500)
+
+      const rows = db
+        .select({
+          id: eventsTable.id,
+          projectId: eventsTable.projectId,
+          actorUserId: eventsTable.actorUserId,
+          action: eventsTable.action,
+          subjectType: eventsTable.subjectType,
+          subjectId: eventsTable.subjectId,
+          payloadJson: eventsTable.payloadJson,
+          createdAt: eventsTable.createdAt,
+          actorEmail: usersTable.email,
+        })
+        .from(eventsTable)
+        .leftJoin(usersTable, eq(eventsTable.actorUserId, usersTable.id))
+        .where(conditions.length > 0 ? and(...conditions) : undefined)
+        .orderBy(desc(eventsTable.createdAt), desc(sql`events.rowid`))
+        .limit(limit)
+        .all()
+
+      return rows.map((row) => ({
+        id: row.id,
+        projectId: row.projectId,
+        actorUserId: row.actorUserId,
+        actorEmail: row.actorEmail,
+        action: row.action,
+        subjectType: row.subjectType,
+        subjectId: row.subjectId,
+        payload: parseJsonObject(row.payloadJson),
+        createdAt: row.createdAt,
+      }))
     },
   }
 

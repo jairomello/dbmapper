@@ -105,6 +105,7 @@ export interface ApplyModelResult {
 
 export interface MutationContext {
   actorUserId?: string | null
+  audit?: InsertEventInput
 }
 
 export const USER_ROLES = ['ADMIN', 'MEMBER', 'VIEWER'] as const
@@ -125,12 +126,17 @@ export interface CreateUserInput {
   role: UserRole
 }
 
+export interface UserMutationOptions {
+  now?: string
+  audit?: InsertEventInput
+}
+
 export interface UserRepository {
-  create(input: CreateUserInput): UserRecord
+  create(input: CreateUserInput, options?: UserMutationOptions): UserRecord
   findByEmail(email: string): UserRecord | null
   findById(id: string): UserRecord | null
   list(): UserRecord[]
-  updateRole(id: string, role: UserRole): UserRecord | null
+  updateRole(id: string, role: UserRole, options?: UserMutationOptions): UserRecord | null
   countByRole(role: UserRole): number
 }
 
@@ -165,8 +171,13 @@ export interface SetItemDescriptionResult {
   updatedAt: string
 }
 
+export interface CreateProjectOptions {
+  now?: string
+  audit?: InsertEventInput
+}
+
 export interface ProjectRepository {
-  create(input: CreateProjectInput): ProjectRecord
+  create(input: CreateProjectInput, options?: CreateProjectOptions): ProjectRecord
   list(): ProjectSummary[]
   get(id: string): ProjectAggregate | null
   replaceModel(id: string, database: DatabaseModel, context?: MutationContext): ProjectAggregate | null
@@ -352,10 +363,21 @@ export interface SuggestionRepository {
   ): SuggestionDecisionResult
 }
 
+export interface EventListFilters {
+  action?: string
+  projectId?: string
+  limit?: number
+}
+
+export interface EventWithActor extends EventRecord {
+  actorEmail: string | null
+}
+
 export interface EventRepository {
   insert(input: InsertEventInput): EventRecord
   list(projectId: string): EventRecord[]
   listAll(): EventRecord[]
+  listEvents(filters?: EventListFilters): EventWithActor[]
 }
 
 export interface AgentRepositories {

@@ -77,6 +77,25 @@ describe('WorkspacePage', () => {
     await waitFor(() => expect(within(reviewedColumn).getByText('aprovado')).toBeTruthy())
   })
 
+  test('o header oferece o link Somente leitura para o viewer do projeto', async () => {
+    const project = sampleProject()
+
+    restoreCallbacks.push(
+      installFetch((url) => {
+        if (url === '/api/auth/me') return jsonResponse(sampleUser)
+        if (url === `/api/projects/${project.id}`) return jsonResponse(project)
+        if (url === `/api/projects/${project.id}/export`) return jsonResponse({ database: project.database })
+        return errorResponse('NOT_FOUND', 'Recurso não encontrado.', 404)
+      }),
+    )
+
+    renderApp(['/project/projeto-1'])
+    fireEvent.click(await screen.findByTestId('workspace-viewer-link'))
+
+    expect(await screen.findByTestId('table-row-cliente')).toBeTruthy()
+    expect(screen.queryByRole('button', { name: 'Salvar' })).toBeNull()
+  })
+
   test('exibe o badge de sugestões pendentes e abre o painel do agente', async () => {
     const project = sampleProject()
 

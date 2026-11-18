@@ -93,10 +93,28 @@ describe('GalleryPage', () => {
     expect(screen.queryByRole('heading', { name: 'Seus projetos' })).toBeNull()
   })
 
-  test('sem sessão a galeria redireciona para o login', async () => {
+  test('o link Somente leitura abre o viewer do projeto', async () => {
+    const project = sampleProject()
+
     restoreCallbacks.push(
-      installFetch(() => errorResponse('UNAUTHORIZED', 'Sessão inválida.', 401)),
+      installFetch((url) => {
+        if (url === '/api/auth/me') return jsonResponse(sampleUser)
+        if (url === '/api/projects') return jsonResponse([summaryOf(project)])
+        if (url === `/api/projects/${project.id}`) return jsonResponse(project)
+        return errorResponse('NOT_FOUND', 'Recurso não encontrado.', 404)
+      }),
     )
+
+    renderApp(['/'])
+    fireEvent.click(await screen.findByTestId(`viewer-link-${project.id}`))
+
+    expect(await screen.findByTestId('table-row-cliente')).toBeTruthy()
+    expect(screen.getByText('Somente leitura')).toBeTruthy()
+    expect(screen.queryByRole('button', { name: 'Salvar' })).toBeNull()
+  })
+
+  test('sem sessão a galeria redireciona para o login', async () => {
+    restoreCallbacks.push(installFetch(() => errorResponse('UNAUTHORIZED', 'Sessão inválida.', 401)))
 
     renderApp(['/'])
 

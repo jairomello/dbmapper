@@ -15,18 +15,30 @@ function formatUpdatedAt(value: string): string {
 
 function ProjectCard({ project }: { project: ProjectSummary }) {
   return (
-    <Link
-      to={`/project/${encodeURIComponent(project.id)}`}
-      className="group flex h-full flex-col gap-2 rounded-lg border border-slate-200 bg-white p-5 shadow-sm transition hover:-translate-y-0.5 hover:border-accent hover:shadow-md"
-      aria-label={`Abrir projeto ${project.name}`}
+    <article
+      className="flex h-full flex-col rounded-lg border border-slate-200 bg-white p-5 shadow-sm transition hover:-translate-y-0.5 hover:border-accent hover:shadow-md"
       data-testid={`project-card-${project.id}`}
     >
-      <h3 className="text-base font-semibold text-ink group-hover:text-accent">{project.name}</h3>
-      <p className="line-clamp-2 text-sm text-slate-600">{project.description || 'Sem descrição.'}</p>
-      <time className="mt-auto text-xs text-slate-500" dateTime={project.updatedAt}>
-        Atualizado em {formatUpdatedAt(project.updatedAt)}
-      </time>
-    </Link>
+      <Link
+        to={`/project/${encodeURIComponent(project.id)}`}
+        className="group flex flex-1 flex-col gap-2"
+        aria-label={`Abrir projeto ${project.name}`}
+      >
+        <h3 className="text-base font-semibold text-ink group-hover:text-accent">{project.name}</h3>
+        <p className="line-clamp-2 text-sm text-slate-600">{project.description || 'Sem descrição.'}</p>
+        <time className="mt-auto text-xs text-slate-500" dateTime={project.updatedAt}>
+          Atualizado em {formatUpdatedAt(project.updatedAt)}
+        </time>
+      </Link>
+      <Link
+        to={`/viewer/${encodeURIComponent(project.id)}`}
+        className="mt-3 inline-flex w-fit items-center rounded-sm border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-100"
+        aria-label={`Abrir projeto ${project.name} somente leitura`}
+        data-testid={`viewer-link-${project.id}`}
+      >
+        Somente leitura
+      </Link>
+    </article>
   )
 }
 

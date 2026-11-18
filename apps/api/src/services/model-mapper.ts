@@ -1,9 +1,4 @@
-import type {
-  ColumnModel,
-  DatabaseModel,
-  RelationshipModel,
-  TableModel,
-} from '@dbmapper/domain'
+import type { ColumnModel, DatabaseModel, DescriptionSource, RelationshipModel, TableModel } from '@dbmapper/domain'
 import { normalizeRelationships } from '@dbmapper/sql-parser'
 import { buildProjectContext } from '../persistence/context'
 import type { ProjectAggregate, ProjectRecord, RelationshipRecord } from '../persistence/ports'
@@ -94,6 +89,40 @@ export function databaseFromAggregate(aggregate: ProjectAggregate): DatabaseMode
   }
 }
 
+export interface ExportSources {
+  project: DescriptionSource
+  tables: Record<string, DescriptionSource>
+  columns: Record<string, Record<string, DescriptionSource>>
+}
+
+export interface ProjectExport {
+  database: DatabaseModel
+}
+
+function buildExportSources(
+  aggregate: ProjectAggregate,
+  context: ReturnType<typeof buildProjectContext>,
+): ExportSources {
+  const sources: ExportSources = {
+    project: aggregate.project.descriptionSource,
+    tables: {},
+    columns: {},
+  }
+
+  for (const table of aggregate.tables) {
+    sources.tables[table.name] = table.descriptionSource
+    sources.columns[table.name] = Object.fromEntries(
+      (context.columnsByTableId.get(table.id) ?? []).map((column) => [column.name, column.descriptionSource]),
+    )
+  }
+
+  return sources
+}
+
+export function projectExport(aggregate: ProjectAggregate): ProjectExport {
+  return { database: databaseFromAggregate(aggregate) }
+}
+
 export interface ProjectView {
   id: string
   name: string
@@ -106,6 +135,7 @@ export interface ProjectView {
   column_ids: Record<string, Record<string, string>>
   relationship_ids: Record<string, string[]>
   database: DatabaseModel
+  sources: ExportSources
 }
 
 export function projectView(aggregate: ProjectAggregate): ProjectView {
@@ -135,5 +165,6 @@ export function projectView(aggregate: ProjectAggregate): ProjectView {
     column_ids: columnIds,
     relationship_ids: relationshipIds,
     database: databaseFromAggregate(aggregate),
+    sources: buildExportSources(aggregate, context),
   }
 }

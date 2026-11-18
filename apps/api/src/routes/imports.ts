@@ -49,7 +49,29 @@ export function registerImportRoutes(app: Hono<AppEnv>, persistence: Persistence
         sqlHash: plan.sqlHash,
         planSnapshot: JSON.stringify(plan),
       },
-      { actorUserId: c.get('user').sub },
+      {
+        actorUserId: c.get('user').sub,
+        audit: {
+          actorUserId: c.get('user').sub,
+          action: 'model.import_applied',
+          subjectType: 'project',
+          subjectId: id,
+          payload: {
+            sqlHash: plan.sqlHash,
+            tables: {
+              added: plan.tables.added.length,
+              removed: plan.tables.removed.length,
+              renamed: plan.tables.renamed.length,
+            },
+            columns: {
+              added: plan.columns.added.length,
+              removed: plan.columns.removed.length,
+              renamed: plan.columns.renamed.length,
+              changed: plan.columns.changed.length,
+            },
+          },
+        },
+      },
     )
     if (!applied) throw new ApiError(404, 'NOT_FOUND', 'Projeto não encontrado.')
 

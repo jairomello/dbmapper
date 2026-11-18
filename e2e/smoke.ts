@@ -165,9 +165,7 @@ try {
 
   const tableRequest = generateRequests[1]
   if (tableRequest?.scope !== 'table' || !tableRequest.tableId) {
-    throw new Error(
-      `A geração por tabela não enviou scope=table com tableId (${JSON.stringify(tableRequest)}).`,
-    )
+    throw new Error(`A geração por tabela não enviou scope=table com tableId (${JSON.stringify(tableRequest)}).`)
   }
   await tableScopePanel.getByRole('button', { name: 'Fechar' }).click()
 
@@ -195,8 +193,35 @@ try {
   }
   if (username.reviewed !== true) throw new Error('A revisão aprovada não foi preservada no export.')
 
+  const viewerMethods: string[] = []
+  const trackViewerRequest = (request: import('playwright').Request) => {
+    viewerMethods.push(request.method())
+  }
+
+  page.on('request', trackViewerRequest)
+  await page.getByTestId('workspace-viewer-link').click()
+  await page.waitForURL(/\/viewer\/[^/]+$/)
+  await page.getByTestId('table-row-users').waitFor()
+  await page.locator('[aria-label="Detalhe somente leitura"]').waitFor()
+  page.off('request', trackViewerRequest)
+
+  const viewerBody = (await page.locator('body').textContent()) ?? ''
+  if (!viewerBody.includes('users')) throw new Error('O viewer read-only não renderizou a tabela users.')
+
+  const mutationControls = await page
+    .getByRole('button', { name: /Salvar|Aprovar|Reabrir|Importar|Atualizar modelo|Sugestões IA/i })
+    .count()
+  if (mutationControls > 0) {
+    throw new Error(`O viewer read-only expôs ${mutationControls} controle(s) de mutação.`)
+  }
+
+  const nonGet = viewerMethods.filter((method) => method.toUpperCase() !== 'GET')
+  if (nonGet.length > 0) {
+    throw new Error(`O viewer emitiu método(s) não-GET: ${nonGet.join(', ')}.`)
+  }
+
   console.log(
-    'E2E smoke ok: login, projeto via SQL, descrição, aprovação, agente (fake, projeto e tabela) e export JSON.',
+    'E2E smoke ok: login, projeto via SQL, descrição, aprovação, agente (fake, projeto e tabela), export JSON e viewer read-only (somente GET).',
   )
 } finally {
   await browser?.close()

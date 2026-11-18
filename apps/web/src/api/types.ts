@@ -31,6 +31,7 @@ export interface ProjectView {
   updatedAt: string
   table_ids: Record<string, string>
   database: DatabaseModel
+  sources: ExportSources
 }
 
 export interface CreateProjectInput {
@@ -104,6 +105,33 @@ export interface ApplyImportResult {
   run: ImportRun
 }
 
+export type DescriptionSource = 'human' | 'agent' | 'mcp'
+
+export interface ExportSources {
+  project: DescriptionSource
+  tables: Record<string, DescriptionSource>
+  columns: Record<string, Record<string, DescriptionSource>>
+}
+
 export interface ProjectDocument {
   database: DatabaseModel
+  sources?: ExportSources
+}
+
+export interface AuditEvent {
+  id: string
+  projectId: string | null
+  actorUserId: string | null
+  actorEmail: string | null
+  action: string
+  subjectType: string
+  subjectId: string
+  payload: Record<string, unknown>
+  createdAt: string
+}
+
+export interface EventListFilters {
+  action?: string
+  projectId?: string
+  limit?: number
 }

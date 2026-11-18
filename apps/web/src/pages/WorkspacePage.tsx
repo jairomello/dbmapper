@@ -112,6 +112,16 @@ export function WorkspacePage() {
           </button>
 
           {projectId && project.data ? (
+            <Link
+              to={`/viewer/${encodeURIComponent(projectId)}`}
+              className="rounded-sm border border-slate-600 px-3 py-1.5 text-xs font-medium text-slate-200 hover:bg-slate-800"
+              data-testid="workspace-viewer-link"
+            >
+              Somente leitura
+            </Link>
+          ) : null}
+
+          {projectId && project.data ? (
             <JsonTransfer
               projectId={projectId}
               onImported={(imported) => {

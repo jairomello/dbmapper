@@ -35,11 +35,22 @@ export function registerUserRoutes(app: Hono<AppEnv>, persistence: Persistence):
       throw new ApiError(409, 'EMAIL_ALREADY_EXISTS', 'Já existe um usuário com este email.')
     }
 
-    const created = users.create({
-      email: input.email,
-      passwordHash: await hashPassword(input.password),
-      role: input.role,
-    })
+    const created = users.create(
+      {
+        email: input.email,
+        passwordHash: await hashPassword(input.password),
+        role: input.role,
+      },
+      {
+        audit: {
+          actorUserId: c.get('user').sub,
+          action: 'user.created',
+          subjectType: 'user',
+          subjectId: '',
+          payload: { email: input.email, role: input.role },
+        },
+      },
+    )
     return c.json(publicUser(created), 201)
   })
 
@@ -54,7 +65,15 @@ export function registerUserRoutes(app: Hono<AppEnv>, persistence: Persistence):
       throw new ApiError(400, 'LAST_ADMIN', 'Não é possível remover o último ADMIN do sistema.')
     }
 
-    const updated = users.updateRole(target.id, input.role)
+    const updated = users.updateRole(target.id, input.role, {
+      audit: {
+        actorUserId: c.get('user').sub,
+        action: 'user.role_changed',
+        subjectType: 'user',
+        subjectId: target.id,
+        payload: { from: target.role, to: input.role },
+      },
+    })
     if (!updated) throw new ApiError(404, 'NOT_FOUND', 'Usuário não encontrado.')
     return c.json(publicUser(updated))
   })
