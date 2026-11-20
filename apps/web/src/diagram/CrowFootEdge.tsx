@@ -1,40 +1,5 @@
-import { BaseEdge, type EdgeProps, getSmoothStepPath, Position } from '@xyflow/react'
-
-function outward(position: Position | undefined): { x: number; y: number } {
-  switch (position) {
-    case Position.Left:
-      return { x: -1, y: 0 }
-    case Position.Right:
-      return { x: 1, y: 0 }
-    case Position.Top:
-      return { x: 0, y: -1 }
-    case Position.Bottom:
-      return { x: 0, y: 1 }
-    default:
-      return { x: 0, y: 0 }
-  }
-}
-
-function manyFoot(x: number, y: number, direction: { x: number; y: number }): string {
-  const apex = { x: x + direction.x * 16, y: y + direction.y * 16 }
-  const perp = { x: -direction.y, y: direction.x }
-  const spread = 7
-  const tips = [
-    { x: x + perp.x * spread, y: y + perp.y * spread },
-    { x, y },
-    { x: -perp.x * spread, y: -perp.y * spread },
-  ]
-  return tips.map((tip) => `M ${apex.x} ${apex.y} L ${tip.x} ${tip.y}`).join(' ')
-}
-
-function oneTick(x: number, y: number, direction: { x: number; y: number }): string {
-  const point = { x: x + direction.x * 15, y: y + direction.y * 15 }
-  const perp = { x: -direction.y, y: direction.x }
-  const spread = 7
-  return `M ${point.x + perp.x * spread} ${point.y + perp.y * spread} L ${point.x - perp.x * spread} ${
-    point.y - perp.y * spread
-  }`
-}
+import { BaseEdge, type EdgeProps, getSmoothStepPath } from '@xyflow/react'
+import { manyFoot, oneTick, outward } from './crowfoot'
 
 export function CrowFootEdge({
   id,

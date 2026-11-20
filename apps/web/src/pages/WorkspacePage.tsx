@@ -67,7 +67,7 @@ export function WorkspacePage() {
   }
 
   return (
-    <div className="flex min-h-screen flex-col bg-bg">
+    <div className="flex h-screen flex-col bg-bg">
       <header className="flex flex-wrap items-center gap-3 border-b border-slate-800 bg-ink px-4 py-3 text-white">
         <Link
           to="/"
