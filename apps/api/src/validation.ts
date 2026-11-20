@@ -93,6 +93,83 @@ export const diagramLayoutSchema = z
   })
   .strict()
 
+const diagramZoneSchema = z
+  .object({
+    name: z.string().trim().min(1).max(200),
+    tabOrder: z.number().int().min(0).default(0),
+    members: z.array(z.string().trim().min(1).max(200)).default([]),
+  })
+  .strict()
+
+const diagramDocumentLayoutSchema = z
+  .object({
+    zoneName: z.string().trim().min(1).max(200),
+    positions: z.record(z.string().trim().min(1).max(200), diagramPositionSchema).default({}),
+    viewport: z
+      .object({
+        x: z.number().finite(),
+        y: z.number().finite(),
+      })
+      .strict()
+      .default({ x: 0, y: 0 }),
+    zoom: z.number().finite().positive().max(10).default(1),
+  })
+  .strict()
+
+export function createDiagramRequestSchema(knownMembers: Iterable<string>) {
+  const known = new Set(knownMembers)
+
+  const documentSchema = z
+    .object({
+      zones: z.array(diagramZoneSchema).optional(),
+      layouts: z.array(diagramDocumentLayoutSchema),
+    })
+    .strict()
+    .superRefine((value, ctx) => {
+      if (!value.zones) return
+
+      const zoneNames = new Map<string, number>()
+      const memberOwners = new Map<string, string>()
+
+      value.zones.forEach((zone, zoneIndex) => {
+        if (zoneNames.has(zone.name)) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: ['zones', zoneIndex, 'name'],
+            message: `Nome de zona duplicado: ${zone.name}.`,
+          })
+        } else {
+          zoneNames.set(zone.name, zoneIndex)
+        }
+
+        zone.members.forEach((member, memberIndex) => {
+          if (!known.has(member)) {
+            ctx.addIssue({
+              code: z.ZodIssueCode.custom,
+              path: ['zones', zoneIndex, 'members', memberIndex],
+              message: `Tabela desconhecida na zona ${zone.name}: ${member}.`,
+            })
+            return
+          }
+
+          const owner = memberOwners.get(member)
+          if (owner !== undefined && owner !== zone.name) {
+            ctx.addIssue({
+              code: z.ZodIssueCode.custom,
+              path: ['zones', zoneIndex, 'members', memberIndex],
+              message: `Tabela ${member} já pertence à zona ${owner}.`,
+            })
+            return
+          }
+
+          memberOwners.set(member, zone.name)
+        })
+      })
+    })
+
+  return z.union([documentSchema, diagramLayoutSchema])
+}
+
 export const tableRenameSchema = z
   .object({
     from: z.string().trim().min(1),

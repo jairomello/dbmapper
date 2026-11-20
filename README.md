@@ -295,6 +295,42 @@ payload único, undo/redo e o modo somente leitura; o smoke e2e exercita criar
 tabela, criar relacionamento com FK automática, desfazer e recarregar o modelo
 persistido. `bun run test:e2e` continua fora do `bun run check`.
 
+## Zonas, chaves entre modelos e export (Fase 9)
+
+A barra acima do canvas ganhou **abas/zonas**: `Principal` (padrão, sempre
+presente) e as zonas criadas pelo `+`. Cada zona tem o próprio layout — posições,
+viewport e zoom — e arrastar uma tabela em uma zona não altera o arranjo das
+demais. Zonas podem ser renomeadas, reordenadas por arrasto e excluídas com
+confirmação; excluir uma zona devolve suas tabelas para `Principal`, e
+`Principal` não pode ser excluída.
+
+- **Atribuição**: mover uma tabela entre zonas pelo menu de contexto do card ou
+  pelo seletor da árvore; arrastar uma tabela da árvore semântica para o canvas
+  adiciona-a à aba ativa na posição do cursor (`MEMBER`/`ADMIN`). Tabelas novas e
+  importadas nascem em `Principal`.
+- **Remover do diagrama ≠ excluir**: a ação do menu do card tira a tabela da zona
+  sem tocar no modelo; ela continua no dicionário e na árvore, marcada como
+  **fora do diagrama**, com a ação **Adicionar à aba atual**. A exclusão real
+  continua em **Excluir tabela** (Fase 8), com confirmação própria.
+- **Localizar pela árvore**: selecionar uma tabela/coluna troca para a aba da
+  zona dela (quando necessário), centraliza e destaca o card.
+- **Chaves entre modelos**: derivadas na renderização — relacionamentos com as
+  duas pontas em zonas diferentes aparecem na faixa **Chaves entre modelos** dos
+  dois cards; os internos ficam em **Chaves estrangeiras**. Nenhum dado novo é
+  gravado no servidor.
+- **Export**: **Exportar PNG** e **Exportar SVG** geram arquivos do diagrama no
+  cliente com [`html-to-image`](https://github.com/bubkoo/html-to-image), sem
+  requisição de save nem alteração de modelo/layout.
+- **Contagem**: o cabeçalho do modo diagrama mostra `N tabelas` (tabelas
+  não-`REMOVED`, sem teto artificial).
+
+Zonas, membros e layouts são gravados juntos no mesmo
+`PUT /api/projects/{id}/diagram` (tabela `diagram_zones` + `diagram_layouts`),
+com apenas o evento `diagram.layout_saved`. Um documento de layout antigo, sem
+`zones`, continua válido e é lido como todas as tabelas em `Principal`. O save do
+layout espera a fila do modelo (Fase 8) assentar antes de sair, evitando que um
+membro recém-criado chegue ao servidor antes da tabela existir.
+
 ## Agente de sugestões (Fase 4)
 
 A Fase 4 adiciona o agente embutido: geração em lote de sugestões de descrição

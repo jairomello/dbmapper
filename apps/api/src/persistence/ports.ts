@@ -206,6 +206,57 @@ export interface PutDiagramLayoutInput {
   audit?: InsertEventInput
 }
 
+export interface DiagramZoneRecord {
+  name: string
+  tabOrder: number
+  members: string[]
+}
+
+export interface DiagramZoneInput {
+  name: string
+  tabOrder: number
+  members: string[]
+}
+
+export interface DiagramLayoutInput {
+  zoneName: string
+  positions: Record<string, DiagramPosition>
+  viewportX: number
+  viewportY: number
+  zoom: number
+}
+
+export interface DiagramDocumentRecord {
+  projectId: string
+  zones: DiagramZoneRecord[]
+  layouts: DiagramLayoutRecord[]
+}
+
+export interface PutDiagramDocumentInput {
+  projectId: string
+  zones?: DiagramZoneInput[]
+  layouts: DiagramLayoutInput[]
+  actorUserId?: string | null
+  now?: string
+  audit?: InsertEventInput
+}
+
+export interface DiagramDocumentIssue {
+  path: string
+  message: string
+  code: string
+}
+
+export class DiagramDocumentValidationError extends Error {
+  readonly issues: DiagramDocumentIssue[]
+
+  constructor(issues: DiagramDocumentIssue[]) {
+    super('Documento de diagrama inválido.')
+    this.name = 'DiagramDocumentValidationError'
+    this.issues = issues
+  }
+}
+
 export interface ProjectRepository {
   create(input: CreateProjectInput, options?: CreateProjectOptions): ProjectRecord
   list(): ProjectSummary[]
@@ -221,6 +272,8 @@ export interface ProjectRepository {
   setItemDescription(input: SetItemDescriptionInput): SetItemDescriptionResult | null
   getDiagramLayout(projectId: string, zoneName?: string): DiagramLayoutRecord | null
   putDiagramLayout(input: PutDiagramLayoutInput): DiagramLayoutRecord | null
+  getDiagramDocument(projectId: string): DiagramDocumentRecord | null
+  putDiagramDocument(input: PutDiagramDocumentInput): DiagramDocumentRecord | null
 }
 
 export interface ApiKeyRecord {

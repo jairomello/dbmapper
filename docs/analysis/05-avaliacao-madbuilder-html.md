@@ -87,7 +87,7 @@ indicador, sem botão) com a copy exata: `Salvando...` / `Salvo às: HH:MM`.
    única (Fase 7) isso não existe; entra junto com as zonas.
 9. **Arrastar da árvore para o canvas** adiciona a tabela na zona atual
    (`ui-droppable` deles) — natural com as zonas prontas.
-10. **Export: SVG primeiro, PNG depois**. Eles só têm PNG e o caminho deles
+10. **Export: SVG e PNG na mesma fase**. Eles só têm PNG e o caminho deles
     (html2canvas em 2 passadas escondendo os cards) é o pior pedaço do código.
     Com React Flow as arestas já são SVG → `toSvg` é quase grátis; PNG via
     `html-to-image`. Nosso SVG passa a ser vantagem sobre eles.

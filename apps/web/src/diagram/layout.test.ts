@@ -2,6 +2,7 @@ import { describe, expect, test } from 'bun:test'
 import { sampleDatabase, tableByName } from '../test/fixtures'
 import {
   buildPositions,
+  buildZonePositions,
   createDiagramEdges,
   createDiagramNodes,
   diagramMatches,
@@ -28,6 +29,13 @@ describe('diagram layout', () => {
     expect(positions.cliente).toEqual({ x: 400, y: 120 })
     expect(positions.pedido).toEqual(gridPosition(1))
     expect(positions.produto).toEqual(gridPosition(2))
+  })
+
+  test('constrói posições apenas dos membros da zona', () => {
+    const positions = buildZonePositions(['pedido', 'cliente'], { cliente: { x: 10, y: 20 } })
+
+    expect(positions).toEqual({ pedido: gridPosition(0), cliente: { x: 10, y: 20 } })
+    expect(positions.fantasma).toBeUndefined()
   })
 
   test('ignora entradas órfãs do layout salvo', () => {

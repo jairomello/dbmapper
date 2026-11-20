@@ -1,20 +1,33 @@
 import type { Hono } from 'hono'
 import { ApiError } from '../errors'
 import { requireRole } from '../middleware/session'
-import { DEFAULT_DIAGRAM_ZONE, type DiagramLayoutRecord, type Persistence } from '../persistence/ports'
+import {
+  DEFAULT_DIAGRAM_ZONE,
+  DiagramDocumentValidationError,
+  type DiagramDocumentRecord,
+  type Persistence,
+  type PutDiagramDocumentInput,
+} from '../persistence/ports'
 import { normalizeDatabaseModel, projectExport, projectView } from '../services/model-mapper'
 import type { AppEnv } from '../types'
-import { createProjectSchema, diagramLayoutSchema, parseJsonBody, projectDocumentSchema } from '../validation'
+import { createDiagramRequestSchema, createProjectSchema, parseJsonBody, projectDocumentSchema } from '../validation'
 
-function diagramLayoutView(layout: DiagramLayoutRecord) {
+function diagramDocumentView(document: DiagramDocumentRecord) {
   return {
-    projectId: layout.projectId,
-    zoneName: layout.zoneName,
-    positions: layout.positions,
-    viewport: { x: layout.viewportX, y: layout.viewportY },
-    zoom: layout.zoom,
-    updatedAt: layout.updatedAt,
-    updatedBy: layout.updatedBy,
+    projectId: document.projectId,
+    zones: document.zones.map((zone) => ({
+      name: zone.name,
+      tabOrder: zone.tabOrder,
+      members: zone.members,
+    })),
+    layouts: document.layouts.map((layout) => ({
+      zoneName: layout.zoneName,
+      positions: layout.positions,
+      viewport: { x: layout.viewportX, y: layout.viewportY },
+      zoom: layout.zoom,
+      updatedAt: layout.updatedAt,
+      updatedBy: layout.updatedBy,
+    })),
   }
 }
 
@@ -92,34 +105,77 @@ export function registerProjectRoutes(app: Hono<AppEnv>, persistence: Persistenc
   })
 
   app.get('/api/projects/:id/diagram', (c) => {
-    const layout = repository.getDiagramLayout(c.req.param('id'))
-    if (!layout) throw new ApiError(404, 'NOT_FOUND', 'Projeto não encontrado.')
-    return c.json(diagramLayoutView(layout))
+    const document = repository.getDiagramDocument(c.req.param('id'))
+    if (!document) throw new ApiError(404, 'NOT_FOUND', 'Projeto não encontrado.')
+    return c.json(diagramDocumentView(document))
   })
 
   app.put('/api/projects/:id/diagram', requireMember, async (c) => {
     const id = c.req.param('id')
-    const payload = await parseJsonBody(c, diagramLayoutSchema)
+    const aggregate = repository.get(id)
+    if (!aggregate) throw new ApiError(404, 'NOT_FOUND', 'Projeto não encontrado.')
+
+    const payload = await parseJsonBody(
+      c,
+      createDiagramRequestSchema(aggregate.tables.map((table) => table.name)),
+    )
     const actorUserId = c.get('user').sub
-    const saved = repository.putDiagramLayout({
-      projectId: id,
-      positions: payload.positions,
-      viewportX: payload.viewport.x,
-      viewportY: payload.viewport.y,
-      zoom: payload.zoom,
-      actorUserId,
-      audit: {
+    const isDocument = 'layouts' in payload
+    const input: PutDiagramDocumentInput = isDocument
+      ? {
+          projectId: id,
+          zones: payload.zones?.map((zone) => ({
+            name: zone.name,
+            tabOrder: zone.tabOrder,
+            members: zone.members,
+          })),
+          layouts: payload.layouts.map((layout) => ({
+            zoneName: layout.zoneName,
+            positions: layout.positions,
+            viewportX: layout.viewport.x,
+            viewportY: layout.viewport.y,
+            zoom: layout.zoom,
+          })),
+        }
+      : {
+          projectId: id,
+          layouts: [
+            {
+              zoneName: DEFAULT_DIAGRAM_ZONE,
+              positions: payload.positions,
+              viewportX: payload.viewport.x,
+              viewportY: payload.viewport.y,
+              zoom: payload.zoom,
+            },
+          ],
+        }
+
+    let saved: DiagramDocumentRecord | null
+    try {
+      saved = repository.putDiagramDocument({
+        ...input,
         actorUserId,
-        action: 'diagram.layout_saved',
-        subjectType: 'project',
-        subjectId: id,
-        payload: {
-          zoneName: DEFAULT_DIAGRAM_ZONE,
-          tables: Object.keys(payload.positions).length,
+        audit: {
+          actorUserId,
+          action: 'diagram.layout_saved',
+          subjectType: 'project',
+          subjectId: id,
+          payload: {
+            zones: input.zones ? input.zones.map((zone) => zone.name) : [DEFAULT_DIAGRAM_ZONE],
+            tables: input.layouts.reduce((total, layout) => total + Object.keys(layout.positions).length, 0),
+          },
         },
-      },
-    })
+      })
+    } catch (error) {
+      if (error instanceof DiagramDocumentValidationError) {
+        throw new ApiError(400, 'VALIDATION_ERROR', 'O payload da requisição é inválido.', {
+          details: { issues: error.issues },
+        })
+      }
+      throw error
+    }
+
     if (!saved) throw new ApiError(404, 'NOT_FOUND', 'Projeto não encontrado.')
-    return c.json(diagramLayoutView(saved))
+    return c.json(diagramDocumentView(saved))
   })
 }

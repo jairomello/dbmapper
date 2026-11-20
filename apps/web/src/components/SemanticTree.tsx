@@ -1,5 +1,7 @@
 import type { DatabaseModel } from '@dbmapper/domain'
-import { useState } from 'react'
+import { type DragEvent, useState } from 'react'
+import type { DiagramZone } from '../api/types'
+import { DIAGRAM_TABLE_MIME } from '../diagram/zones'
 import type { Selection } from '../lib/selection'
 import { SemanticBadge } from './SemanticBadge'
 
@@ -7,6 +9,11 @@ interface SemanticTreeProps {
   database: DatabaseModel
   selection: Selection
   onSelect: (selection: Selection) => void
+  zones?: DiagramZone[]
+  activeZone?: string
+  canMoveTables?: boolean
+  onMoveTable?: (table: string, zone: string) => void
+  onAddToActiveZone?: (table: string) => void
 }
 
 function isActive(selection: Selection, candidate: Selection): boolean {
@@ -19,9 +26,23 @@ function isActive(selection: Selection, candidate: Selection): boolean {
   return false
 }
 
-export function SemanticTree({ database, selection, onSelect }: SemanticTreeProps) {
+export function SemanticTree({
+  database,
+  selection,
+  onSelect,
+  zones,
+  activeZone,
+  canMoveTables = false,
+  onMoveTable,
+  onAddToActiveZone,
+}: SemanticTreeProps) {
   const tables = database.tables.filter((table) => table.status !== 'REMOVED')
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({})
+
+  function zoneOfTable(table: string): string | null {
+    if (!zones) return null
+    return zones.find((zone) => zone.members.includes(table))?.name ?? null
+  }
 
   const allCollapsed = tables.length > 0 && tables.every((table) => collapsed[table.name])
 
@@ -73,6 +94,8 @@ export function SemanticTree({ database, selection, onSelect }: SemanticTreeProp
           {tables.map((table) => {
             const tableCollapsed = Boolean(collapsed[table.name])
             const tableActive = isActive(selection, { type: 'table', table: table.name })
+            const tableZone = zoneOfTable(table.name)
+            const outside = Boolean(zones) && tableZone === null
 
             return (
               <li key={table.name} data-testid={`table-item-${table.name}`}>
@@ -97,11 +120,64 @@ export function SemanticTree({ database, selection, onSelect }: SemanticTreeProp
                     onClick={() => onSelect({ type: 'table', table: table.name })}
                     data-testid={`table-row-${table.name}`}
                     data-active={tableActive}
+                    draggable={canMoveTables}
+                    onDragStart={(event: DragEvent<HTMLButtonElement>) => {
+                      if (!canMoveTables) return
+                      event.dataTransfer.setData(DIAGRAM_TABLE_MIME, table.name)
+                      event.dataTransfer.setData('text/plain', table.name)
+                      event.dataTransfer.effectAllowed = 'move'
+                    }}
                   >
                     <span className="truncate">{table.name}</span>
                     <SemanticBadge item={table} />
                   </button>
                 </div>
+
+                {zones ? (
+                  <div className="ml-8 flex flex-wrap items-center gap-1 px-1 pb-1">
+                    {outside ? (
+                      <span
+                        className="rounded-sm bg-amber-100 px-1.5 py-0.5 text-[10px] font-medium text-amber-800"
+                        data-testid={`table-outside-${table.name}`}
+                      >
+                        fora do diagrama
+                      </span>
+                    ) : null}
+                    {canMoveTables && zones.length > 0 ? (
+                      <select
+                        className="rounded-sm border border-slate-300 bg-white px-1 py-0.5 text-[10px] text-slate-600"
+                        aria-label={`Mover tabela ${table.name} para zona`}
+                        data-testid={`table-zone-${table.name}`}
+                        value={tableZone ?? ''}
+                        onChange={(event) => {
+                          if (!event.target.value) return
+                          onMoveTable?.(table.name, event.target.value)
+                        }}
+                      >
+                        {outside ? <option value="">Fora do diagrama</option> : null}
+                        {zones.map((zone) => (
+                          <option key={zone.name} value={zone.name}>
+                            {zone.name}
+                          </option>
+                        ))}
+                      </select>
+                    ) : null}
+                    {outside && canMoveTables && onAddToActiveZone ? (
+                      <button
+                        type="button"
+                        className="rounded-sm border border-amber-300 bg-white px-1.5 py-0.5 text-[10px] font-medium text-amber-800 hover:bg-amber-50"
+                        aria-label={`Adicionar ${table.name} à aba atual`}
+                        data-testid={`table-add-to-zone-${table.name}`}
+                        onClick={() => {
+                          onAddToActiveZone(table.name)
+                          onSelect({ type: 'table', table: table.name })
+                        }}
+                      >
+                        Adicionar à aba atual{activeZone ? ` (${activeZone})` : ''}
+                      </button>
+                    ) : null}
+                  </div>
+                ) : null}
 
                 {tableCollapsed ? null : (
                   <ul className="ml-6 border-l border-slate-200 pl-1">

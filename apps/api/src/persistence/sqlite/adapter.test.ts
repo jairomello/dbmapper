@@ -3,6 +3,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import type { DatabaseModel } from '@dbmapper/domain'
 import { afterEach, describe, expect, test } from 'bun:test'
+import { DiagramDocumentValidationError, type PutDiagramDocumentInput } from '../ports'
 import { createSqlitePersistence } from './adapter'
 
 const directories: string[] = []
@@ -306,6 +307,177 @@ describe('persistência SQLite', () => {
       expect(persistence.agent.events.listAll()).toHaveLength(before)
       expect(persistence.agent.events.listAll().some((event) => event.action === 'diagram.layout_saved')).toBe(false)
       expect(persistence.projects.getDiagramLayout(created.id)!.positions).toEqual({})
+    } finally {
+      persistence.close()
+    }
+  })
+})
+
+describe('persistência SQLite: documento de diagrama com zonas', () => {
+  const documentInput = (projectId: string): PutDiagramDocumentInput => ({
+    projectId,
+    zones: [
+      { name: 'Principal', tabOrder: 0, members: ['cliente'] },
+      { name: 'Vendas', tabOrder: 1, members: ['pedido'] },
+    ],
+    layouts: [
+      {
+        zoneName: 'Principal',
+        positions: { cliente: { x: 10, y: 20 } },
+        viewportX: 1,
+        viewportY: 2,
+        zoom: 0.8,
+      },
+      {
+        zoneName: 'Vendas',
+        positions: { pedido: { x: 300.5, y: 40 } },
+        viewportX: -5,
+        viewportY: 12,
+        zoom: 1.5,
+      },
+    ],
+  })
+
+  test('faz roundtrip de zonas e layouts no mesmo documento', async () => {
+    const persistence = await createPersistence()
+
+    try {
+      const created = persistence.projects.create({ name: 'Zonas' })
+      persistence.projects.replaceModel(created.id, database)
+
+      const saved = persistence.projects.putDiagramDocument(documentInput(created.id))
+      expect(saved).not.toBeNull()
+      expect(saved!.zones).toEqual([
+        { name: 'Principal', tabOrder: 0, members: ['cliente'] },
+        { name: 'Vendas', tabOrder: 1, members: ['pedido'] },
+      ])
+      expect(saved!.layouts.map((layout) => layout.zoneName)).toEqual(['Principal', 'Vendas'])
+
+      const loaded = persistence.projects.getDiagramDocument(created.id)
+      expect(loaded).not.toBeNull()
+      expect(loaded!.zones).toEqual(saved!.zones)
+      expect(loaded!.layouts).toHaveLength(2)
+      expect(loaded!.layouts.find((layout) => layout.zoneName === 'Vendas')!.positions).toEqual({
+        pedido: { x: 300.5, y: 40 },
+      })
+      expect(loaded!.layouts.find((layout) => layout.zoneName === 'Principal')!.zoom).toBe(0.8)
+    } finally {
+      persistence.close()
+    }
+  })
+
+  test('documento legado sem zones é lido como todas as tabelas em Principal', async () => {
+    const persistence = await createPersistence()
+
+    try {
+      const created = persistence.projects.create({ name: 'Legado' })
+      persistence.projects.replaceModel(created.id, database)
+      persistence.projects.putDiagramLayout({
+        projectId: created.id,
+        positions: { cliente: { x: 1, y: 2 } },
+        viewportX: 0,
+        viewportY: 0,
+        zoom: 1,
+      })
+
+      const loaded = persistence.projects.getDiagramDocument(created.id)
+      expect(loaded!.zones).toEqual([{ name: 'Principal', tabOrder: 0, members: ['cliente', 'pedido'] }])
+      expect(loaded!.layouts).toHaveLength(1)
+      expect(loaded!.layouts[0].zoneName).toBe('Principal')
+      expect(loaded!.layouts[0].positions).toEqual({ cliente: { x: 1, y: 2 } })
+      expect(loaded!.layouts[0].updatedBy).toBeNull()
+    } finally {
+      persistence.close()
+    }
+  })
+
+  test('rejeita membro inexistente sem gravar nada', async () => {
+    const persistence = await createPersistence()
+
+    try {
+      const created = persistence.projects.create({ name: 'Membro inválido' })
+      persistence.projects.replaceModel(created.id, database)
+
+      expect(() =>
+        persistence.projects.putDiagramDocument({
+          projectId: created.id,
+          zones: [{ name: 'Principal', tabOrder: 0, members: ['tabela_inexistente'] }],
+          layouts: [],
+        }),
+      ).toThrow(DiagramDocumentValidationError)
+
+      const loaded = persistence.projects.getDiagramDocument(created.id)
+      expect(loaded!.zones).toEqual([{ name: 'Principal', tabOrder: 0, members: ['cliente', 'pedido'] }])
+    } finally {
+      persistence.close()
+    }
+  })
+
+  test('excluir uma zona devolve os membros para Principal', async () => {
+    const persistence = await createPersistence()
+
+    try {
+      const created = persistence.projects.create({ name: 'Exclusão' })
+      persistence.projects.replaceModel(created.id, database)
+      persistence.projects.putDiagramDocument(documentInput(created.id))
+
+      const saved = persistence.projects.putDiagramDocument({
+        projectId: created.id,
+        zones: [{ name: 'Principal', tabOrder: 0, members: ['cliente'] }],
+        layouts: [
+          {
+            zoneName: 'Principal',
+            positions: { cliente: { x: 10, y: 20 } },
+            viewportX: 0,
+            viewportY: 0,
+            zoom: 1,
+          },
+        ],
+      })
+
+      expect(saved!.zones).toEqual([{ name: 'Principal', tabOrder: 0, members: ['cliente', 'pedido'] }])
+      expect(saved!.layouts.map((layout) => layout.zoneName)).toEqual(['Principal'])
+    } finally {
+      persistence.close()
+    }
+  })
+
+  test('falha na escrita desfaz zonas e layouts juntos', async () => {
+    const persistence = await createPersistence()
+
+    try {
+      const created = persistence.projects.create({ name: 'Atomicidade' })
+      persistence.projects.replaceModel(created.id, database)
+      persistence.projects.putDiagramDocument(documentInput(created.id))
+      const before = persistence.projects.getDiagramDocument(created.id)
+
+      expect(() =>
+        persistence.projects.putDiagramDocument({
+          projectId: created.id,
+          zones: [{ name: 'Principal', tabOrder: 0, members: ['pedido'] }],
+          layouts: [
+            {
+              zoneName: 'Principal',
+              positions: { pedido: { x: 99, y: 99 } },
+              viewportX: 0,
+              viewportY: 0,
+              zoom: 2,
+            },
+          ],
+          audit: {
+            actorUserId: 'usuario-inexistente',
+            action: 'diagram.layout_saved',
+            subjectType: 'project',
+            subjectId: created.id,
+          },
+        }),
+      ).toThrow()
+
+      const after = persistence.projects.getDiagramDocument(created.id)
+      expect(after!.zones).toEqual(before!.zones)
+      expect(after!.layouts.map((layout) => layout.positions)).toEqual(
+        before!.layouts.map((layout) => layout.positions),
+      )
     } finally {
       persistence.close()
     }

@@ -39,9 +39,23 @@ describe('migração do domínio do dicionário', () => {
         'import_runs',
         'users',
         'login_attempts',
+        'diagram_zones',
       ]) {
         expect(tableNames).toContain(expected)
       }
+
+      const diagramZoneColumns = sqlite.query("PRAGMA table_info('diagram_zones')").all() as Array<{ name: string }>
+      for (const expected of ['id', 'project_id', 'name', 'tab_order', 'members_json']) {
+        expect(diagramZoneColumns.map((column) => column.name)).toContain(expected)
+      }
+
+      const diagramZoneIndexes = sqlite.query("PRAGMA index_list('diagram_zones')").all() as Array<{
+        name: string
+        unique: number
+      }>
+      const zoneNameIndex = diagramZoneIndexes.find((indexRow) => indexRow.name === 'diagram_zones_project_name_uq')
+      expect(zoneNameIndex).toBeTruthy()
+      expect(zoneNameIndex!.unique).toBe(1)
 
       const projectColumns = sqlite.query("PRAGMA table_info('projects')").all() as Array<{ name: string }>
       expect(projectColumns.map((column) => column.name).sort()).toEqual([

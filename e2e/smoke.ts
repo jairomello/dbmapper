@@ -98,6 +98,17 @@ async function waitForModelSave(page: Page): Promise<void> {
   if (!response.ok()) throw new Error(`PUT do modelo falhou (${response.status()}).`)
 }
 
+async function waitForDiagramSave(page: Page): Promise<void> {
+  const response = await page.waitForResponse(
+    (candidate) => {
+      if (candidate.request().method() !== 'PUT') return false
+      return /^\/api\/projects\/[^/]+\/diagram$/.test(new URL(candidate.url()).pathname)
+    },
+    { timeout: 15000 },
+  )
+  if (!response.ok()) throw new Error(`PUT do diagrama falhou (${response.status()}).`)
+}
+
 async function readPersistedProject(page: Page, projectId: string): Promise<PersistedProject> {
   return page.evaluate(async (id) => {
     const response = await fetch(`/api/projects/${id}`)
@@ -245,18 +256,24 @@ try {
   const savedLayout = await page.evaluate(async (id) => {
     const response = await fetch(`/api/projects/${id}/diagram`)
     return (await response.json()) as {
-      positions: Record<string, { x: number; y: number }>
-      zoom: number
-      viewport: { x: number; y: number }
+      zones: Array<{ name: string; tabOrder: number; members: string[] }>
+      layouts: Array<{
+        zoneName: string
+        positions: Record<string, { x: number; y: number }>
+        zoom: number
+        viewport: { x: number; y: number }
+      }>
     }
   }, projectId)
 
-  const savedUsers = savedLayout.positions.users
+  const savedZone = savedLayout.layouts.find((layout) => layout.zoneName === 'Principal') ?? savedLayout.layouts[0]
+  if (!savedZone) throw new Error('O layout salvo não contém nenhuma zona.')
+  const savedUsers = savedZone.positions.users
   if (!savedUsers) throw new Error('O layout salvo não contém a posição do card users.')
   if (Math.abs(savedUsers.x - 80) < 40 && Math.abs(savedUsers.y - 80) < 40) {
     throw new Error('O arraste do card users não foi persistido no layout.')
   }
-  if (Math.abs(savedLayout.zoom - 1) < 0.01) throw new Error('O zoom do diagrama não foi persistido no layout.')
+  if (Math.abs(savedZone.zoom - 1) < 0.01) throw new Error('O zoom do diagrama não foi persistido no layout.')
 
   await page.reload()
   await page.getByTestId('table-row-users').waitFor()
@@ -281,8 +298,8 @@ try {
       `A posição do card users não foi preservada após recarregar (${savedUsers.x},${savedUsers.y} -> ${restored.x},${restored.y}).`,
     )
   }
-  if (Math.abs(restored.zoom - savedLayout.zoom) > 0.02) {
-    throw new Error(`O zoom do diagrama não foi preservado após recarregar (${savedLayout.zoom} -> ${restored.zoom}).`)
+  if (Math.abs(restored.zoom - savedZone.zoom) > 0.02) {
+    throw new Error(`O zoom do diagrama não foi preservado após recarregar (${savedZone.zoom} -> ${restored.zoom}).`)
   }
 
   const downloadPromise = page.waitForEvent('download')
@@ -342,8 +359,10 @@ try {
   await page.getByTestId('diagram-node-users').waitFor()
 
   const createTable = waitForModelSave(page)
+  const createTableLayout = waitForDiagramSave(page)
   await page.getByTestId('diagram-add-table').click()
   await createTable
+  await createTableLayout
   await page.getByTestId('diagram-node-nova_tabela').waitFor()
   await page.getByTestId('diagram-column-nova_tabela-id').waitFor()
 
@@ -409,8 +428,90 @@ try {
     throw new Error('O relacionamento removido pelo undo reapareceu após recarregar.')
   }
 
+  const zoneSave = waitForDiagramSave(page)
+  await page.getByTestId('diagram-zone-add').click()
+  await page.getByLabel('Nome da zona').fill('Geografia')
+  await page.getByTestId('diagram-zone-create').click()
+  await page.getByTestId('diagram-zone-tab-Geografia').waitFor()
+  await zoneSave
+
+  const dragIntoSave = waitForDiagramSave(page)
+  await page
+    .getByTestId('table-row-products')
+    .dragTo(page.getByTestId('diagram-canvas'), { targetPosition: { x: 520, y: 360 } })
+  await dragIntoSave
+  await page.getByTestId('diagram-node-products').waitFor()
+
+  const afterDragLayout = await page.evaluate(async (id) => {
+    const response = await fetch(`/api/projects/${id}/diagram`)
+    return (await response.json()) as {
+      zones: Array<{ name: string; tabOrder: number; members: string[] }>
+      layouts: Array<{ zoneName: string; positions: Record<string, { x: number; y: number }> }>
+    }
+  }, projectId)
+  const geografia = afterDragLayout.zones.find((zone) => zone.name === 'Geografia')
+  if (!geografia?.members.includes('products')) {
+    throw new Error('A tabela products não foi arrastada para a zona Geografia.')
+  }
+  if (!afterDragLayout.layouts.find((layout) => layout.zoneName === 'Geografia')?.positions.products) {
+    throw new Error('A posição da tabela products não foi persistida na zona Geografia.')
+  }
+
+  const removeSave = waitForDiagramSave(page)
+  await page.getByTestId('diagram-node-products').click({ button: 'right' })
+  await page.getByTestId('canvas-menu-remove-from-diagram').click()
+  const removeDialog = page.getByRole('dialog', { name: 'Remover do diagrama' })
+  await removeDialog.waitFor()
+  await removeDialog.getByRole('button', { name: 'Remover' }).click()
+  await removeSave
+  await page.getByTestId('diagram-node-products').waitFor({ state: 'detached' })
+  await page.getByTestId('table-row-products').waitFor()
+  await page.getByTestId('table-outside-products').waitFor()
+
+  const afterRemoveLayout = await page.evaluate(async (id) => {
+    const response = await fetch(`/api/projects/${id}/diagram`)
+    return (await response.json()) as { zones: Array<{ name: string; members: string[] }> }
+  }, projectId)
+  if (afterRemoveLayout.zones.some((zone) => zone.members.includes('products'))) {
+    throw new Error('A tabela products continuou em alguma zona após ser removida do diagrama.')
+  }
+  persistedTable(await readPersistedProject(page, projectId), 'products')
+
+  await page.getByTestId('table-row-users').click()
+  await page.waitForFunction(
+    () =>
+      document.querySelector('[data-testid="diagram-zone-tab-Principal"]')?.getAttribute('aria-selected') === 'true',
+  )
+  await page.getByTestId('diagram-node-users').waitFor()
+
+  let exportWrites = 0
+  const trackExportWrites = (request: import('playwright').Request) => {
+    if (request.method() === 'PUT' && request.url().includes('/diagram')) exportWrites += 1
+  }
+  page.on('request', trackExportWrites)
+
+  const pngDownload = page.waitForEvent('download', { timeout: 60000 })
+  await page.getByTestId('diagram-export-png').click()
+  const png = await pngDownload
+  if (!png.suggestedFilename().endsWith('.png')) {
+    throw new Error(`O export PNG gerou um arquivo inesperado: ${png.suggestedFilename()}.`)
+  }
+  if (!(await png.path())) throw new Error('O export PNG não gerou arquivo.')
+
+  const svgDownload = page.waitForEvent('download', { timeout: 60000 })
+  await page.getByTestId('diagram-export-svg').click()
+  const svg = await svgDownload
+  if (!svg.suggestedFilename().endsWith('.svg')) {
+    throw new Error(`O export SVG gerou um arquivo inesperado: ${svg.suggestedFilename()}.`)
+  }
+  if (!(await svg.path())) throw new Error('O export SVG não gerou arquivo.')
+  page.off('request', trackExportWrites)
+  if (exportWrites > 0) {
+    throw new Error('O export do diagrama emitiu requisição de save.')
+  }
+
   console.log(
-    'E2E smoke ok: login, projeto via SQL, descrição, aprovação, agente (fake, projeto e tabela), diagrama (arraste, zoom e layout persistidos), export JSON, viewer read-only (somente GET) e edição no canvas (tabela, relacionamento com FK automática, undo e modelo persistido).',
+    'E2E smoke ok: login, projeto via SQL, descrição, aprovação, agente (fake, projeto e tabela), diagrama (arraste, zoom e layout persistidos), export JSON, viewer read-only (somente GET), edição no canvas (tabela, relacionamento com FK automática, undo e modelo persistido) e zonas da Fase 9 (criar aba, arrastar da árvore, remover sem excluir, localizar por outra zona e export PNG/SVG).',
   )
 } finally {
   await browser?.close()

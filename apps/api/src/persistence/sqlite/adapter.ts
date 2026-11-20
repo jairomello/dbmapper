@@ -1,7 +1,7 @@
 import { Database } from 'bun:sqlite'
 import { fileURLToPath } from 'node:url'
 import type { DatabaseModel, DescriptionSource, ReviewStatus } from '@dbmapper/domain'
-import { and, asc, desc, eq, gte, inArray, like, lt, or, sql } from 'drizzle-orm'
+import { and, asc, desc, eq, gte, inArray, like, lt, notInArray, or, sql } from 'drizzle-orm'
 import { drizzle } from 'drizzle-orm/bun-sqlite'
 import { migrate } from 'drizzle-orm/bun-sqlite/migrator'
 import {
@@ -10,6 +10,7 @@ import {
   apiKeys as apiKeysTable,
   columns as columnsTable,
   diagramLayouts as diagramLayoutsTable,
+  diagramZones as diagramZonesTable,
   events as eventsTable,
   importRuns,
   loginAttempts as loginAttemptsTable,
@@ -41,8 +42,12 @@ import type {
   CreateUserInput,
   DecisionAudit,
   DescriptionItemType,
+  DiagramDocumentIssue,
+  DiagramDocumentRecord,
   DiagramLayoutRecord,
   DiagramPosition,
+  DiagramZoneInput,
+  DiagramZoneRecord,
   EventListFilters,
   EventRecord,
   EventRepository,
@@ -56,6 +61,7 @@ import type {
   ProjectRecord,
   ProjectRepository,
   ProjectSummary,
+  PutDiagramDocumentInput,
   PutDiagramLayoutInput,
   RelationshipRecord,
   SetItemDescriptionInput,
@@ -68,7 +74,7 @@ import type {
   UserRepository,
   UserRole,
 } from '../ports'
-import { DEFAULT_DIAGRAM_ZONE } from '../ports'
+import { DEFAULT_DIAGRAM_ZONE, DiagramDocumentValidationError } from '../ports'
 
 const migrationsFolder = fileURLToPath(new URL('../../db/migrations', import.meta.url))
 
@@ -849,6 +855,264 @@ export function createSqlitePersistence(
           updatedBy: actorUserId,
         }
       })
+    },
+
+    getDiagramDocument(projectId: string): DiagramDocumentRecord | null {
+      const project = db.select({ id: projects.id }).from(projects).where(eq(projects.id, projectId)).get()
+      if (!project) return null
+
+      const tableNames = db
+        .select({ name: tablesTable.name })
+        .from(tablesTable)
+        .where(eq(tablesTable.projectId, projectId))
+        .orderBy(asc(tablesTable.position), asc(tablesTable.name))
+        .all()
+        .map((table) => table.name)
+      const knownTables = new Set(tableNames)
+
+      const zoneRows = db
+        .select()
+        .from(diagramZonesTable)
+        .where(eq(diagramZonesTable.projectId, projectId))
+        .orderBy(asc(diagramZonesTable.tabOrder), asc(diagramZonesTable.name))
+        .all()
+
+      const zones: DiagramZoneRecord[] =
+        zoneRows.length === 0
+          ? [{ name: DEFAULT_DIAGRAM_ZONE, tabOrder: 0, members: tableNames }]
+          : zoneRows.map((zone) => ({
+              name: zone.name,
+              tabOrder: zone.tabOrder,
+              members: parseStringArray(zone.membersJson).filter((member) => knownTables.has(member)),
+            }))
+
+      if (!zones.some((zone) => zone.name === DEFAULT_DIAGRAM_ZONE)) {
+        zones.unshift({ name: DEFAULT_DIAGRAM_ZONE, tabOrder: 0, members: [] })
+      }
+
+      const layoutRows = db
+        .select()
+        .from(diagramLayoutsTable)
+        .where(eq(diagramLayoutsTable.projectId, projectId))
+        .all()
+      const layoutByZone = new Map(layoutRows.map((row) => [row.zoneName, row]))
+
+      const layouts: DiagramLayoutRecord[] = zones.map((zone) => {
+        const row = layoutByZone.get(zone.name)
+        if (!row) {
+          return {
+            projectId,
+            zoneName: zone.name,
+            positions: {},
+            viewportX: 0,
+            viewportY: 0,
+            zoom: 1,
+            updatedAt: null,
+            updatedBy: null,
+          }
+        }
+
+        const positions: Record<string, DiagramPosition> = {}
+        for (const [name, position] of Object.entries(parseDiagramPositions(row.positionsJson))) {
+          if (knownTables.has(name)) positions[name] = position
+        }
+
+        return {
+          projectId: row.projectId,
+          zoneName: row.zoneName,
+          positions,
+          viewportX: row.viewportX,
+          viewportY: row.viewportY,
+          zoom: row.zoom,
+          updatedAt: row.updatedAt,
+          updatedBy: row.updatedBy,
+        }
+      })
+
+      return { projectId, zones, layouts }
+    },
+
+    putDiagramDocument(input: PutDiagramDocumentInput): DiagramDocumentRecord | null {
+      const now = input.now ?? new Date().toISOString()
+      const actorUserId = input.actorUserId ?? input.audit?.actorUserId ?? null
+
+      const committed = db.transaction((tx) => {
+        const exists = tx.select({ id: projects.id }).from(projects).where(eq(projects.id, input.projectId)).get()
+        if (!exists) return false
+
+        const tableNames = tx
+          .select({ name: tablesTable.name })
+          .from(tablesTable)
+          .where(eq(tablesTable.projectId, input.projectId))
+          .orderBy(asc(tablesTable.position), asc(tablesTable.name))
+          .all()
+          .map((table) => table.name)
+        const knownTables = new Set(tableNames)
+
+        let zones: DiagramZoneInput[] | undefined
+
+        if (input.zones !== undefined) {
+          const issues: DiagramDocumentIssue[] = []
+          const zoneNameIndex = new Map<string, number>()
+          const memberOwner = new Map<string, string>()
+
+          input.zones.forEach((zone, zoneIndex) => {
+            if (zoneNameIndex.has(zone.name)) {
+              issues.push({
+                path: `zones.${zoneIndex}.name`,
+                message: `Nome de zona duplicado: ${zone.name}.`,
+                code: 'duplicate_zone',
+              })
+            } else {
+              zoneNameIndex.set(zone.name, zoneIndex)
+            }
+
+            zone.members.forEach((member, memberIndex) => {
+              if (!knownTables.has(member)) {
+                issues.push({
+                  path: `zones.${zoneIndex}.members.${memberIndex}`,
+                  message: `Tabela desconhecida na zona ${zone.name}: ${member}.`,
+                  code: 'unknown_member',
+                })
+                return
+              }
+
+              const owner = memberOwner.get(member)
+              if (owner !== undefined && owner !== zone.name) {
+                issues.push({
+                  path: `zones.${zoneIndex}.members.${memberIndex}`,
+                  message: `Tabela ${member} já pertence à zona ${owner}.`,
+                  code: 'duplicate_member',
+                })
+                return
+              }
+
+              memberOwner.set(member, zone.name)
+            })
+          })
+
+          const zoneNames = new Set(input.zones.map((zone) => zone.name))
+          input.layouts.forEach((layout, layoutIndex) => {
+            if (layout.zoneName !== DEFAULT_DIAGRAM_ZONE && !zoneNames.has(layout.zoneName)) {
+              issues.push({
+                path: `layouts.${layoutIndex}.zoneName`,
+                message: `Zona desconhecida no layout: ${layout.zoneName}.`,
+                code: 'unknown_zone',
+              })
+            }
+          })
+
+          if (issues.length > 0) throw new DiagramDocumentValidationError(issues)
+
+          const existingZones = tx
+            .select()
+            .from(diagramZonesTable)
+            .where(eq(diagramZonesTable.projectId, input.projectId))
+            .all()
+          const inputZoneNames = new Set(input.zones.map((zone) => zone.name))
+
+          zones = input.zones.map((zone) => ({
+            name: zone.name,
+            tabOrder: zone.tabOrder,
+            members: [...zone.members],
+          }))
+
+          if (!zones.some((zone) => zone.name === DEFAULT_DIAGRAM_ZONE)) {
+            zones.unshift({ name: DEFAULT_DIAGRAM_ZONE, tabOrder: 0, members: [] })
+          }
+
+          const assignedMembers = new Set(zones.flatMap((zone) => zone.members))
+          const returnedMembers: string[] = []
+          for (const existing of existingZones) {
+            if (inputZoneNames.has(existing.name) || existing.name === DEFAULT_DIAGRAM_ZONE) continue
+            for (const member of parseStringArray(existing.membersJson)) {
+              if (!assignedMembers.has(member) && knownTables.has(member)) returnedMembers.push(member)
+            }
+          }
+
+          if (returnedMembers.length > 0) {
+            const principal = zones.find((zone) => zone.name === DEFAULT_DIAGRAM_ZONE)
+            if (principal) {
+              principal.members = [...new Set([...principal.members, ...returnedMembers])]
+            }
+          }
+
+          tx.delete(diagramZonesTable).where(eq(diagramZonesTable.projectId, input.projectId)).run()
+          for (const zone of zones) {
+            tx.insert(diagramZonesTable)
+              .values({
+                id: crypto.randomUUID(),
+                projectId: input.projectId,
+                name: zone.name,
+                tabOrder: zone.tabOrder,
+                membersJson: JSON.stringify(zone.members),
+              })
+              .run()
+          }
+
+          tx.delete(diagramLayoutsTable)
+            .where(
+              and(
+                eq(diagramLayoutsTable.projectId, input.projectId),
+                notInArray(
+                  diagramLayoutsTable.zoneName,
+                  zones.map((zone) => zone.name),
+                ),
+              ),
+            )
+            .run()
+        }
+
+        for (const layout of input.layouts) {
+          const positions: Record<string, DiagramPosition> = {}
+          for (const [name, position] of Object.entries(layout.positions)) {
+            if (knownTables.has(name)) positions[name] = position
+          }
+
+          const positionsJson = JSON.stringify(positions)
+          tx.insert(diagramLayoutsTable)
+            .values({
+              projectId: input.projectId,
+              zoneName: layout.zoneName,
+              positionsJson,
+              viewportX: layout.viewportX,
+              viewportY: layout.viewportY,
+              zoom: layout.zoom,
+              updatedAt: now,
+              updatedBy: actorUserId,
+            })
+            .onConflictDoUpdate({
+              target: [diagramLayoutsTable.projectId, diagramLayoutsTable.zoneName],
+              set: {
+                positionsJson,
+                viewportX: layout.viewportX,
+                viewportY: layout.viewportY,
+                zoom: layout.zoom,
+                updatedAt: now,
+                updatedBy: actorUserId,
+              },
+            })
+            .run()
+        }
+
+        if (input.audit) {
+          insertEventRow(
+            tx,
+            {
+              ...input.audit,
+              projectId: input.projectId,
+              subjectId: input.audit.subjectId || input.projectId,
+              actorUserId: input.audit.actorUserId ?? actorUserId,
+              createdAt: now,
+            },
+            now,
+          )
+        }
+
+        return true
+      })
+
+      return committed ? projectRepository.getDiagramDocument(input.projectId) : null
     },
   }
 

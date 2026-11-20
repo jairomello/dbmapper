@@ -1,4 +1,3 @@
-import { useMutation, useQuery } from '@tanstack/react-query'
 import type { ColumnModel, DatabaseModel, RelationshipModel } from '@dbmapper/domain'
 import {
   Background,
@@ -16,9 +15,8 @@ import {
   ReactFlowProvider,
   useReactFlow,
 } from '@xyflow/react'
-import { type MouseEvent as ReactMouseEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { diagramApi } from '../api/diagram'
-import type { DiagramLayoutInput, DiagramPosition } from '../api/types'
+import { type DragEvent, type MouseEvent as ReactMouseEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import type { DiagramPosition } from '../api/types'
 import { CrowFootEdge } from '../diagram/CrowFootEdge'
 import { CanvasContextMenu, type CanvasMenuItem } from '../diagram/CanvasContextMenu'
 import { ColumnPopover, type ColumnDraft, TablePopover } from '../diagram/ColumnPopover'
@@ -35,8 +33,9 @@ import {
   updateColumnCommand,
 } from '../diagram/commands'
 import { ConfirmDialog } from '../diagram/ConfirmDialog'
+import { diagramFileName, downloadDiagram, renderDiagram, type DiagramExportFormat } from '../diagram/exportDiagram'
 import {
-  buildPositions,
+  buildRelationshipKeys,
   createDiagramEdges,
   createDiagramNodes,
   DIAGRAM_NODE_WIDTH,
@@ -48,14 +47,15 @@ import {
 import { RelationshipDialog, type RelationshipDraft } from '../diagram/RelationshipDialog'
 import { TableNode } from '../diagram/TableNode'
 import { type DiagramSaveState, useDiagramEditing } from '../diagram/useDiagramEditing'
+import { type DiagramZones, diagramQueryKey, useDiagramZones } from '../diagram/useDiagramZones'
+import { DIAGRAM_TABLE_MIME } from '../diagram/zones'
+import { ZoneTabs } from '../diagram/ZoneTabs'
 import type { Selection } from '../lib/selection'
-
-const SAVE_DEBOUNCE_MS = 500
 
 const NODE_TYPES = { table: TableNode }
 const EDGE_TYPES = { crowsfoot: CrowFootEdge }
 
-export const diagramQueryKey = (projectId: string) => ['diagram', projectId] as const
+export { diagramQueryKey }
 
 function formatSavedAt(date: Date): string {
   return new Intl.DateTimeFormat('pt-BR', { hour: '2-digit', minute: '2-digit' }).format(date)
@@ -85,14 +85,25 @@ export interface DiagramCanvasProps {
   canEdit: boolean
   locked?: boolean
   onSaveStateChange?: (state: DiagramSaveState) => void
+  zones?: DiagramZones
 }
 
 export function DiagramCanvas(props: DiagramCanvasProps) {
   return (
     <ReactFlowProvider>
-      <DiagramCanvasInner {...props} />
+      {props.zones ? <DiagramCanvasInner {...props} zones={props.zones} /> : <DiagramCanvasWithZones {...props} />}
     </ReactFlowProvider>
   )
+}
+
+function DiagramCanvasWithZones(props: DiagramCanvasProps) {
+  const zones = useDiagramZones({
+    projectId: props.projectId,
+    database: props.database,
+    canEdit: props.canEdit,
+    locked: props.locked,
+  })
+  return <DiagramCanvasInner {...props} zones={zones} />
 }
 
 function DiagramCanvasInner({
@@ -103,13 +114,8 @@ function DiagramCanvasInner({
   canEdit,
   locked = false,
   onSaveStateChange,
-}: DiagramCanvasProps) {
-  const layoutQuery = useQuery({
-    queryKey: diagramQueryKey(projectId),
-    queryFn: () => diagramApi.get(projectId),
-    retry: false,
-  })
-
+  zones,
+}: DiagramCanvasProps & { zones: DiagramZones }) {
   const editor = useDiagramEditing({
     projectId,
     database,
@@ -119,91 +125,57 @@ function DiagramCanvasInner({
   })
   const workingDatabase = editor.database
   const effectiveCanEdit = canEdit && !locked
+  const positions = zones.activeLayout.positions
 
-  const [positions, setPositions] = useState<Record<string, DiagramPosition>>(() => buildPositions(workingDatabase))
   const [query, setQuery] = useState('')
-  const [lastSavedAt, setLastSavedAt] = useState<Date | null>(null)
-  const [saveFailed, setSaveFailed] = useState(false)
   const [menu, setMenu] = useState<CanvasMenu | null>(null)
   const [pendingDelete, setPendingDelete] = useState<PendingDelete | null>(null)
+  const [pendingRemove, setPendingRemove] = useState<string | null>(null)
   const [openPopover, setOpenPopover] = useState<OpenPopover | null>(null)
   const [pendingRelationship, setPendingRelationship] = useState<{ source: string; target: string } | null>(null)
   const [relationshipMode, setRelationshipMode] = useState<RelationshipMode>('off')
   const [relationshipSource, setRelationshipSource] = useState<string | null>(null)
+  const [exporting, setExporting] = useState<DiagramExportFormat | null>(null)
+  const [exportError, setExportError] = useState<string | null>(null)
 
   const wrapperRef = useRef<HTMLDivElement | null>(null)
-  const positionsRef = useRef(positions)
   const viewportRef = useRef({ x: 0, y: 0, zoom: 1 })
-  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const pendingRef = useRef<DiagramLayoutInput | null>(null)
   const flowReadyRef = useRef(false)
   const appliedSavedViewportRef = useRef(false)
   const skipViewportSaveRef = useRef(false)
-  const lastDatabaseRef = useRef<DatabaseModel | null>(null)
-  const lastLayoutRef = useRef<unknown>(null)
+  const previousZoneRef = useRef(zones.activeZone)
 
   const { setViewport, setCenter, getNode, fitView, screenToFlowPosition } = useReactFlow<DiagramNode, DiagramEdge>()
 
-  useEffect(() => {
-    positionsRef.current = positions
-  }, [positions])
-
-  useEffect(() => {
-    const savedLayout = layoutQuery.data
-    if (lastDatabaseRef.current === workingDatabase && lastLayoutRef.current === savedLayout) return
-    lastDatabaseRef.current = workingDatabase
-    lastLayoutRef.current = savedLayout
-
-    const savedPositions = savedLayout?.positions ?? {}
-    const next = buildPositions(workingDatabase, savedPositions)
-    for (const [name, position] of Object.entries(positionsRef.current)) {
-      if (!savedPositions[name] && next[name]) next[name] = position
+  const zoneDatabase = useMemo(() => {
+    const members = new Set(zones.activeMembers)
+    return {
+      ...workingDatabase,
+      tables: workingDatabase.tables.filter((table) => table.status !== 'REMOVED' && members.has(table.name)),
     }
-    positionsRef.current = next
-    setPositions(next)
-  }, [workingDatabase, layoutQuery.data])
+  }, [workingDatabase, zones.activeMembers])
 
-  const saveMutation = useMutation({
-    mutationFn: (layout: DiagramLayoutInput) => diagramApi.save(projectId, layout),
-    onSuccess: () => {
-      setLastSavedAt(new Date())
-      setSaveFailed(false)
-    },
-    onError: () => setSaveFailed(true),
-  })
-  const saveLayout = saveMutation.mutate
+  useEffect(() => {
+    zones.syncDatabase(workingDatabase)
+  }, [workingDatabase, zones.syncDatabase])
 
-  const flush = useCallback(() => {
-    const pending = pendingRef.current
-    if (!pending) return
-    pendingRef.current = null
-    saveLayout(pending)
-  }, [saveLayout])
+  const modelSaving = editor.saveState.status === 'saving'
+  useEffect(() => {
+    zones.setModelSaving(modelSaving)
+  }, [modelSaving, zones.setModelSaving])
 
-  const scheduleSave = useCallback(
-    (layout: DiagramLayoutInput) => {
-      if (!effectiveCanEdit) return
-      pendingRef.current = layout
-      if (timerRef.current) clearTimeout(timerRef.current)
-      timerRef.current = setTimeout(() => {
-        timerRef.current = null
-        flush()
-      }, SAVE_DEBOUNCE_MS)
-    },
-    [effectiveCanEdit, flush],
-  )
-
-  useEffect(
-    () => () => {
-      if (timerRef.current) clearTimeout(timerRef.current)
-    },
-    [],
-  )
+  const relationshipKeys = useMemo(() => {
+    const zoneByTable = new Map<string, string>()
+    for (const zone of zones.zones) {
+      for (const member of zone.members) zoneByTable.set(member, zone.name)
+    }
+    return buildRelationshipKeys(workingDatabase, (table) => zoneByTable.get(table) ?? null)
+  }, [workingDatabase, zones.zones])
 
   const handleNodesChange: OnNodesChange<DiagramNode> = useCallback(
     (changes) => {
       let changed = false
-      const next = { ...positionsRef.current }
+      const next = { ...positions }
 
       for (const change of changes) {
         if (change.type !== 'position' || !change.position) continue
@@ -214,22 +186,17 @@ function DiagramCanvasInner({
       }
 
       if (!changed) return
-      positionsRef.current = next
-      setPositions(next)
-      scheduleSave({ positions: next, viewport: viewportRef.current, zoom: viewportRef.current.zoom })
+      zones.updatePositions(next)
     },
-    [scheduleSave],
+    [positions, zones],
   )
 
   const handleNodeDragStop: OnNodeDrag<DiagramNode> = useCallback(
     (_event, node) => {
       if (!effectiveCanEdit) return
-      const next = { ...positionsRef.current, [node.id]: node.position }
-      positionsRef.current = next
-      setPositions(next)
-      scheduleSave({ positions: next, viewport: viewportRef.current, zoom: viewportRef.current.zoom })
+      zones.updatePositions({ ...positions, [node.id]: node.position })
     },
-    [effectiveCanEdit, scheduleSave],
+    [effectiveCanEdit, positions, zones],
   )
 
   const handleMoveEnd: OnMoveEnd = useCallback(
@@ -242,56 +209,50 @@ function DiagramCanvasInner({
         skipViewportSaveRef.current = false
         return
       }
-      scheduleSave({
-        positions: positionsRef.current,
-        viewport: { x: viewport.x, y: viewport.y },
-        zoom: viewport.zoom,
-      })
+      zones.updateViewport({ x: viewport.x, y: viewport.y }, viewport.zoom)
     },
-    [scheduleSave],
+    [zones],
   )
 
   const applySavedViewport = useCallback(
     (instance: ReactFlowInstance<DiagramNode, DiagramEdge>) => {
-      const layout = layoutQuery.data
-      if (!layout) return false
-      const viewport = { x: layout.viewport.x, y: layout.viewport.y, zoom: layout.zoom }
+      if (zones.activeLayout.updatedAt === null) return false
+      const viewport = {
+        x: zones.activeLayout.viewport.x,
+        y: zones.activeLayout.viewport.y,
+        zoom: zones.activeLayout.zoom,
+      }
       viewportRef.current = viewport
       skipViewportSaveRef.current = true
       void instance.setViewport(viewport)
       return true
     },
-    [layoutQuery.data],
+    [zones.activeLayout],
   )
 
   const handleInit = useCallback(
     (instance: ReactFlowInstance<DiagramNode, DiagramEdge>) => {
       flowReadyRef.current = true
-      if (layoutQuery.isLoading) return
-      if (applySavedViewport(instance)) {
-        appliedSavedViewportRef.current = true
-        return
-      }
+      if (zones.isLoading) return
       appliedSavedViewportRef.current = true
       skipViewportSaveRef.current = true
-      void instance.fitView({ padding: 0.2 })
+      if (!applySavedViewport(instance)) void instance.fitView({ padding: 0.2 })
       setTimeout(() => {
         skipViewportSaveRef.current = false
       }, 400)
     },
-    [applySavedViewport, layoutQuery.isLoading],
+    [applySavedViewport, zones.isLoading],
   )
 
   useEffect(() => {
-    if (!layoutQuery.data || !flowReadyRef.current || appliedSavedViewportRef.current) return
+    if (zones.isLoading || !flowReadyRef.current || appliedSavedViewportRef.current) return
     appliedSavedViewportRef.current = true
-    const hasSavedPositions = Object.keys(layoutQuery.data.positions).length > 0
     skipViewportSaveRef.current = true
-    if (hasSavedPositions) {
+    if (zones.activeLayout.updatedAt !== null) {
       const viewport = {
-        x: layoutQuery.data.viewport.x,
-        y: layoutQuery.data.viewport.y,
-        zoom: layoutQuery.data.zoom,
+        x: zones.activeLayout.viewport.x,
+        y: zones.activeLayout.viewport.y,
+        zoom: zones.activeLayout.zoom,
       }
       viewportRef.current = viewport
       void setViewport(viewport)
@@ -301,10 +262,37 @@ function DiagramCanvasInner({
     setTimeout(() => {
       skipViewportSaveRef.current = false
     }, 400)
-  }, [layoutQuery.data, setViewport, fitView])
+  }, [zones.isLoading, zones.activeLayout, setViewport, fitView])
+
+  useEffect(() => {
+    if (previousZoneRef.current === zones.activeZone) return
+    previousZoneRef.current = zones.activeZone
+    if (!flowReadyRef.current) return
+    skipViewportSaveRef.current = true
+    if (zones.activeLayout.updatedAt !== null) {
+      const viewport = {
+        x: zones.activeLayout.viewport.x,
+        y: zones.activeLayout.viewport.y,
+        zoom: zones.activeLayout.zoom,
+      }
+      viewportRef.current = viewport
+      void setViewport(viewport)
+    } else {
+      void fitView({ padding: 0.2 })
+    }
+    setTimeout(() => {
+      skipViewportSaveRef.current = false
+    }, 400)
+  }, [zones.activeZone, zones.activeLayout, setViewport, fitView])
 
   useEffect(() => {
     if (!flowReadyRef.current || selection.type === 'database') return
+    const zone = zones.zoneOf(selection.table)
+    if (!zone) return
+    if (zone !== zones.activeZone) {
+      zones.setActiveZone(zone)
+      return
+    }
     const node = getNode(selection.table)
     if (!node) return
     const width = node.measured?.width ?? node.width ?? DIAGRAM_NODE_WIDTH
@@ -314,33 +302,18 @@ function DiagramCanvasInner({
       zoom: viewportRef.current.zoom,
       duration: 250,
     })
-  }, [selection, getNode, setCenter])
-
-  const setTablePosition = useCallback((table: string, position: DiagramPosition) => {
-    const next = { ...positionsRef.current, [table]: position }
-    positionsRef.current = next
-    setPositions(next)
-  }, [])
-
-  const persistPositions = useCallback(() => {
-    scheduleSave({
-      positions: positionsRef.current,
-      viewport: viewportRef.current,
-      zoom: viewportRef.current.zoom,
-    })
-  }, [scheduleSave])
+  }, [selection, zones.activeZone, zones.zoneOf, zones.setActiveZone, getNode, setCenter])
 
   const addTableAt = useCallback(
     (position: DiagramPosition) => {
       if (!effectiveCanEdit) return
       const command = createTableCommand(workingDatabase)
       const table = (command.params as TableCreateParams).table.name
-      setTablePosition(table, position)
       if (!editor.execute(command)) return
+      zones.addTableToPrincipal(table, position)
       onSelect({ type: 'table', table })
-      persistPositions()
     },
-    [effectiveCanEdit, workingDatabase, editor, onSelect, persistPositions, setTablePosition],
+    [effectiveCanEdit, workingDatabase, editor, zones, onSelect],
   )
 
   const addTableAtViewportCenter = useCallback(() => {
@@ -361,10 +334,7 @@ function DiagramCanvasInner({
       if (selection.type !== 'database' && selection.table === pendingDelete.table) {
         onSelect({ type: 'database' })
       }
-      const next = { ...positionsRef.current }
-      delete next[pendingDelete.table]
-      positionsRef.current = next
-      setPositions(next)
+      zones.forgetTable(pendingDelete.table)
     } else if (pendingDelete.kind === 'column') {
       editor.execute(deleteColumnCommand(workingDatabase, pendingDelete.table, pendingDelete.column))
       if (
@@ -378,7 +348,7 @@ function DiagramCanvasInner({
       editor.execute(deleteRelationshipCommand(workingDatabase, pendingDelete.table, pendingDelete.relationship))
     }
     setPendingDelete(null)
-  }, [pendingDelete, workingDatabase, editor, selection, onSelect])
+  }, [pendingDelete, workingDatabase, editor, selection, onSelect, zones])
 
   const handleConnect: OnConnect = useCallback(
     (connection) => {
@@ -441,16 +411,17 @@ function DiagramCanvasInner({
     }
   }
 
-  const matches = useMemo(() => diagramMatches(workingDatabase, query), [workingDatabase, query])
+  const matches = useMemo(() => diagramMatches(zoneDatabase, query), [zoneDatabase, query])
   const nodes = useMemo(
     () =>
       createDiagramNodes({
-        database: workingDatabase,
+        database: zoneDatabase,
         positions,
         selection,
         matches,
         query,
         draggable: effectiveCanEdit,
+        keys: relationshipKeys,
         onSelect,
         canEdit: effectiveCanEdit,
         relationshipMode: relationshipMode !== 'off',
@@ -462,7 +433,7 @@ function DiagramCanvasInner({
         onDeleteRelationship: requestDeleteRelationship,
       }),
     [
-      workingDatabase,
+      zoneDatabase,
       positions,
       selection,
       matches,
@@ -472,21 +443,22 @@ function DiagramCanvasInner({
       relationshipMode,
       handlePickTable,
       requestDeleteRelationship,
+      relationshipKeys,
     ],
   )
   const edges = useMemo(
-    () => createDiagramEdges(workingDatabase, { canEdit: effectiveCanEdit, onDelete: requestDeleteRelationship }),
-    [workingDatabase, effectiveCanEdit, requestDeleteRelationship],
+    () => createDiagramEdges(zoneDatabase, { canEdit: effectiveCanEdit, onDelete: requestDeleteRelationship }),
+    [zoneDatabase, effectiveCanEdit, requestDeleteRelationship],
   )
 
   const layoutStatus = !canEdit
     ? 'Somente leitura'
     : locked
       ? 'Edição bloqueada durante a atualização'
-      : saveMutation.isPending
+      : zones.saveState.pending
         ? 'Salvando...'
-        : lastSavedAt
-          ? `Salvo às: ${formatSavedAt(lastSavedAt)}`
+        : zones.saveState.savedAt
+          ? `Salvo às: ${formatSavedAt(zones.saveState.savedAt)}`
           : 'Layout salvo automaticamente'
 
   const modelStatus = !effectiveCanEdit
@@ -499,7 +471,7 @@ function DiagramCanvasInner({
           ? `Falha ao salvar: ${editor.saveState.error}`
           : null
 
-  const saveStatus = modelStatus ?? (saveFailed ? 'Falha ao salvar o layout.' : layoutStatus)
+  const saveStatus = modelStatus ?? (zones.saveState.error ? 'Falha ao salvar o layout.' : layoutStatus)
 
   const menuItems: CanvasMenuItem[] =
     menu?.kind === 'canvas'
@@ -517,6 +489,18 @@ function DiagramCanvasInner({
               testId: 'canvas-menu-properties',
               onSelect: () => setOpenPopover({ kind: 'table', table: menu.table }),
             },
+            ...zones.zones
+              .filter((zone) => zone.name !== zones.zoneOf(menu.table))
+              .map((zone) => ({
+                label: `Mover para ${zone.name}`,
+                testId: `canvas-menu-move-${zone.name}`,
+                onSelect: () => zones.moveTable(menu.table, zone.name),
+              })),
+            {
+              label: 'Remover do diagrama',
+              testId: 'canvas-menu-remove-from-diagram',
+              onSelect: () => setPendingRemove(menu.table),
+            },
             {
               label: 'Excluir tabela',
               testId: 'canvas-menu-delete-table',
@@ -533,8 +517,67 @@ function DiagramCanvasInner({
           ?.columns.find((column) => column.name === openPopover.column)
       : undefined
 
+  const selectedTable = selection.type === 'database' ? null : selection.table
+  const selectedOutsideZone =
+    selectedTable !== null &&
+    zones.zoneOf(selectedTable) === null &&
+    workingDatabase.tables.some((table) => table.name === selectedTable && table.status !== 'REMOVED')
+
+  function handleDragOver(event: DragEvent<HTMLDivElement>) {
+    if (!effectiveCanEdit) return
+    if (!event.dataTransfer.types.includes(DIAGRAM_TABLE_MIME) && !event.dataTransfer.types.includes('text/plain')) return
+    event.preventDefault()
+    event.dataTransfer.dropEffect = 'move'
+  }
+
+  function handleDrop(event: DragEvent<HTMLDivElement>) {
+    if (!effectiveCanEdit) return
+    const table = event.dataTransfer.getData(DIAGRAM_TABLE_MIME) || event.dataTransfer.getData('text/plain')
+    if (!table) return
+    event.preventDefault()
+    const position = screenToFlowPosition({ x: event.clientX, y: event.clientY })
+    if (zones.addTableToActiveZone(table, position)) onSelect({ type: 'table', table })
+  }
+
+  async function handleExport(format: DiagramExportFormat) {
+    const element = wrapperRef.current?.querySelector<HTMLElement>('.react-flow')
+    if (!element) {
+      setExportError('Não foi possível localizar o diagrama para exportar.')
+      return
+    }
+    setExporting(format)
+    setExportError(null)
+    try {
+      const dataUrl = await renderDiagram(element, format)
+      downloadDiagram(dataUrl, diagramFileName(zones.activeZone, format))
+    } catch {
+      setExportError('Não foi possível exportar o diagrama.')
+    } finally {
+      setExporting(null)
+    }
+  }
+
   return (
-    <div ref={wrapperRef} className="h-full w-full" data-testid="diagram-canvas">
+    <div
+      ref={wrapperRef}
+      className="flex h-full w-full flex-col"
+      data-testid="diagram-canvas"
+      role="application"
+      aria-label="Área do diagrama"
+      onDragOver={handleDragOver}
+      onDrop={handleDrop}
+    >
+      <ZoneTabs
+        zones={zones.zones}
+        activeZone={zones.activeZone}
+        canEdit={effectiveCanEdit}
+        onActivate={zones.setActiveZone}
+        onCreate={zones.createZone}
+        onRename={zones.renameZone}
+        onDelete={zones.deleteZone}
+        onReorder={zones.reorderZones}
+      />
+      <div className="relative min-h-0 flex-1">
       <ReactFlow<DiagramNode, DiagramEdge>
         nodes={nodes}
         edges={edges}
@@ -574,6 +617,31 @@ function DiagramCanvasInner({
               onChange={(event) => setQuery(event.target.value)}
             />
           </label>
+          <div className="flex flex-wrap gap-1" data-testid="diagram-export-actions">
+            <button
+              type="button"
+              className="nodrag nopan rounded-sm border border-slate-300 bg-white px-2 py-1 text-[11px] font-medium text-slate-600 hover:bg-slate-100 disabled:opacity-50"
+              onClick={() => void handleExport('png')}
+              disabled={exporting !== null}
+              data-testid="diagram-export-png"
+            >
+              {exporting === 'png' ? 'Exportando…' : 'Exportar PNG'}
+            </button>
+            <button
+              type="button"
+              className="nodrag nopan rounded-sm border border-slate-300 bg-white px-2 py-1 text-[11px] font-medium text-slate-600 hover:bg-slate-100 disabled:opacity-50"
+              onClick={() => void handleExport('svg')}
+              disabled={exporting !== null}
+              data-testid="diagram-export-svg"
+            >
+              {exporting === 'svg' ? 'Exportando…' : 'Exportar SVG'}
+            </button>
+          </div>
+          {exportError ? (
+            <p className="rounded-sm bg-red-50 px-2 py-1 text-[11px] text-red-700" role="alert">
+              {exportError}
+            </p>
+          ) : null}
           {effectiveCanEdit ? (
             <div className="flex flex-wrap gap-1">
               <button
@@ -628,16 +696,16 @@ function DiagramCanvasInner({
           ) : null}
           <p
             className={`rounded-sm px-2 py-1 text-[11px] ${
-              saveFailed || editor.saveState.status === 'error'
+              zones.saveState.error || editor.saveState.status === 'error'
                 ? 'bg-red-50 text-red-700'
                 : 'bg-white/90 text-slate-500'
             }`}
             data-testid="diagram-save-status"
-            role={saveFailed || editor.saveState.status === 'error' ? 'alert' : 'status'}
+            role={zones.saveState.error || editor.saveState.status === 'error' ? 'alert' : 'status'}
           >
             {saveStatus}
           </p>
-          {layoutQuery.isError ? (
+          {zones.isError ? (
             <p className="rounded-sm bg-amber-50 px-2 py-1 text-[11px] text-amber-700">
               Não foi possível carregar o layout salvo.
             </p>
@@ -645,7 +713,47 @@ function DiagramCanvasInner({
         </Panel>
       </ReactFlow>
 
+      {selectedOutsideZone && selectedTable ? (
+        <div
+          className="absolute bottom-4 left-1/2 z-10 flex -translate-x-1/2 items-center gap-2 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-900 shadow-md"
+          data-testid="diagram-outside-zone"
+          role="status"
+        >
+          <span>
+            {effectiveCanEdit
+              ? `A tabela ${selectedTable} está fora do diagrama.`
+              : `A tabela ${selectedTable} está fora do diagrama.`}
+          </span>
+          {effectiveCanEdit ? (
+            <button
+              type="button"
+              className="rounded-sm border border-amber-400 bg-white px-2 py-1 text-[11px] font-semibold text-amber-900 hover:bg-amber-100"
+              onClick={() => {
+                zones.addTableToActiveZone(selectedTable)
+              }}
+              data-testid="diagram-add-to-zone"
+            >
+              Adicionar à aba atual
+            </button>
+          ) : null}
+        </div>
+      ) : null}
+      </div>
+
       {menu ? <CanvasContextMenu x={menu.x} y={menu.y} items={menuItems} onClose={() => setMenu(null)} /> : null}
+
+      {pendingRemove ? (
+        <ConfirmDialog
+          title="Remover do diagrama"
+          confirmLabel="Remover"
+          message={`Remover ${pendingRemove} do diagrama? A tabela continua no dicionário e na árvore semântica.`}
+          onConfirm={() => {
+            zones.removeTable(pendingRemove)
+            setPendingRemove(null)
+          }}
+          onCancel={() => setPendingRemove(null)}
+        />
+      ) : null}
 
       {pendingDelete ? (
         <ConfirmDialog
@@ -711,18 +819,13 @@ function DiagramCanvasInner({
           table={openPopover.table}
           onCancel={() => setOpenPopover(null)}
           onConfirm={(name) => {
-            editor.execute(renameTableCommand(workingDatabase, openPopover.table, name))
-            const nextPositions = { ...positionsRef.current }
-            const position = nextPositions[openPopover.table]
-            delete nextPositions[openPopover.table]
-            if (position) nextPositions[name] = position
-            positionsRef.current = nextPositions
-            setPositions(nextPositions)
-            if (selection.type !== 'database' && selection.table === openPopover.table) {
+            const from = openPopover.table
+            editor.execute(renameTableCommand(workingDatabase, from, name))
+            zones.renameTable(from, name)
+            if (selection.type !== 'database' && selection.table === from) {
               onSelect({ ...selection, table: name })
             }
             setOpenPopover(null)
-            persistPositions()
           }}
         />
       ) : null}

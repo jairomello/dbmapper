@@ -13,6 +13,21 @@ const NODE_HEADER_HEIGHT = 37
 const NODE_COLUMN_HEIGHT = 28
 const HANDLE_SIZE = 8
 
+export interface DiagramRelationshipKey {
+  table: string
+  direction: 'outgoing' | 'incoming'
+  localColumns: string[]
+  referencedColumns: string[]
+  constraintName: string
+}
+
+export interface DiagramRelationshipKeys {
+  crossZone: DiagramRelationshipKey[]
+  foreign: DiagramRelationshipKey[]
+}
+
+export const EMPTY_RELATIONSHIP_KEYS: DiagramRelationshipKeys = { crossZone: [], foreign: [] }
+
 export interface DiagramNodeData extends Record<string, unknown> {
   table: TableModel
   active: boolean
@@ -21,6 +36,7 @@ export interface DiagramNodeData extends Record<string, unknown> {
   columnMatches: string[]
   searchActive: boolean
   draggable: boolean
+  keys: DiagramRelationshipKeys
   canEdit?: boolean
   relationshipMode?: boolean
   onSelect: (selection: Selection) => void
@@ -82,6 +98,44 @@ export function visibleTables(database: DatabaseModel): TableModel[] {
   return database.tables.filter((table) => table.status !== 'REMOVED')
 }
 
+export function buildRelationshipKeys(
+  database: DatabaseModel,
+  zoneOf: (table: string) => string | null,
+): Record<string, DiagramRelationshipKeys> {
+  const visible = visibleTables(database)
+  const visibleNames = new Set(visible.map((table) => table.name))
+  const keys: Record<string, DiagramRelationshipKeys> = {}
+
+  function entry(table: string): DiagramRelationshipKeys {
+    keys[table] ??= { crossZone: [], foreign: [] }
+    return keys[table]
+  }
+
+  for (const table of visible) {
+    const sourceZone = zoneOf(table.name)
+
+    for (const relationship of table.relationships?.parents ?? []) {
+      if (!visibleNames.has(relationship.table)) continue
+      const targetZone = zoneOf(relationship.table)
+      const crossZone = sourceZone !== null && targetZone !== null && sourceZone !== targetZone
+      const shared = {
+        localColumns: relationship.local_columns,
+        referencedColumns: relationship.referenced_columns,
+        constraintName: relationship.constraint_name,
+      }
+
+      const sourceKeys = entry(table.name)
+      const targetKeys = entry(relationship.table)
+      const target = crossZone ? 'crossZone' : 'foreign'
+
+      sourceKeys[target].push({ ...shared, table: relationship.table, direction: 'outgoing' })
+      targetKeys[target].push({ ...shared, table: table.name, direction: 'incoming' })
+    }
+  }
+
+  return keys
+}
+
 export function gridPosition(index: number): DiagramPosition {
   return {
     x: GRID_ORIGIN_X + (index % GRID_COLUMNS) * (DIAGRAM_NODE_WIDTH + GRID_GAP_X),
@@ -89,7 +143,7 @@ export function gridPosition(index: number): DiagramPosition {
   }
 }
 
-function isDiagramPosition(value: unknown): value is DiagramPosition {
+export function isDiagramPosition(value: unknown): value is DiagramPosition {
   if (typeof value !== 'object' || value === null) return false
   const candidate = value as Record<string, unknown>
   return (
@@ -108,6 +162,18 @@ export function buildPositions(
   visibleTables(database).forEach((table, index) => {
     const saved = savedPositions[table.name]
     positions[table.name] = isDiagramPosition(saved) ? { x: saved.x, y: saved.y } : gridPosition(index)
+  })
+  return positions
+}
+
+export function buildZonePositions(
+  members: readonly string[],
+  savedPositions: Record<string, DiagramPosition> = {},
+): Record<string, DiagramPosition> {
+  const positions: Record<string, DiagramPosition> = {}
+  members.forEach((name, index) => {
+    const saved = savedPositions[name]
+    positions[name] = isDiagramPosition(saved) ? { x: saved.x, y: saved.y } : gridPosition(index)
   })
   return positions
 }
@@ -150,6 +216,7 @@ export function createDiagramNodes(options: {
   matches: Set<string>
   query: string
   draggable: boolean
+  keys?: Record<string, DiagramRelationshipKeys>
   onSelect: (selection: Selection) => void
   canEdit?: boolean
   relationshipMode?: boolean
@@ -167,6 +234,7 @@ export function createDiagramNodes(options: {
     matches,
     query,
     draggable,
+    keys,
     onSelect,
     canEdit,
     relationshipMode,
@@ -178,6 +246,7 @@ export function createDiagramNodes(options: {
     onDeleteRelationship,
   } = options
   const searchActive = query.trim().length > 0
+  const diagramKeys = keys ?? buildRelationshipKeys(database, () => null)
 
   return visibleTables(database).map((table, index) => {
     const active =
@@ -206,6 +275,7 @@ export function createDiagramNodes(options: {
         columnMatches,
         searchActive,
         draggable,
+        keys: diagramKeys[table.name] ?? EMPTY_RELATIONSHIP_KEYS,
         canEdit,
         relationshipMode,
         onSelect,

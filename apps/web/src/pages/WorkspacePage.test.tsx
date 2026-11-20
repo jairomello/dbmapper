@@ -2,7 +2,7 @@ import type { DatabaseModel } from '@dbmapper/domain'
 import { afterEach, describe, expect, test } from 'bun:test'
 import { cleanup, fireEvent, screen, waitFor, within } from '../test/setup'
 import { errorResponse, installFetch, jsonResponse } from '../test/fetch'
-import type { DiagramLayout, UserRole } from '../api/types'
+import type { DiagramLayout, DiagramLayoutInput, UserRole } from '../api/types'
 import { sampleProject, sampleUser } from '../test/fixtures'
 import { renderApp } from '../test/render'
 
@@ -49,17 +49,22 @@ function stubDiagramRect(): void {
 
 const emptyDiagramLayout: DiagramLayout = {
   projectId: 'projeto-1',
-  zoneName: 'Principal',
-  positions: {},
-  viewport: { x: 0, y: 0 },
-  zoom: 1,
-  updatedAt: null,
-  updatedBy: null,
+  zones: [{ name: 'Principal', tabOrder: 0, members: ['cliente', 'pedido'] }],
+  layouts: [
+    {
+      zoneName: 'Principal',
+      positions: {},
+      viewport: { x: 0, y: 0 },
+      zoom: 1,
+      updatedAt: null,
+      updatedBy: null,
+    },
+  ],
 }
 
 function stubProjectWithDiagram(role: UserRole = 'MEMBER', layout: DiagramLayout = emptyDiagramLayout) {
   const project = sampleProject()
-  const puts: DiagramLayout[] = []
+  const puts: DiagramLayoutInput[] = []
   const modelPuts: DatabaseModel[] = []
 
   restoreCallbacks.push(
@@ -67,9 +72,9 @@ function stubProjectWithDiagram(role: UserRole = 'MEMBER', layout: DiagramLayout
       if (url === '/api/auth/me') return jsonResponse({ ...sampleUser, role })
       if (url === `/api/projects/${project.id}/diagram`) {
         if (init?.method === 'PUT') {
-          const body = JSON.parse(String(init.body)) as DiagramLayout
+          const body = JSON.parse(String(init.body)) as DiagramLayoutInput
           puts.push(body)
-          return jsonResponse({ ...layout, ...body })
+          return jsonResponse(layout)
         }
         return jsonResponse(layout)
       }
@@ -301,8 +306,7 @@ function stubWorkspaceEditing(options: { holdPut?: boolean; failPut?: boolean } 
       if (url === '/api/auth/me') return jsonResponse(sampleUser)
       if (url === `/api/projects/${project.id}/diagram`) {
         if (init?.method === 'PUT') {
-          const body = JSON.parse(String(init.body)) as DiagramLayout
-          return jsonResponse({ ...emptyDiagramLayout, ...body })
+          return jsonResponse(emptyDiagramLayout)
         }
         return jsonResponse(emptyDiagramLayout)
       }
@@ -386,5 +390,102 @@ describe('WorkspacePage diagram editing status', () => {
     expect(screen.queryByTestId('diagram-add-table')).toBeNull()
     expect(screen.queryByTestId('diagram-relationship-mode')).toBeNull()
     expect(screen.queryByTestId('diagram-undo')).toBeNull()
+  })
+})
+
+describe('WorkspacePage diagram zones', () => {
+  function zonedLayout(): DiagramLayout {
+    return {
+      projectId: 'projeto-1',
+      zones: [
+        { name: 'Principal', tabOrder: 0, members: ['cliente'] },
+        { name: 'Geografia', tabOrder: 1, members: ['pedido'] },
+      ],
+      layouts: [
+        {
+          zoneName: 'Principal',
+          positions: { cliente: { x: 100, y: 100 } },
+          viewport: { x: 0, y: 0 },
+          zoom: 1,
+          updatedAt: '2026-01-01T00:00:00.000Z',
+          updatedBy: 'user-1',
+        },
+        {
+          zoneName: 'Geografia',
+          positions: { pedido: { x: 300, y: 200 } },
+          viewport: { x: 0, y: 0 },
+          zoom: 1,
+          updatedAt: '2026-01-01T00:00:00.000Z',
+          updatedBy: 'user-1',
+        },
+      ],
+    }
+  }
+
+  test('selecionar tabela da árvore troca para a aba da zona dela', async () => {
+    stubDiagramRect()
+    stubProjectWithDiagram('MEMBER', zonedLayout())
+    renderApp(['/project/projeto-1'])
+
+    await screen.findByTestId('table-row-cliente')
+    fireEvent.click(screen.getByTestId('view-diagram'))
+    await screen.findByTestId('diagram-zone-tab-Geografia')
+
+    fireEvent.click(screen.getByTestId('table-row-pedido'))
+    await waitFor(() =>
+      expect(screen.getByTestId('diagram-zone-tab-Geografia').getAttribute('aria-selected')).toBe('true'),
+    )
+    expect(await screen.findByTestId('diagram-node-pedido')).toBeTruthy()
+  })
+
+  test('mostra a contagem de tabelas no cabeçalho e atualiza ao criar e excluir', async () => {
+    stubDiagramRect()
+    stubProjectWithDiagram()
+    renderApp(['/project/projeto-1'])
+
+    await screen.findByTestId('table-row-cliente')
+    fireEvent.click(screen.getByTestId('view-diagram'))
+    await screen.findByTestId('diagram-node-cliente')
+    expect(screen.getByTestId('diagram-table-count').textContent).toBe('2 tabelas')
+
+    fireEvent.click(screen.getByTestId('diagram-add-table'))
+    await waitFor(() => expect(screen.getByTestId('diagram-table-count').textContent).toBe('3 tabelas'))
+
+    const node = (await screen.findByTestId('diagram-node-nova_tabela')).closest('.react-flow__node')
+    if (!(node instanceof HTMLElement)) throw new Error('Wrapper do card nova_tabela não encontrado.')
+    fireEvent.contextMenu(node, { clientX: 120, clientY: 80, button: 2 })
+    fireEvent.click(await screen.findByTestId('canvas-menu-delete-table'))
+    const dialog = await screen.findByRole('dialog', { name: 'Excluir tabela' })
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Excluir' }))
+
+    await waitFor(() => expect(screen.getByTestId('diagram-table-count').textContent).toBe('2 tabelas'))
+  })
+
+  test('tabela fora do diagrama aparece marcada na árvore e pode ser adicionada à aba atual', async () => {
+    stubDiagramRect()
+    const layout: DiagramLayout = {
+      projectId: 'projeto-1',
+      zones: [{ name: 'Principal', tabOrder: 0, members: ['cliente'] }],
+      layouts: [
+        {
+          zoneName: 'Principal',
+          positions: { cliente: { x: 100, y: 100 } },
+          viewport: { x: 0, y: 0 },
+          zoom: 1,
+          updatedAt: '2026-01-01T00:00:00.000Z',
+          updatedBy: 'user-1',
+        },
+      ],
+    }
+    stubProjectWithDiagram('MEMBER', layout)
+    renderApp(['/project/projeto-1'])
+
+    await screen.findByTestId('table-row-pedido')
+    fireEvent.click(screen.getByTestId('view-diagram'))
+    await screen.findByTestId('diagram-zone-tab-Principal')
+    await waitFor(() => expect(screen.getByTestId('table-outside-pedido')).toBeTruthy())
+
+    fireEvent.click(screen.getByTestId('table-add-to-zone-pedido'))
+    expect(await screen.findByTestId('diagram-node-pedido')).toBeTruthy()
   })
 })

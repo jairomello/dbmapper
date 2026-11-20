@@ -15,6 +15,7 @@ import { StatusBar } from '../components/StatusBar'
 import { SuggestionPanel } from '../components/SuggestionPanel'
 import { UpdateWizard } from '../components/UpdateWizard'
 import { INITIAL_SAVE_STATE, type DiagramSaveState } from '../diagram/useDiagramEditing'
+import { useDiagramZones } from '../diagram/useDiagramZones'
 import type { Selection } from '../lib/selection'
 import { PROJECTS_QUERY_KEY, projectQueryKey, useProject } from '../projects/queries'
 
@@ -41,6 +42,16 @@ export function WorkspacePage() {
   const pendingSuggestions = usePendingSuggestions(projectId)
   const pendingCount = pendingSuggestions.data?.suggestions.length ?? 0
   const canEditDiagram = session.data?.role === 'MEMBER' || session.data?.role === 'ADMIN'
+  const diagramTableCount = project.data
+    ? project.data.database.tables.filter((table) => table.status !== 'REMOVED').length
+    : 0
+  const diagramZones = useDiagramZones({
+    projectId,
+    database: project.data?.database,
+    canEdit: canEditDiagram,
+    locked: isWizardOpen,
+    enabled: view === 'diagrama',
+  })
 
   useEffect(() => {
     if (view === 'diagrama' && selection.type !== 'database') setIsEditorPanelOpen(true)
@@ -162,7 +173,19 @@ export function WorkspacePage() {
       <div className="flex min-h-0 flex-1">
         <aside className="w-80 shrink-0 overflow-hidden border-r border-slate-200 bg-white">
           {project.data ? (
-            <SemanticTree database={project.data.database} selection={selection} onSelect={setSelection} />
+            <SemanticTree
+              database={project.data.database}
+              selection={selection}
+              onSelect={setSelection}
+              zones={diagramZones.zones}
+              activeZone={diagramZones.activeZone}
+              canMoveTables={canEditDiagram && view === 'diagrama' && !isWizardOpen}
+              onMoveTable={(table, zone) => diagramZones.moveTable(table, zone)}
+              onAddToActiveZone={(table) => {
+                setSelection({ type: 'table', table })
+                diagramZones.addTableToActiveZone(table)
+              }}
+            />
           ) : (
             <div className="p-4 text-sm text-slate-500">Carregando projeto…</div>
           )}
@@ -204,7 +227,7 @@ export function WorkspacePage() {
               </fieldset>
 
               {view === 'diagrama' ? (
-                <div className="border-b border-slate-200 bg-white px-4 py-1.5 text-xs">
+                <div className="flex items-center justify-between gap-3 border-b border-slate-200 bg-white px-4 py-1.5 text-xs">
                   <span
                     className={
                       diagramSaveState.status === 'error' ? 'font-medium text-red-700' : 'font-medium text-slate-600'
@@ -219,6 +242,9 @@ export function WorkspacePage() {
                         : diagramSaveState.status === 'error'
                           ? `Falha ao salvar: ${diagramSaveState.error}`
                           : 'Pronto'}
+                  </span>
+                  <span className="font-medium text-slate-600" data-testid="diagram-table-count">
+                    {diagramTableCount} {diagramTableCount === 1 ? 'tabela' : 'tabelas'}
                   </span>
                 </div>
               ) : null}
@@ -243,6 +269,7 @@ export function WorkspacePage() {
                       canEdit={canEditDiagram}
                       locked={isWizardOpen}
                       onSaveStateChange={setDiagramSaveState}
+                      zones={diagramZones}
                     />
                   </div>
                   <div className="border-t border-slate-200 bg-white">

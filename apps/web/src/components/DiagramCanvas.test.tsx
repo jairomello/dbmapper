@@ -1,6 +1,9 @@
 import type { DatabaseModel } from '@dbmapper/domain'
 import { afterEach, describe, expect, test } from 'bun:test'
-import type { DiagramLayout } from '../api/types'
+import { useState } from 'react'
+import type { DiagramLayout, DiagramLayoutInput, DiagramZoneInput, DiagramZoneLayout } from '../api/types'
+import { DIAGRAM_TABLE_MIME } from '../diagram/zones'
+import type { Selection } from '../lib/selection'
 import { sampleDatabase, sampleProject } from '../test/fixtures'
 import { errorResponse, installFetch, jsonResponse } from '../test/fetch'
 import { renderWithClient } from '../test/render'
@@ -8,23 +11,64 @@ import { cleanup, fireEvent, screen, waitFor, within } from '../test/setup'
 import { DiagramCanvas } from './DiagramCanvas'
 
 const restoreCallbacks: Array<() => void> = []
+const DEFAULT_MEMBERS = ['cliente', 'pedido']
 
 afterEach(() => {
   while (restoreCallbacks.length > 0) restoreCallbacks.pop()?.()
   cleanup()
 })
 
-function emptyLayout(overrides: Partial<DiagramLayout> = {}): DiagramLayout {
+function principalLayout(overrides: Partial<DiagramZoneLayout> = {}): DiagramZoneLayout {
   return {
-    projectId: 'projeto-1',
     zoneName: 'Principal',
     positions: {},
     viewport: { x: 0, y: 0 },
     zoom: 1,
-    updatedAt: null,
-    updatedBy: null,
+    updatedAt: '2026-01-01T00:00:00.000Z',
+    updatedBy: 'user-1',
     ...overrides,
   }
+}
+
+function emptyLayout(overrides: Partial<DiagramZoneLayout> = {}): DiagramLayout {
+  return {
+    projectId: 'projeto-1',
+    zones: [{ name: 'Principal', tabOrder: 0, members: [...DEFAULT_MEMBERS] }],
+    layouts: [principalLayout(overrides)],
+  }
+}
+
+function twoZoneLayout(
+  principal: Partial<DiagramZoneLayout> = {},
+  geografia: Partial<DiagramZoneLayout> = {},
+): DiagramLayout {
+  return {
+    projectId: 'projeto-1',
+    zones: [
+      { name: 'Principal', tabOrder: 0, members: ['cliente'] },
+      { name: 'Geografia', tabOrder: 1, members: ['pedido'] },
+    ],
+    layouts: [
+      principalLayout({ ...principal, positions: { cliente: { x: 100, y: 100 }, ...principal.positions } }),
+      {
+        zoneName: 'Geografia',
+        positions: { pedido: { x: 420, y: 300 }, ...geografia.positions },
+        viewport: { x: 0, y: 0 },
+        zoom: 1,
+        updatedAt: '2026-01-01T00:00:00.000Z',
+        updatedBy: 'user-1',
+        ...geografia,
+      },
+    ],
+  }
+}
+
+function layoutFor(input: DiagramLayoutInput, zone = 'Principal'): DiagramZoneLayout | undefined {
+  return input.layouts.find((layout) => layout.zoneName === zone) as DiagramZoneLayout | undefined
+}
+
+function zoneFor(input: DiagramLayoutInput, table: string): DiagramZoneInput | undefined {
+  return input.zones?.find((zone) => (zone.members ?? []).includes(table))
 }
 
 function stubRect(): void {
@@ -47,13 +91,13 @@ function stubRect(): void {
   })
 }
 
-function stubLayout(layout: DiagramLayout, puts: DiagramLayout[] = []) {
+function stubLayout(layout: DiagramLayout, puts: DiagramLayoutInput[] = []) {
   restoreCallbacks.push(
     installFetch((url, init) => {
       if (url !== '/api/projects/projeto-1/diagram') return jsonResponse({}, 404)
       if (init?.method === 'PUT') {
-        puts.push(JSON.parse(String(init.body)) as DiagramLayout)
-        return jsonResponse({ ...layout, ...(JSON.parse(String(init.body)) as DiagramLayout) })
+        puts.push(JSON.parse(String(init.body)) as DiagramLayoutInput)
+        return jsonResponse(layout)
       }
       return jsonResponse(layout)
     }),
@@ -161,8 +205,8 @@ describe('DiagramCanvas', () => {
     dragTable('cliente')
 
     await waitFor(() => expect(puts.length).toBeGreaterThan(0), { timeout: 3000 })
-    expect(puts[0].positions.cliente).not.toEqual({ x: 80, y: 80 })
-    expect(puts[0].positions.pedido).toEqual({ x: 420, y: 80 })
+    expect(layoutFor(puts[0])?.positions.cliente).not.toEqual({ x: 80, y: 80 })
+    expect(layoutFor(puts[0])?.positions.pedido).toEqual({ x: 420, y: 80 })
     await waitFor(() => expect(screen.getByTestId('diagram-save-status').textContent).toContain('Salvo às:'))
     expect(screen.getByTestId('diagram-save-status').textContent).not.toContain('Salvando...')
   })
@@ -227,23 +271,50 @@ describe('DiagramCanvas', () => {
   })
 })
 
-function stubEditing() {
+function stubEditing(layout: DiagramLayout = emptyLayout(), options: { holdModelPut?: boolean } = {}) {
   const project = sampleProject()
   const modelPuts: DatabaseModel[] = []
-  const layout = emptyLayout()
+  const layoutPuts: DiagramLayoutInput[] = []
+  let currentLayout = layout
+  let releaseModel: (() => void) | null = null
+  const modelGate = options.holdModelPut
+    ? new Promise<void>((resolve) => {
+        releaseModel = resolve
+      })
+    : null
 
   restoreCallbacks.push(
-    installFetch((url, init) => {
+    installFetch(async (url, init) => {
       if (url === '/api/projects/projeto-1/diagram') {
         if (init?.method === 'PUT') {
-          const body = JSON.parse(String(init.body)) as DiagramLayout
-          return jsonResponse({ ...layout, ...body })
+          const body = JSON.parse(String(init.body)) as DiagramLayoutInput
+          layoutPuts.push(body)
+          currentLayout = {
+            projectId: 'projeto-1',
+            zones:
+              body.zones?.map((zone) => ({
+                name: zone.name,
+                tabOrder: zone.tabOrder ?? 0,
+                members: zone.members ?? [],
+              })) ?? currentLayout.zones,
+            layouts:
+              body.layouts.map((entry) => ({
+                zoneName: entry.zoneName,
+                positions: entry.positions ?? {},
+                viewport: entry.viewport ?? { x: 0, y: 0 },
+                zoom: entry.zoom ?? 1,
+                updatedAt: new Date().toISOString(),
+                updatedBy: 'user-1',
+              })) ?? currentLayout.layouts,
+          }
+          return jsonResponse(currentLayout)
         }
-        return jsonResponse(layout)
+        return jsonResponse(currentLayout)
       }
       if (url === `/api/projects/${project.id}` && init?.method === 'PUT') {
         const body = JSON.parse(String(init.body)) as { database: DatabaseModel }
         modelPuts.push(body.database)
+        if (modelGate) await modelGate
         return jsonResponse({ ...project, database: body.database })
       }
       if (url === `/api/projects/${project.id}`) return jsonResponse(project)
@@ -251,7 +322,12 @@ function stubEditing() {
     }),
   )
 
-  return { modelPuts, project }
+  return {
+    modelPuts,
+    layoutPuts,
+    project,
+    releaseModelPut: () => releaseModel?.(),
+  }
 }
 
 function pane(): HTMLElement {
@@ -591,5 +667,321 @@ describe('DiagramCanvas editing', () => {
     expect(modelPuts[2].tables.map((table) => table.name)).toContain('nova_tabela')
     expect(await screen.findByTestId('diagram-node-nova_tabela')).toBeTruthy()
     expect(screen.queryByTestId('diagram-redo')).toBeNull()
+  })
+
+  test('não emite o PUT do layout com o save do modelo em voo e re-agenda quando ele assenta', async () => {
+    stubRect()
+    const stub = stubEditing(emptyLayout(), { holdModelPut: true })
+    renderCanvas()
+
+    await screen.findByTestId('diagram-node-cliente')
+    fireEvent.click(screen.getByTestId('diagram-add-table'))
+    await waitFor(() => expect(stub.modelPuts).toHaveLength(1))
+
+    await new Promise((resolve) => setTimeout(resolve, 800))
+    expect(stub.layoutPuts).toHaveLength(0)
+
+    stub.releaseModelPut()
+    await waitFor(() => expect(stub.layoutPuts.length).toBeGreaterThan(0), { timeout: 3000 })
+    const last = stub.layoutPuts[stub.layoutPuts.length - 1]
+    expect(zoneFor(last, 'nova_tabela')?.name).toBe('Principal')
+  })
+})
+
+function CanvasHarness({ canEdit = true }: { canEdit?: boolean }) {
+  const [selection, setSelection] = useState<Selection>({ type: 'database' })
+  return (
+    <div>
+      <button type="button" data-testid="select-pedido" onClick={() => setSelection({ type: 'table', table: 'pedido' })}>
+        pedido
+      </button>
+      <div style={{ width: 1000, height: 700 }}>
+        <DiagramCanvas
+          projectId="projeto-1"
+          database={sampleDatabase()}
+          selection={selection}
+          onSelect={setSelection}
+          canEdit={canEdit}
+        />
+      </div>
+    </div>
+  )
+}
+
+function dataTransfer(data: Record<string, string> = {}) {
+  return {
+    types: Object.keys(data),
+    effectAllowed: 'all',
+    dropEffect: 'none',
+    setData: (type: string, value: string) => {
+      data[type] = value
+    },
+    getData: (type: string) => data[type] ?? '',
+  }
+}
+
+function dropWithPosition(element: HTMLElement, table: string, x: number, y: number) {
+  const event = new Event('drop', { bubbles: true, cancelable: true })
+  Object.defineProperties(event, {
+    clientX: { value: x },
+    clientY: { value: y },
+    dataTransfer: { value: dataTransfer({ [DIAGRAM_TABLE_MIME]: table }) },
+  })
+  fireEvent(element, event)
+}
+
+describe('DiagramCanvas zones', () => {
+  test('cria, renomeia, move tabela e exclui zona devolvendo as tabelas a Principal', async () => {
+    stubRect()
+    const stub = stubEditing()
+    renderCanvas()
+
+    await screen.findByTestId('diagram-node-cliente')
+    fireEvent.click(screen.getByTestId('diagram-zone-add'))
+    fireEvent.change(screen.getByLabelText('Nome da zona'), { target: { value: 'Geografia' } })
+    fireEvent.click(screen.getByTestId('diagram-zone-create'))
+
+    expect(await screen.findByTestId('diagram-zone-tab-Geografia')).toBeTruthy()
+    expect(screen.getByTestId('diagram-zone-tab-Geografia').getAttribute('aria-selected')).toBe('true')
+
+    fireEvent.click(screen.getByTestId('diagram-zone-tab-Principal'))
+    fireEvent.contextMenu(nodeWrapper('cliente'), { clientX: 120, clientY: 80, button: 2 })
+    fireEvent.click(await screen.findByTestId('canvas-menu-move-Geografia'))
+
+    await waitFor(() => expect(stub.layoutPuts.length).toBeGreaterThan(0))
+    const moved = stub.layoutPuts[stub.layoutPuts.length - 1]
+    expect(zoneFor(moved, 'cliente')?.name).toBe('Geografia')
+    expect(zoneFor(moved, 'cliente')?.members).toEqual(['cliente'])
+    expect(stub.modelPuts).toHaveLength(0)
+
+    await waitFor(() => expect(screen.queryByTestId('diagram-node-cliente')).toBeNull())
+    fireEvent.click(screen.getByTestId('diagram-zone-tab-Geografia'))
+    expect(await screen.findByTestId('diagram-node-cliente')).toBeTruthy()
+
+    fireEvent.click(screen.getByTestId('diagram-zone-rename'))
+    fireEvent.change(screen.getByLabelText('Novo nome da zona'), { target: { value: 'Geo' } })
+    fireEvent.click(screen.getByTestId('diagram-zone-rename-save'))
+    expect(await screen.findByTestId('diagram-zone-tab-Geo')).toBeTruthy()
+
+    fireEvent.click(screen.getByTestId('diagram-zone-delete'))
+    const dialog = await screen.findByRole('dialog', { name: 'Excluir zona' })
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Excluir' }))
+
+    await waitFor(() => expect(screen.queryByTestId('diagram-zone-tab-Geo')).toBeNull())
+    await waitFor(() => {
+      const last = stub.layoutPuts[stub.layoutPuts.length - 1]
+      expect(last.zones?.map((zone) => zone.name)).toEqual(['Principal'])
+      expect(zoneFor(last, 'cliente')?.name).toBe('Principal')
+    })
+    expect(await screen.findByTestId('diagram-node-cliente')).toBeTruthy()
+  })
+
+  test('troca de zona restaura posições e não emite PUT', async () => {
+    stubRect()
+    const puts = stubLayout(twoZoneLayout())
+    renderCanvas()
+
+    await screen.findByTestId('diagram-node-cliente')
+    await waitFor(() => expect(nodeWrapper('cliente').style.transform).toContain('translate(100px,100px)'))
+    expect(screen.queryByTestId('diagram-node-pedido')).toBeNull()
+
+    fireEvent.click(screen.getByTestId('diagram-zone-tab-Geografia'))
+    await waitFor(() => expect(nodeWrapper('pedido').style.transform).toContain('translate(420px,300px)'))
+    expect(screen.queryByTestId('diagram-node-cliente')).toBeNull()
+
+    fireEvent.click(screen.getByTestId('diagram-zone-tab-Principal'))
+    await waitFor(() => expect(nodeWrapper('cliente').style.transform).toContain('translate(100px,100px)'))
+
+    await new Promise((resolve) => setTimeout(resolve, 700))
+    expect(puts).toHaveLength(0)
+  })
+
+  test('reordena as abas por arrasto e persiste tabOrder na PUT', async () => {
+    stubRect()
+    const stub = stubEditing(twoZoneLayout())
+    renderCanvas()
+
+    await screen.findByTestId('diagram-zone-tab-Geografia')
+    const transfer = dataTransfer()
+    fireEvent.dragStart(screen.getByTestId('diagram-zone-tab-Geografia'), { dataTransfer: transfer })
+    fireEvent.drop(screen.getByTestId('diagram-zone-tab-Principal'), { dataTransfer: transfer })
+
+    await waitFor(() => expect(stub.layoutPuts.length).toBeGreaterThan(0))
+    const zones = stub.layoutPuts[stub.layoutPuts.length - 1].zones ?? []
+    expect(zones.find((zone) => zone.name === 'Geografia')?.tabOrder).toBe(0)
+    expect(zones.find((zone) => zone.name === 'Principal')?.tabOrder).toBe(1)
+  })
+
+  test('deriva Chaves entre modelos para relacionamento entre zonas nas duas pontas', async () => {
+    stubRect()
+    stubEditing(twoZoneLayout())
+    renderCanvas()
+
+    await screen.findByTestId('diagram-node-cliente')
+    await screen.findByTestId('diagram-zone-tab-Geografia')
+    await waitFor(() =>
+      expect(screen.getByTestId('diagram-cross-zone-cliente').textContent).toContain('Chaves entre modelos'),
+    )
+    expect(screen.queryByTestId('diagram-foreign-keys-cliente')).toBeNull()
+
+    fireEvent.click(screen.getByTestId('diagram-zone-tab-Geografia'))
+    await screen.findByTestId('diagram-node-pedido')
+    await waitFor(() =>
+      expect(screen.getByTestId('diagram-cross-zone-pedido').textContent).toContain('Chaves entre modelos'),
+    )
+    expect(screen.queryByTestId('diagram-foreign-keys-pedido')).toBeNull()
+  })
+
+  test('relacionamento com as duas tabelas na mesma zona fica em Chaves estrangeiras', async () => {
+    stubRect()
+    stubEditing(emptyLayout())
+    renderCanvas()
+
+    await screen.findByTestId('diagram-node-pedido')
+    expect(screen.getByTestId('diagram-foreign-keys-pedido').textContent).toContain('Chaves estrangeiras')
+    expect(screen.queryByTestId('diagram-cross-zone-pedido')).toBeNull()
+  })
+
+  test('drop da árvore adiciona a tabela na aba ativa na posição do cursor', async () => {
+    stubRect()
+    const stub = stubEditing(twoZoneLayout())
+    renderCanvas()
+
+    await screen.findByTestId('diagram-zone-tab-Geografia')
+    fireEvent.click(screen.getByTestId('diagram-zone-tab-Principal'))
+    await screen.findByTestId('diagram-node-cliente')
+    fireEvent.click(screen.getByTestId('diagram-zone-tab-Geografia'))
+    await screen.findByTestId('diagram-node-pedido')
+
+    dropWithPosition(screen.getByTestId('diagram-canvas'), 'cliente', 300, 220)
+
+    await waitFor(() => expect(stub.layoutPuts.length).toBeGreaterThan(0))
+    const last = stub.layoutPuts[stub.layoutPuts.length - 1]
+    expect(zoneFor(last, 'cliente')?.name).toBe('Geografia')
+    expect(last.layouts.find((layout) => layout.zoneName === 'Geografia')?.positions?.cliente).toEqual({
+      x: 300,
+      y: 220,
+    })
+    expect(stub.modelPuts).toHaveLength(0)
+    expect(await screen.findByTestId('diagram-node-cliente')).toBeTruthy()
+  })
+
+  test('remover do diagrama tira da zona sem alterar o modelo', async () => {
+    const stub = stubEditing()
+    renderCanvas()
+
+    await screen.findByTestId('diagram-node-cliente')
+    fireEvent.contextMenu(nodeWrapper('cliente'), { clientX: 120, clientY: 80, button: 2 })
+    fireEvent.click(await screen.findByTestId('canvas-menu-remove-from-diagram'))
+    const dialog = await screen.findByRole('dialog', { name: 'Remover do diagrama' })
+    expect(within(dialog).getByText(/continua no dicionário/)).toBeTruthy()
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Remover' }))
+
+    await waitFor(() => expect(stub.layoutPuts.length).toBeGreaterThan(0))
+    const last = stub.layoutPuts[stub.layoutPuts.length - 1]
+    expect(zoneFor(last, 'cliente')).toBeUndefined()
+    expect(zoneFor(last, 'pedido')?.name).toBe('Principal')
+    expect(stub.modelPuts).toHaveLength(0)
+    await waitFor(() => expect(screen.queryByTestId('diagram-node-cliente')).toBeNull())
+    expect(screen.getByTestId('diagram-node-pedido')).toBeTruthy()
+  })
+
+  test('localizar tabela de outra zona troca a aba e centraliza o card', async () => {
+    stubRect()
+    stubEditing(twoZoneLayout())
+    renderWithClient(<CanvasHarness />)
+
+    await screen.findByTestId('diagram-node-cliente')
+    await screen.findByTestId('diagram-zone-tab-Geografia')
+    fireEvent.click(screen.getByTestId('select-pedido'))
+    await waitFor(() =>
+      expect(screen.getByTestId('diagram-zone-tab-Geografia').getAttribute('aria-selected')).toBe('true'),
+    )
+    expect(await screen.findByTestId('diagram-node-pedido')).toBeTruthy()
+  })
+
+  test('tabela sem zona não troca de aba e oferece adicionar à aba atual', async () => {
+    stubRect()
+    stubEditing({
+      projectId: 'projeto-1',
+      zones: [{ name: 'Principal', tabOrder: 0, members: ['cliente'] }],
+      layouts: [principalLayout({ positions: { cliente: { x: 100, y: 100 } } })],
+    })
+    renderWithClient(<CanvasHarness />)
+
+    await screen.findByTestId('diagram-node-cliente')
+    fireEvent.click(screen.getByTestId('select-pedido'))
+    expect(await screen.findByTestId('diagram-outside-zone')).toBeTruthy()
+    expect(screen.queryByTestId('diagram-node-pedido')).toBeNull()
+
+    fireEvent.click(screen.getByTestId('diagram-add-to-zone'))
+    expect(await screen.findByTestId('diagram-node-pedido')).toBeTruthy()
+  })
+
+  test('VIEWER alterna abas mas não vê controles de zona, mover ou remover', async () => {
+    stubRect()
+    stubLayout(twoZoneLayout())
+    renderCanvas(false)
+
+    await screen.findByTestId('diagram-node-cliente')
+    await screen.findByTestId('diagram-zone-tab-Geografia')
+    expect(screen.queryByTestId('diagram-zone-add')).toBeNull()
+    expect(screen.queryByTestId('diagram-zone-delete')).toBeNull()
+    expect(screen.queryByTestId('diagram-zone-rename')).toBeNull()
+
+    fireEvent.click(screen.getByTestId('diagram-zone-tab-Geografia'))
+    await screen.findByTestId('diagram-node-pedido')
+    fireEvent.contextMenu(nodeWrapper('pedido'), { clientX: 120, clientY: 80, button: 2 })
+    expect(screen.queryByRole('menu')).toBeNull()
+    expect(screen.queryByTestId('diagram-outside-zone')).toBeNull()
+  })
+})
+
+describe('DiagramCanvas zone assignment defaults', () => {
+  test('tabela nova nasce em Principal mesmo com outra aba ativa', async () => {
+    stubRect()
+    const stub = stubEditing(twoZoneLayout())
+    renderCanvas()
+
+    await screen.findByTestId('diagram-zone-tab-Geografia')
+    fireEvent.click(screen.getByTestId('diagram-zone-tab-Geografia'))
+    await screen.findByTestId('diagram-node-pedido')
+
+    fireEvent.click(screen.getByTestId('diagram-add-table'))
+    await waitFor(() => expect(stub.modelPuts).toHaveLength(1))
+    await waitFor(() => expect(stub.layoutPuts.length).toBeGreaterThan(0))
+
+    const last = stub.layoutPuts[stub.layoutPuts.length - 1]
+    expect(zoneFor(last, 'nova_tabela')?.name).toBe('Principal')
+    expect(zoneFor(last, 'pedido')?.name).toBe('Geografia')
+  })
+
+  test('documento legado sem zones é lido como todas as tabelas em Principal e materializa na primeira escrita', async () => {
+    stubRect()
+    const legacy = {
+      projectId: 'projeto-1',
+      layouts: [
+        {
+          zoneName: 'Principal',
+          positions: { cliente: { x: 111, y: 77 }, pedido: { x: 480, y: 90 } },
+          viewport: { x: 0, y: 0 },
+          zoom: 1,
+          updatedAt: null,
+          updatedBy: null,
+        },
+      ],
+    } as unknown as DiagramLayout
+    const puts = stubLayout(legacy)
+    renderCanvas()
+
+    await screen.findByTestId('diagram-node-cliente')
+    await waitFor(() => expect(nodeWrapper('cliente').style.transform).toContain('translate(111px,77px)'))
+    expect(screen.getByTestId('diagram-zone-tab-Principal')).toBeTruthy()
+
+    dragTable('cliente')
+    await waitFor(() => expect(puts.length).toBeGreaterThan(0))
+    expect(puts[puts.length - 1].zones).toEqual([
+      { name: 'Principal', tabOrder: 0, members: ['cliente', 'pedido'] },
+    ])
   })
 })

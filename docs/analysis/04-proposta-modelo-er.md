@@ -112,8 +112,8 @@ diagram_layouts(id, project_id FK, zone_name, positions_json /* {table: {x,y}} *
 
 ### 3.3 Abas/zonas
 - Zona = agrupamento nomeado de tabelas (default `Principal`), com próprio
-  layout. Atribuição tabela→zona persistida junto do layout
-  (`positions_json` por zona + `members` ou campo `zone` na tabela).
+  layout. Atribuição tabela→zona persistida em `diagram_zones` (`members_json`),
+  com `positions_json` e viewport por zona em `diagram_layouts`.
 - **Semântica (transcrição 1):** no produto de referência cada aba é um
   **banco de dados separado** ("cada um desses quadrados é uma base de dados
   separada") e o modelo de template entra somente-leitura até ser
@@ -159,7 +159,7 @@ diagram_layouts(id, project_id FK, zone_name, positions_json /* {table: {x,y}} *
 |---|---|---|
 | **7** | **Canvas ER visual** | React Flow no workspace; cards com header/colunas/rodapé de chaves; arestas crow's-foot das relationships existentes; zoom/pan/minimapa/grid; busca lateral com highlight; arrasto persiste layout (`diagram_layouts` + evento); sync seleção árvore↔canvas; e2e |
 | **8** | **Edição no canvas** | Popover de coluna (campos v1), criar/excluir tabela e coluna, criar/excluir relacionamento por handle ou modo `1:n` **com auto-criação da coluna FK** (`<tabela>_id`, nome editável, mesmo PUT), menu de contexto, undo/redo, validações inline |
-| **9** | **Zonas/abas + polish** | Abas `Principal`/`+` com zonas, "Chaves entre modelos", mover tabela entre zonas, export PNG/SVG do diagrama, contagem no breadcrumb |
+| **9** | **Zonas/abas + polish** | Abas `Principal`/`+` com zonas, "Chaves entre modelos", mover tabela entre zonas, export PNG/SVG do diagrama, contagem `N tabelas` no cabeçalho (sem teto) |
 
 Estimativa de delegações (opencode, como sempre): Fase 7 ≈ 2 runs
 (backend layout+API / frontend React Flow) + e2e; Fase 8 ≈ 2–3 runs;

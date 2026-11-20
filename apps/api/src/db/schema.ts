@@ -167,6 +167,23 @@ export const diagramLayouts = sqliteTable(
   }),
 )
 
+export const diagramZones = sqliteTable(
+  'diagram_zones',
+  {
+    id: text('id').primaryKey(),
+    projectId: text('project_id')
+      .notNull()
+      .references(() => projects.id, { onDelete: 'cascade' }),
+    name: text('name').notNull(),
+    tabOrder: integer('tab_order').notNull().default(0),
+    membersJson: text('members_json').notNull().default('[]'),
+  },
+  (table) => ({
+    projectNameUq: uniqueIndex('diagram_zones_project_name_uq').on(table.projectId, table.name),
+    projectIdx: index('diagram_zones_project_idx').on(table.projectId),
+  }),
+)
+
 export const importRuns = sqliteTable(
   'import_runs',
   {

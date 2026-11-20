@@ -1,5 +1,6 @@
 import { Handle, type NodeProps, Position } from '@xyflow/react'
-import type { DiagramNode } from './layout'
+import type { RelationshipModel } from '@dbmapper/domain'
+import { EMPTY_RELATIONSHIP_KEYS, type DiagramNode, type DiagramRelationshipKey } from './layout'
 
 export function TableNode({ data }: NodeProps<DiagramNode>) {
   const {
@@ -11,6 +12,7 @@ export function TableNode({ data }: NodeProps<DiagramNode>) {
     searchActive,
     canEdit,
     relationshipMode,
+    keys = EMPTY_RELATIONSHIP_KEYS,
     onSelect,
     onPickTable,
     onAddColumn,
@@ -20,6 +22,44 @@ export function TableNode({ data }: NodeProps<DiagramNode>) {
     onDeleteRelationship,
   } = data
   const highlighted = searchActive && tableMatch
+
+  function parentFor(key: DiagramRelationshipKey): RelationshipModel | undefined {
+    if (key.direction !== 'outgoing') return undefined
+    return table.relationships?.parents.find(
+      (relationship) =>
+        relationship.table === key.table &&
+        relationship.constraint_name === key.constraintName &&
+        relationship.local_columns.join(',') === key.localColumns.join(','),
+    )
+  }
+
+  function keyRow(key: DiagramRelationshipKey) {
+    const parent = parentFor(key)
+    const label =
+      key.direction === 'outgoing'
+        ? `→ ${key.table} (${key.localColumns.join(', ')})`
+        : `← ${key.table} (${key.referencedColumns.join(', ')})`
+
+    return (
+      <li key={`${key.table}|${key.direction}|${key.constraintName}|${key.localColumns.join(',')}`} className="flex items-center gap-1">
+        <span className="min-w-0 flex-1 truncate text-[10px] text-slate-500">{label}</span>
+        {canEdit && parent ? (
+          <button
+            type="button"
+            className="nodrag nopan rounded-sm border border-slate-300 px-1 text-[10px] text-red-600 hover:bg-red-50"
+            onClick={(event) => {
+              event.stopPropagation()
+              onDeleteRelationship?.(table.name, parent)
+            }}
+            aria-label={`Excluir relacionamento ${table.name} → ${parent.table}`}
+            title="Excluir relacionamento"
+          >
+            ×
+          </button>
+        ) : null}
+      </li>
+    )
+  }
 
   function pickTable() {
     if (relationshipMode && onPickTable) {
@@ -180,33 +220,25 @@ export function TableNode({ data }: NodeProps<DiagramNode>) {
         })}
       </ul>
 
-      {canEdit && (table.relationships?.parents.length ?? 0) > 0 ? (
-        <div className="border-t border-slate-100 px-3 py-1.5" data-testid={`diagram-relationships-${table.name}`}>
-          <p className="text-[9px] font-semibold uppercase tracking-wide text-slate-400">Relacionamentos</p>
-          <ul className="mt-1 space-y-1">
-            {table.relationships.parents.map((relationship) => (
-              <li
-                key={`${relationship.table}|${relationship.local_columns.join(',')}`}
-                className="flex items-center gap-1"
-              >
-                <span className="min-w-0 flex-1 truncate text-[10px] text-slate-500">
-                  → {relationship.table} ({relationship.local_columns.join(', ')})
-                </span>
-                <button
-                  type="button"
-                  className="nodrag nopan rounded-sm border border-slate-300 px-1 text-[10px] text-red-600 hover:bg-red-50"
-                  onClick={(event) => {
-                    event.stopPropagation()
-                    onDeleteRelationship?.(table.name, relationship)
-                  }}
-                  aria-label={`Excluir relacionamento ${table.name} → ${relationship.table}`}
-                  title="Excluir relacionamento"
-                >
-                  ×
-                </button>
-              </li>
-            ))}
-          </ul>
+      {keys.crossZone.length > 0 || keys.foreign.length > 0 ? (
+        <div
+          className="border-t border-slate-100 px-3 py-1.5"
+          data-testid={canEdit ? `diagram-relationships-${table.name}` : `diagram-keys-${table.name}`}
+        >
+          {keys.crossZone.length > 0 ? (
+            <section data-testid={`diagram-cross-zone-${table.name}`}>
+              <p className="text-[9px] font-semibold uppercase tracking-wide text-indigo-500">
+                Chaves entre modelos
+              </p>
+              <ul className="mt-1 space-y-1">{keys.crossZone.map(keyRow)}</ul>
+            </section>
+          ) : null}
+          {keys.foreign.length > 0 ? (
+            <section data-testid={`diagram-foreign-keys-${table.name}`} className={keys.crossZone.length > 0 ? 'mt-1.5' : ''}>
+              <p className="text-[9px] font-semibold uppercase tracking-wide text-rose-500">Chaves estrangeiras</p>
+              <ul className="mt-1 space-y-1">{keys.foreign.map(keyRow)}</ul>
+            </section>
+          ) : null}
         </div>
       ) : null}
     </div>

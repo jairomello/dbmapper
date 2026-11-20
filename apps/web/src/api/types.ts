@@ -141,15 +141,43 @@ export interface DiagramPosition {
   y: number
 }
 
-export interface DiagramLayoutInput {
+export interface DiagramZone {
+  name: string
+  tabOrder: number
+  members: string[]
+}
+
+export interface DiagramZoneLayout {
+  zoneName: string
   positions: Record<string, DiagramPosition>
   viewport: DiagramPosition
   zoom: number
-}
-
-export interface DiagramLayout extends DiagramLayoutInput {
-  projectId: string
-  zoneName: string
   updatedAt: string | null
   updatedBy: string | null
+}
+
+export interface DiagramLayout {
+  projectId: string
+  zones: DiagramZone[]
+  layouts: DiagramZoneLayout[]
+}
+
+export type DiagramDocument = DiagramLayout
+
+export interface DiagramZoneInput {
+  name: string
+  tabOrder?: number
+  members?: string[]
+}
+
+export interface DiagramZoneLayoutInput {
+  zoneName: string
+  positions?: Record<string, DiagramPosition>
+  viewport?: DiagramPosition
+  zoom?: number
+}
+
+export interface DiagramLayoutInput {
+  zones?: DiagramZoneInput[]
+  layouts: DiagramZoneLayoutInput[]
 }

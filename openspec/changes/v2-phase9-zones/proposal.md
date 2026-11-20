@@ -49,6 +49,11 @@ abas/zonas** (ex.: módulo de pessoas × permissionamento), distinguir
   (`v2-phase7-diagram`), que promove a capability `diagram-canvas` — validar
   esta fase antes do archive da 7 avisa que o alvo ainda não existe (INFO);
   a ordem 7→8→9 do roadmap garante o archive correto.
+- `diagram-layout` (delta MODIFIED): o `GET /diagram` passa a devolver o
+  documento `{ projectId, zones, layouts }` em vez do layout plano da Fase 7,
+  e o `PUT` aceita o documento novo ou o legado (gravado como zona
+  `Principal`). Requirements de chave-por-nome, papéis, auditoria e export
+  intocado ficam como estão.
 
 ## Impact
 
