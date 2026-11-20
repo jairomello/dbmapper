@@ -49,4 +49,4 @@
 
 ## 11. Archive
 
-- [ ] 11.1 `openspec archive v2-phase8-edit --yes` após o ok do Jairo, marcar o checkbox no tasks arquivado e commitar o change promovido — verificação: `openspec list` sem o change e `openspec/specs/diagram-editing` existente.
+- [x] 11.1 `openspec archive v2-phase8-edit --yes` após o ok do Jairo, marcar o checkbox no tasks arquivado e commitar o change promovido — verificação: `openspec list` sem o change e `openspec/specs/diagram-editing` existente.
