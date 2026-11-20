@@ -94,6 +94,13 @@ indicador, sem botão) com a copy exata: `Salvando...` / `Salvo às: HH:MM`.
 
 ## 4. Backlog (não entra em 7/8/9 — anotar na proposta v2 §10.1)
 
+> Atualização 20/11/2026: "Gerar SQL" saiu do backlog e virou a Fase 10
+> (`openspec/changes/v2-phase10-ddl`); barra de ferramentas com
+> selecionar/mover e organização automática (grade/estrela), destaque de
+> arestas por direção e espessura viraram a Fase 11
+> (`openspec/changes/v2-phase11-canvas-ux`). Drag da árvore e "remover do
+> diagrama" entraram na Fase 9.
+
 - **Import de banco vivo** (`importDatabase`: conecta e faz reverse-engineering)
   — hoje só importamos script SQL. Temos `pg-local`; é feature de exploração.
 - **Gerar SQL CREATE / classes de modelo a partir do diagrama** (`generateSql`,

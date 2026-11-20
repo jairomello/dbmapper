@@ -14,7 +14,11 @@
 ## 3. Atribuição de tabelas
 
 - [ ] 3.1 Mover tabela entre zonas (menu de contexto do card e ação na árvore) com persistência no documento — verificação: teste cobre a remoção da zona de origem, presença na destino e um único PUT.
-- [ ] 3.2 Tabelas novas/importadas nascem em `Principal`; tabela sem zona aparece só em `Principal` — verificação: teste cobre criação, import e renderização por zona.
+- [ ] 3.2 Tabelas novas/importadas nascem em `Principal`; documento de layout sem `zones` (Fase 7) é lido como "todas em `Principal`" e a primeira escrita materializa os membros — verificação: teste cobre criação, import e leitura do documento legado.
+- [ ] 3.3 Arrastar tabela da árvore para o canvas (`dragstart`/`drop` + `screenToFlowPosition`): adiciona à aba ativa na posição do drop, move de zona quando necessário e só grava um PUT; `VIEWER` não arrasta — verificação: teste de componente cobre drop em coordenada esperada, troca de zona e gating por papel.
+- [ ] 3.4 Ação "Remover do diagrama" por card: tira da zona sem alterar o modelo, mantém na árvore marcada como "fora do diagrama" e oferece "Adicionar à aba atual" — verificação: teste afirma que o payload do modelo não muda e que o documento de layout perde só o membro/posição.
+- [ ] 3.5 Localizar tabela/coluna da árvore no diagrama: troca para a aba da zona antes de centralizar, destaca o card e trata tabela sem zona (ação de adicionar ou mensagem para `VIEWER`) — verificação: teste cobre tabela em outra zona, na mesma zona e sem zona.
+- [ ] 3.6 Tabela sem zona: `VIEWER` vê o diagrama sem os controles de adição/remoção (só leitura) — verificação: teste de papel como no restante do canvas.
 
 ## 4. Chaves entre zonas derivadas
 
@@ -28,7 +32,7 @@
 
 ## 6. E2e de zonas
 
-- [ ] 6.1 E2e Playwright: login → diagrama → criar zona → mover tabela → trocar de aba (layout preservado) → exportar — verificação: `bun run test:e2e` verde com o cenário novo.
+- [ ] 6.1 E2e Playwright: login → diagrama → criar zona → arrastar tabela da árvore para a aba → remover do diagrama (tabela continua na árvore) → localizar por outra zona (troca de aba) → exportar — verificação: `bun run test:e2e` verde com o cenário novo.
 
 ## 7. Validate
 

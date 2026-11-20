@@ -17,7 +17,9 @@ a próxima** — sem pressa, vamos aos poucos. Design e decisões:
 | 6   | **Polish**               | DBViewer como rota read-only, auditoria completa, preparação para deploy (notebook → labapps → Vultr `jairo.tools`)                       | `v2-phase6-polish`  | ✅ concluída em 18/11/2026 |
 | 7   | **Canvas ER visual**     | React Flow no workspace (toggle Diagrama), cards/arestas, seleção sincronizada, busca com destaque, layout persistido por nome + evento de auditoria | `v2-phase7-diagram` | ✅ concluída em 20/11/2026 |
 | 8   | **Edição no canvas**     | Criar/excluir tabela e coluna, relacionamentos com coluna FK auto-criada no mesmo PUT, popover de coluna, fila de comandos com undo/redo e indicador de save | `v2-phase8-edit` | 📋 especificada em 18/11/2026 (aguardando liberação) |
-| 9   | **Zonas/abas + polish**  | Abas `Principal`/`+`, atribuição e movimentação de tabelas, "Chaves entre modelos" derivada, export PNG/SVG, contagem de tabelas           | `v2-phase9-zones` | 📋 especificada em 18/11/2026 (aguardando liberação) |
+| 9   | **Zonas/abas + polish**  | Abas `Principal`/`+`, atribuição e movimentação de tabelas, drag da árvore para a aba, "Remover do diagrama", "Chaves entre modelos" derivada, localizar tabela por zona, export PNG/SVG, contagem de tabelas | `v2-phase9-zones` | 📋 especificada em 18/11/2026, ampliada em 20/11/2026 (aguardando liberação) |
+| 10  | **Gerar SQL (DDL)**      | Script completo e migração por dialeto (`postgres`/`mysql`) a partir do modelo, baseline por projeto (capturado no import e manual), renames explícitos, avisos/destrutivos e download `.sql` | `v2-phase10-ddl` | 📋 especificada em 20/11/2026 (aguardando liberação) |
+| 11  | **Experiência do canvas** | Toolbar (selecionar/mover/zoom/criar/organizar/exportar), destaque das arestas da tabela selecionada com cor e direção, tracejado animado, arestas mais grossas e auto-layout grade/estrela | `v2-phase11-canvas-ux` | 📋 especificada em 20/11/2026 (aguardando liberação) |
 
 ## Como funciona
 
@@ -44,3 +46,8 @@ a próxima** — sem pressa, vamos aos poucos. Design e decisões:
   referências do Mad.Builder (docs 04–06), revisão contra a implementação
   (docs 07–09) e os changes `v2-phase7-diagram`, `v2-phase8-edit` e
   `v2-phase9-zones` criados com artefatos completos e validados em strict.
+- 20/11/2026 — revisão de uso do canvas com o modelo real (Axiis, 108 tabelas):
+  Fase 9 ampliada (drag da árvore para a aba, "Remover do diagrama", localizar
+  tabela por zona) e Fases 10 (`v2-phase10-ddl`, geração de DDL/migração com
+  baseline) e 11 (`v2-phase11-canvas-ux`, toolbar, destaque de arestas e
+  auto-layout) especificadas e validadas em strict.
