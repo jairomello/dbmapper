@@ -139,4 +139,175 @@ describe('persistência SQLite', () => {
       persistence.close()
     }
   })
+
+  test('persiste o layout do diagrama por nome com roundtrip e upsert idempotente', async () => {
+    const persistence = await createPersistence()
+
+    try {
+      const created = persistence.projects.create({ name: 'Layout' })
+      persistence.projects.replaceModel(created.id, database)
+
+      const saved = persistence.projects.putDiagramLayout({
+        projectId: created.id,
+        positions: { cliente: { x: 10, y: 20 }, pedido: { x: 300.5, y: 40 } },
+        viewportX: -5,
+        viewportY: 12,
+        zoom: 0.8,
+      })
+      expect(saved).not.toBeNull()
+
+      const loaded = persistence.projects.getDiagramLayout(created.id)
+      expect(loaded).not.toBeNull()
+      expect(loaded!.zoneName).toBe('Principal')
+      expect(loaded!.positions).toEqual({ cliente: { x: 10, y: 20 }, pedido: { x: 300.5, y: 40 } })
+      expect(loaded!.viewportX).toBe(-5)
+      expect(loaded!.viewportY).toBe(12)
+      expect(loaded!.zoom).toBe(0.8)
+
+      persistence.projects.putDiagramLayout({
+        projectId: created.id,
+        positions: { cliente: { x: 99, y: 100 } },
+        viewportX: 1,
+        viewportY: 2,
+        zoom: 1.5,
+      })
+
+      const reloaded = persistence.projects.getDiagramLayout(created.id)
+      expect(reloaded!.positions).toEqual({ cliente: { x: 99, y: 100 } })
+      expect(reloaded!.zoom).toBe(1.5)
+      expect(reloaded!.viewportX).toBe(1)
+      expect(reloaded!.viewportY).toBe(2)
+    } finally {
+      persistence.close()
+    }
+  })
+
+  test('descarta posições de tabelas ausentes do modelo no GET', async () => {
+    const persistence = await createPersistence()
+
+    try {
+      const created = persistence.projects.create({ name: 'Órfãos' })
+      persistence.projects.replaceModel(created.id, database)
+      persistence.projects.putDiagramLayout({
+        projectId: created.id,
+        positions: { cliente: { x: 1, y: 2 }, tabela_removida: { x: 3, y: 4 } },
+        viewportX: 0,
+        viewportY: 0,
+        zoom: 1,
+      })
+
+      const loaded = persistence.projects.getDiagramLayout(created.id)
+      expect(loaded!.positions).toEqual({ cliente: { x: 1, y: 2 } })
+    } finally {
+      persistence.close()
+    }
+  })
+
+  test('GET de projeto sem layout retorna layout vazio e projeto inexistente retorna null', async () => {
+    const persistence = await createPersistence()
+
+    try {
+      const created = persistence.projects.create({ name: 'Sem layout' })
+
+      const loaded = persistence.projects.getDiagramLayout(created.id)
+      expect(loaded).toEqual({
+        projectId: created.id,
+        zoneName: 'Principal',
+        positions: {},
+        viewportX: 0,
+        viewportY: 0,
+        zoom: 1,
+        updatedAt: null,
+        updatedBy: null,
+      })
+
+      expect(persistence.projects.getDiagramLayout('missing')).toBeNull()
+      expect(
+        persistence.projects.putDiagramLayout({
+          projectId: 'missing',
+          positions: {},
+          viewportX: 0,
+          viewportY: 0,
+          zoom: 1,
+        }),
+      ).toBeNull()
+    } finally {
+      persistence.close()
+    }
+  })
+
+  test('grava diagram.layout_saved com ator e projeto na mesma transação', async () => {
+    const persistence = await createPersistence()
+
+    try {
+      const created = persistence.projects.create({ name: 'Auditado' })
+      persistence.projects.replaceModel(created.id, database)
+      const actor = persistence.users.create({
+        email: 'layout@example.com',
+        passwordHash: 'hash',
+        role: 'MEMBER',
+      })
+
+      persistence.projects.putDiagramLayout({
+        projectId: created.id,
+        positions: { cliente: { x: 1, y: 2 } },
+        viewportX: 0,
+        viewportY: 0,
+        zoom: 1,
+        actorUserId: actor.id,
+        audit: {
+          actorUserId: actor.id,
+          action: 'diagram.layout_saved',
+          subjectType: 'project',
+          subjectId: created.id,
+        },
+      })
+
+      const events = persistence.agent.events.listAll().filter((event) => event.action === 'diagram.layout_saved')
+      expect(events).toHaveLength(1)
+      expect(events[0].actorUserId).toBe(actor.id)
+      expect(events[0].projectId).toBe(created.id)
+      expect(events[0].subjectId).toBe(created.id)
+    } finally {
+      persistence.close()
+    }
+  })
+
+  test('escrita que falha não deixa evento nem layout gravado', async () => {
+    const persistence = await createPersistence()
+
+    try {
+      const created = persistence.projects.create({ name: 'Falha' })
+      persistence.projects.replaceModel(created.id, database)
+      const actor = persistence.users.create({
+        email: 'falha@example.com',
+        passwordHash: 'hash',
+        role: 'MEMBER',
+      })
+      const before = persistence.agent.events.listAll().length
+
+      expect(() =>
+        persistence.projects.putDiagramLayout({
+          projectId: created.id,
+          positions: { cliente: { x: 1, y: 2 } },
+          viewportX: 0,
+          viewportY: 0,
+          zoom: 1,
+          actorUserId: actor.id,
+          audit: {
+            actorUserId: 'usuario-inexistente',
+            action: 'diagram.layout_saved',
+            subjectType: 'project',
+            subjectId: created.id,
+          },
+        }),
+      ).toThrow()
+
+      expect(persistence.agent.events.listAll()).toHaveLength(before)
+      expect(persistence.agent.events.listAll().some((event) => event.action === 'diagram.layout_saved')).toBe(false)
+      expect(persistence.projects.getDiagramLayout(created.id)!.positions).toEqual({})
+    } finally {
+      persistence.close()
+    }
+  })
 })

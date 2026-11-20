@@ -13,6 +13,7 @@
     "@dbmapper/contracts": "workspace:*",
     "@dbmapper/domain": "workspace:*",
     "@tanstack/react-query": "^5.107.1",
+    "@xyflow/react": "^13.0.2",
     "react": "^18.3.0",
     "react-dom": "^18.3.0",
     "react-router-dom": "^7.18.5"

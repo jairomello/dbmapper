@@ -9,6 +9,7 @@ const ACTION_FAMILIES = [
   { value: '', label: 'Todas as ações' },
   { value: 'project.', label: 'Projetos' },
   { value: 'model.', label: 'Modelo' },
+  { value: 'diagram.', label: 'Diagrama' },
   { value: 'user.', label: 'Usuários' },
   { value: 'item.', label: 'Itens' },
   { value: 'agent.', label: 'Agente IA' },

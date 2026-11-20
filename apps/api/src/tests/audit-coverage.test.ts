@@ -148,6 +148,18 @@ describe('auditoria: cobertura das rotas mutantes', () => {
       },
     },
     {
+      name: 'PUT /api/projects/:id/diagram',
+      action: 'diagram.layout_saved',
+      run: async () => {
+        const saved = await apiRequest(context, `/api/projects/${projectId}/diagram`, 'PUT', {
+          positions: { cliente: { x: 10, y: 20 } },
+          viewport: { x: 0, y: 0 },
+          zoom: 1,
+        })
+        expect(saved.response.status).toBe(200)
+      },
+    },
+    {
       name: 'POST /api/projects/import',
       action: 'project.imported',
       run: async () => {

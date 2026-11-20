@@ -176,6 +176,36 @@ export interface CreateProjectOptions {
   audit?: InsertEventInput
 }
 
+export interface DiagramPosition {
+  x: number
+  y: number
+}
+
+export const DEFAULT_DIAGRAM_ZONE = 'Principal'
+
+export interface DiagramLayoutRecord {
+  projectId: string
+  zoneName: string
+  positions: Record<string, DiagramPosition>
+  viewportX: number
+  viewportY: number
+  zoom: number
+  updatedAt: string | null
+  updatedBy: string | null
+}
+
+export interface PutDiagramLayoutInput {
+  projectId: string
+  positions: Record<string, DiagramPosition>
+  viewportX: number
+  viewportY: number
+  zoom: number
+  zoneName?: string
+  actorUserId?: string | null
+  now?: string
+  audit?: InsertEventInput
+}
+
 export interface ProjectRepository {
   create(input: CreateProjectInput, options?: CreateProjectOptions): ProjectRecord
   list(): ProjectSummary[]
@@ -189,6 +219,8 @@ export interface ProjectRepository {
   ): ApplyModelResult | null
   listImportRuns(projectId: string): ImportRunRecord[]
   setItemDescription(input: SetItemDescriptionInput): SetItemDescriptionResult | null
+  getDiagramLayout(projectId: string, zoneName?: string): DiagramLayoutRecord | null
+  putDiagramLayout(input: PutDiagramLayoutInput): DiagramLayoutRecord | null
 }
 
 export interface ApiKeyRecord {

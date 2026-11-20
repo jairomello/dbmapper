@@ -1,5 +1,5 @@
 import { sql } from 'drizzle-orm'
-import { check, index, integer, sqliteTable, text, uniqueIndex } from 'drizzle-orm/sqlite-core'
+import { check, index, integer, primaryKey, real, sqliteTable, text, uniqueIndex } from 'drizzle-orm/sqlite-core'
 
 const isoNow = sql`(strftime('%Y-%m-%dT%H:%M:%fZ','now'))`
 
@@ -145,6 +145,25 @@ export const relationships = sqliteTable(
   },
   (table) => ({
     tableIdx: index('relationships_table_idx').on(table.tableId),
+  }),
+)
+
+export const diagramLayouts = sqliteTable(
+  'diagram_layouts',
+  {
+    projectId: text('project_id')
+      .notNull()
+      .references(() => projects.id, { onDelete: 'cascade' }),
+    zoneName: text('zone_name').notNull().default('Principal'),
+    positionsJson: text('positions_json').notNull().default('{}'),
+    viewportX: real('viewport_x').notNull().default(0),
+    viewportY: real('viewport_y').notNull().default(0),
+    zoom: real('zoom').notNull().default(1),
+    updatedAt: text('updated_at').notNull().default(isoNow),
+    updatedBy: text('updated_by').references(() => users.id),
+  },
+  (table) => ({
+    pk: primaryKey({ columns: [table.projectId, table.zoneName] }),
   }),
 )
 

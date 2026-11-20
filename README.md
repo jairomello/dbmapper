@@ -230,6 +230,35 @@ O smoke sobe API + web em portas isoladas, cria o admin, faz login, abre a galer
 cria um projeto importando `legacy/example.sql`, descreve/aprova uma coluna e valida o
 JSON exportado.
 
+## Diagrama do modelo (Fase 7)
+
+O workspace oferece duas views no topo da área principal: **Editor** (padrão) e
+**Diagrama**. A view Diagrama renderiza o modelo como um canvas ER com React
+Flow (`@xyflow/react`): um card por tabela não removida (colunas na ordem do
+modelo, marcas `PK`/`FK`), arestas crow's-foot para cada relacionamento,
+minimapa, controles de zoom e grade. A árvore semântica, o header e a barra de
+cobertura continuam visíveis e funcionais.
+
+Fluxo de uso:
+
+1. Abra um projeto e clique em **Diagrama**.
+2. Clique em um card (ou em uma coluna) para selecionar; a árvore e o editor
+   acompanham. Selecionar na árvore destaca e centraliza o card correspondente.
+3. Use **Buscar no diagrama** para destacar tabelas/campos; nenhum card é
+   removido ou escondido.
+4. Arraste os cards ou ajuste pan/zoom: o layout é salvo automaticamente
+   (`PUT /api/projects/{id}/diagram`) com debounce e o indicador mostra
+   `Salvando...` / `Salvo às: HH:MM`. Ao reabrir o diagrama, posições, viewport
+   e zoom salvos são restaurados.
+5. O painel inferior **Editor de metadados** abre na seleção e pode ser
+   recolhido; voltar para **Editor** mantém a seleção atual.
+
+O layout é indexado pelo **nome** da tabela (ids internos regeneram a cada save
+do modelo) e fica fora do export v1. `GET /api/projects/{id}/diagram` aceita
+qualquer sessão; `PUT` exige `MEMBER`/`ADMIN`. `VIEWER` vê o diagrama em modo
+somente leitura — sem arraste e sem requisições de escrita do layout. O save é
+auditado como `diagram.layout_saved` (família `diagram.` na tela de auditoria).
+
 ## Agente de sugestões (Fase 4)
 
 A Fase 4 adiciona o agente embutido: geração em lote de sugestões de descrição

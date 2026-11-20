@@ -1,11 +1,12 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { usePendingSuggestions } from '../agent/queries'
 import { authApi } from '../api/auth'
 import { projectsApi } from '../api/projects'
 import type { DatabaseModel } from '@dbmapper/domain'
 import { SESSION_QUERY_KEY, useSession } from '../auth/session'
+import { DiagramCanvas } from '../components/DiagramCanvas'
 import { JsonTransfer } from '../components/JsonTransfer'
 import { MetadataEditor } from '../components/MetadataEditor'
 import { NewProjectDialog } from '../components/NewProjectDialog'
@@ -25,12 +26,19 @@ export function WorkspacePage() {
   const project = useProject(projectId)
 
   const [selection, setSelection] = useState<Selection>({ type: 'database' })
+  const [view, setView] = useState<'editor' | 'diagrama'>('editor')
+  const [isEditorPanelOpen, setIsEditorPanelOpen] = useState(false)
   const [isCreating, setIsCreating] = useState(false)
   const [isWizardOpen, setIsWizardOpen] = useState(false)
   const [isAgentOpen, setIsAgentOpen] = useState(false)
   const [activeJobId, setActiveJobId] = useState<string | null>(null)
   const pendingSuggestions = usePendingSuggestions(projectId)
   const pendingCount = pendingSuggestions.data?.suggestions.length ?? 0
+  const canEditDiagram = session.data?.role === 'MEMBER' || session.data?.role === 'ADMIN'
+
+  useEffect(() => {
+    if (view === 'diagrama' && selection.type !== 'database') setIsEditorPanelOpen(true)
+  }, [view, selection])
 
   const saveProject = useMutation({
     mutationFn: (database: DatabaseModel) => {
@@ -157,14 +165,85 @@ export function WorkspacePage() {
         <main className="flex min-w-0 flex-1 flex-col">
           {project.data ? (
             <>
-              <div className="min-h-0 flex-1">
-                <MetadataEditor
-                  database={project.data.database}
-                  selection={selection}
-                  onSave={saveProject.mutateAsync}
-                  isSaving={saveProject.isPending}
-                />
-              </div>
+              <fieldset
+                className="flex items-center gap-1 border-b border-slate-200 bg-white px-4 py-2"
+                aria-label="Modo de visualização"
+              >
+                <button
+                  type="button"
+                  className={`rounded-sm px-3 py-1.5 text-xs font-semibold transition ${
+                    view === 'editor'
+                      ? 'bg-accent text-white'
+                      : 'border border-slate-300 text-slate-600 hover:bg-slate-100'
+                  }`}
+                  aria-pressed={view === 'editor'}
+                  onClick={() => setView('editor')}
+                  data-testid="view-editor"
+                >
+                  Editor
+                </button>
+                <button
+                  type="button"
+                  className={`rounded-sm px-3 py-1.5 text-xs font-semibold transition ${
+                    view === 'diagrama'
+                      ? 'bg-accent text-white'
+                      : 'border border-slate-300 text-slate-600 hover:bg-slate-100'
+                  }`}
+                  aria-pressed={view === 'diagrama'}
+                  onClick={() => setView('diagrama')}
+                  data-testid="view-diagram"
+                >
+                  Diagrama
+                </button>
+              </fieldset>
+
+              {view === 'editor' ? (
+                <div className="min-h-0 flex-1">
+                  <MetadataEditor
+                    database={project.data.database}
+                    selection={selection}
+                    onSave={saveProject.mutateAsync}
+                    isSaving={saveProject.isPending}
+                  />
+                </div>
+              ) : (
+                <>
+                  <div className="min-h-0 flex-1">
+                    <DiagramCanvas
+                      projectId={projectId}
+                      database={project.data.database}
+                      selection={selection}
+                      onSelect={setSelection}
+                      canEdit={canEditDiagram}
+                    />
+                  </div>
+                  <div className="border-t border-slate-200 bg-white">
+                    <div className="flex items-center justify-between gap-2 px-4 py-1.5">
+                      <span className="text-xs font-semibold text-slate-600">Editor de metadados</span>
+                      <button
+                        type="button"
+                        className="rounded-sm border border-slate-300 px-2 py-1 text-xs font-medium text-slate-600 hover:bg-slate-100"
+                        onClick={() => setIsEditorPanelOpen((current) => !current)}
+                        aria-expanded={isEditorPanelOpen}
+                        data-testid="diagram-editor-toggle"
+                      >
+                        {isEditorPanelOpen ? 'Recolher editor' : 'Abrir editor'}
+                      </button>
+                    </div>
+                    {isEditorPanelOpen ? (
+                      <div className="h-80 min-h-0 overflow-hidden" data-testid="diagram-editor-panel">
+                        <MetadataEditor
+                          database={project.data.database}
+                          selection={selection}
+                          onSave={saveProject.mutateAsync}
+                          isSaving={saveProject.isPending}
+                        />
+                      </div>
+                    ) : null}
+                  </div>
+                </>
+              )}
+
               <StatusBar database={project.data.database} />
             </>
           ) : (

@@ -135,3 +135,21 @@ export interface EventListFilters {
   projectId?: string
   limit?: number
 }
+
+export interface DiagramPosition {
+  x: number
+  y: number
+}
+
+export interface DiagramLayoutInput {
+  positions: Record<string, DiagramPosition>
+  viewport: DiagramPosition
+  zoom: number
+}
+
+export interface DiagramLayout extends DiagramLayoutInput {
+  projectId: string
+  zoneName: string
+  updatedAt: string | null
+  updatedBy: string | null
+}

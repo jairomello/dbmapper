@@ -9,6 +9,7 @@ import {
   aiSuggestions as aiSuggestionsTable,
   apiKeys as apiKeysTable,
   columns as columnsTable,
+  diagramLayouts as diagramLayoutsTable,
   events as eventsTable,
   importRuns,
   loginAttempts as loginAttemptsTable,
@@ -40,6 +41,8 @@ import type {
   CreateUserInput,
   DecisionAudit,
   DescriptionItemType,
+  DiagramLayoutRecord,
+  DiagramPosition,
   EventListFilters,
   EventRecord,
   EventRepository,
@@ -53,6 +56,7 @@ import type {
   ProjectRecord,
   ProjectRepository,
   ProjectSummary,
+  PutDiagramLayoutInput,
   RelationshipRecord,
   SetItemDescriptionInput,
   SetItemDescriptionResult,
@@ -64,6 +68,7 @@ import type {
   UserRepository,
   UserRole,
 } from '../ports'
+import { DEFAULT_DIAGRAM_ZONE } from '../ports'
 
 const migrationsFolder = fileURLToPath(new URL('../../db/migrations', import.meta.url))
 
@@ -89,6 +94,20 @@ function parseJsonObject(value: string): Record<string, unknown> {
   } catch {
     return {}
   }
+}
+
+function parseDiagramPositions(value: string): Record<string, DiagramPosition> {
+  const positions: Record<string, DiagramPosition> = {}
+
+  for (const [name, raw] of Object.entries(parseJsonObject(value))) {
+    if (raw === null || typeof raw !== 'object' || Array.isArray(raw)) continue
+    const { x, y } = raw as { x?: unknown; y?: unknown }
+    if (typeof x === 'number' && typeof y === 'number' && Number.isFinite(x) && Number.isFinite(y)) {
+      positions[name] = { x, y }
+    }
+  }
+
+  return positions
 }
 
 function toUserRecord(row: typeof usersTable.$inferSelect): UserRecord {
@@ -717,6 +736,117 @@ export function createSqlitePersistence(
           reviewed,
           changed,
           updatedAt: now,
+        }
+      })
+    },
+
+    getDiagramLayout(projectId: string, zoneName: string = DEFAULT_DIAGRAM_ZONE): DiagramLayoutRecord | null {
+      const project = db.select({ id: projects.id }).from(projects).where(eq(projects.id, projectId)).get()
+      if (!project) return null
+
+      const tableNames = new Set(
+        db
+          .select({ name: tablesTable.name })
+          .from(tablesTable)
+          .where(eq(tablesTable.projectId, projectId))
+          .all()
+          .map((table) => table.name),
+      )
+
+      const row = db
+        .select()
+        .from(diagramLayoutsTable)
+        .where(
+          and(eq(diagramLayoutsTable.projectId, projectId), eq(diagramLayoutsTable.zoneName, zoneName)),
+        )
+        .get()
+      if (!row) {
+        return {
+          projectId,
+          zoneName,
+          positions: {},
+          viewportX: 0,
+          viewportY: 0,
+          zoom: 1,
+          updatedAt: null,
+          updatedBy: null,
+        }
+      }
+
+      const positions: Record<string, DiagramPosition> = {}
+      for (const [name, position] of Object.entries(parseDiagramPositions(row.positionsJson))) {
+        if (tableNames.has(name)) positions[name] = position
+      }
+
+      return {
+        projectId: row.projectId,
+        zoneName: row.zoneName,
+        positions,
+        viewportX: row.viewportX,
+        viewportY: row.viewportY,
+        zoom: row.zoom,
+        updatedAt: row.updatedAt,
+        updatedBy: row.updatedBy,
+      }
+    },
+
+    putDiagramLayout(input: PutDiagramLayoutInput): DiagramLayoutRecord | null {
+      const now = input.now ?? new Date().toISOString()
+      const zoneName = input.zoneName ?? DEFAULT_DIAGRAM_ZONE
+      const actorUserId = input.actorUserId ?? input.audit?.actorUserId ?? null
+      const positionsJson = JSON.stringify(input.positions)
+
+      return db.transaction((tx) => {
+        const exists = tx.select({ id: projects.id }).from(projects).where(eq(projects.id, input.projectId)).get()
+        if (!exists) return null
+
+        tx.insert(diagramLayoutsTable)
+          .values({
+            projectId: input.projectId,
+            zoneName,
+            positionsJson,
+            viewportX: input.viewportX,
+            viewportY: input.viewportY,
+            zoom: input.zoom,
+            updatedAt: now,
+            updatedBy: actorUserId,
+          })
+          .onConflictDoUpdate({
+            target: [diagramLayoutsTable.projectId, diagramLayoutsTable.zoneName],
+            set: {
+              positionsJson,
+              viewportX: input.viewportX,
+              viewportY: input.viewportY,
+              zoom: input.zoom,
+              updatedAt: now,
+              updatedBy: actorUserId,
+            },
+          })
+          .run()
+
+        if (input.audit) {
+          insertEventRow(
+            tx,
+            {
+              ...input.audit,
+              projectId: input.projectId,
+              subjectId: input.audit.subjectId || input.projectId,
+              actorUserId: input.audit.actorUserId ?? actorUserId,
+              createdAt: now,
+            },
+            now,
+          )
+        }
+
+        return {
+          projectId: input.projectId,
+          zoneName,
+          positions: input.positions,
+          viewportX: input.viewportX,
+          viewportY: input.viewportY,
+          zoom: input.zoom,
+          updatedAt: now,
+          updatedBy: actorUserId,
         }
       })
     },

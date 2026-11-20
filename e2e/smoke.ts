@@ -169,6 +169,77 @@ try {
   }
   await tableScopePanel.getByRole('button', { name: 'Fechar' }).click()
 
+  await page.getByTestId('database-row').click()
+  await page.getByTestId('view-diagram').click()
+  const usersCard = page.getByTestId('diagram-node-users')
+  await usersCard.waitFor()
+  await page.waitForTimeout(800)
+
+  const dragHandle = usersCard.locator('.diagram-drag-handle')
+  const handleBox = await dragHandle.boundingBox()
+  if (!handleBox) throw new Error('A alça de arraste do diagrama não está visível.')
+
+  const layoutSaved = page.waitForResponse(
+    (response) => response.request().method() === 'PUT' && response.url().includes('/diagram'),
+    { timeout: 15000 },
+  )
+  const startX = handleBox.x + handleBox.width / 2
+  const startY = handleBox.y + handleBox.height / 2
+  await page.mouse.move(startX, startY)
+  await page.mouse.down()
+  await page.mouse.move(startX + 160, startY + 100, { steps: 12 })
+  await page.mouse.up()
+  await layoutSaved
+
+  await page.getByRole('button', { name: 'Zoom In' }).click()
+  await page.waitForTimeout(1200)
+
+  const projectId = new URL(page.url()).pathname.split('/').pop()
+  if (!projectId) throw new Error('Não foi possível identificar o projeto no diagrama.')
+
+  const savedLayout = await page.evaluate(async (id) => {
+    const response = await fetch(`/api/projects/${id}/diagram`)
+    return (await response.json()) as {
+      positions: Record<string, { x: number; y: number }>
+      zoom: number
+      viewport: { x: number; y: number }
+    }
+  }, projectId)
+
+  const savedUsers = savedLayout.positions.users
+  if (!savedUsers) throw new Error('O layout salvo não contém a posição do card users.')
+  if (Math.abs(savedUsers.x - 80) < 40 && Math.abs(savedUsers.y - 80) < 40) {
+    throw new Error('O arraste do card users não foi persistido no layout.')
+  }
+  if (Math.abs(savedLayout.zoom - 1) < 0.01) throw new Error('O zoom do diagrama não foi persistido no layout.')
+
+  await page.reload()
+  await page.getByTestId('table-row-users').waitFor()
+  await page.getByTestId('view-diagram').click()
+  await page.getByTestId('diagram-node-users').waitFor()
+  await page.waitForTimeout(1000)
+
+  const restored = await page.evaluate(() => {
+    const node = document.querySelector('[data-testid="rf__node-users"]')
+    const viewport = document.querySelector('.react-flow__viewport')
+    const translate = node instanceof HTMLElement ? node.style.transform.match(/-?[\d.]+/g) : null
+    const scale = viewport instanceof HTMLElement ? viewport.style.transform.match(/scale\(([\d.]+)\)/) : null
+    return {
+      x: translate ? Number(translate[0]) : Number.NaN,
+      y: translate ? Number(translate[1]) : Number.NaN,
+      zoom: scale ? Number(scale[1]) : Number.NaN,
+    }
+  })
+
+  if (Math.abs(restored.x - savedUsers.x) > 3 || Math.abs(restored.y - savedUsers.y) > 3) {
+    throw new Error(
+      `A posição do card users não foi preservada após recarregar (${savedUsers.x},${savedUsers.y} -> ${restored.x},${restored.y}).`,
+    )
+  }
+  if (Math.abs(restored.zoom - savedLayout.zoom) > 0.02) {
+    throw new Error(`O zoom do diagrama não foi preservado após recarregar (${savedLayout.zoom} -> ${restored.zoom}).`)
+  }
+
   const downloadPromise = page.waitForEvent('download')
   await page.getByRole('button', { name: 'Exportar JSON' }).click()
   const download = await downloadPromise
@@ -221,7 +292,7 @@ try {
   }
 
   console.log(
-    'E2E smoke ok: login, projeto via SQL, descrição, aprovação, agente (fake, projeto e tabela), export JSON e viewer read-only (somente GET).',
+    'E2E smoke ok: login, projeto via SQL, descrição, aprovação, agente (fake, projeto e tabela), diagrama (arraste, zoom e layout persistidos), export JSON e viewer read-only (somente GET).',
   )
 } finally {
   await browser?.close()

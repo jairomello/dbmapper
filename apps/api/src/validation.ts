@@ -72,6 +72,27 @@ export const createProjectSchema = z
   })
   .strict()
 
+const diagramPositionSchema = z
+  .object({
+    x: z.number().finite(),
+    y: z.number().finite(),
+  })
+  .strict()
+
+export const diagramLayoutSchema = z
+  .object({
+    positions: z.record(z.string().trim().min(1).max(200), diagramPositionSchema).default({}),
+    viewport: z
+      .object({
+        x: z.number().finite(),
+        y: z.number().finite(),
+      })
+      .strict()
+      .default({ x: 0, y: 0 }),
+    zoom: z.number().finite().positive().max(10).default(1),
+  })
+  .strict()
+
 export const tableRenameSchema = z
   .object({
     from: z.string().trim().min(1),

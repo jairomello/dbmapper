@@ -1,10 +1,22 @@
 import type { Hono } from 'hono'
 import { ApiError } from '../errors'
 import { requireRole } from '../middleware/session'
-import type { Persistence } from '../persistence/ports'
+import { DEFAULT_DIAGRAM_ZONE, type DiagramLayoutRecord, type Persistence } from '../persistence/ports'
 import { normalizeDatabaseModel, projectExport, projectView } from '../services/model-mapper'
 import type { AppEnv } from '../types'
-import { createProjectSchema, parseJsonBody, projectDocumentSchema } from '../validation'
+import { createProjectSchema, diagramLayoutSchema, parseJsonBody, projectDocumentSchema } from '../validation'
+
+function diagramLayoutView(layout: DiagramLayoutRecord) {
+  return {
+    projectId: layout.projectId,
+    zoneName: layout.zoneName,
+    positions: layout.positions,
+    viewport: { x: layout.viewportX, y: layout.viewportY },
+    zoom: layout.zoom,
+    updatedAt: layout.updatedAt,
+    updatedBy: layout.updatedBy,
+  }
+}
 
 export function registerProjectRoutes(app: Hono<AppEnv>, persistence: Persistence): void {
   const repository = persistence.projects
@@ -77,5 +89,37 @@ export function registerProjectRoutes(app: Hono<AppEnv>, persistence: Persistenc
     const aggregate = repository.get(c.req.param('id'))
     if (!aggregate) throw new ApiError(404, 'NOT_FOUND', 'Projeto não encontrado.')
     return c.json(projectExport(aggregate))
+  })
+
+  app.get('/api/projects/:id/diagram', (c) => {
+    const layout = repository.getDiagramLayout(c.req.param('id'))
+    if (!layout) throw new ApiError(404, 'NOT_FOUND', 'Projeto não encontrado.')
+    return c.json(diagramLayoutView(layout))
+  })
+
+  app.put('/api/projects/:id/diagram', requireMember, async (c) => {
+    const id = c.req.param('id')
+    const payload = await parseJsonBody(c, diagramLayoutSchema)
+    const actorUserId = c.get('user').sub
+    const saved = repository.putDiagramLayout({
+      projectId: id,
+      positions: payload.positions,
+      viewportX: payload.viewport.x,
+      viewportY: payload.viewport.y,
+      zoom: payload.zoom,
+      actorUserId,
+      audit: {
+        actorUserId,
+        action: 'diagram.layout_saved',
+        subjectType: 'project',
+        subjectId: id,
+        payload: {
+          zoneName: DEFAULT_DIAGRAM_ZONE,
+          tables: Object.keys(payload.positions).length,
+        },
+      },
+    })
+    if (!saved) throw new ApiError(404, 'NOT_FOUND', 'Projeto não encontrado.')
+    return c.json(diagramLayoutView(saved))
   })
 }
