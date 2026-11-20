@@ -15,7 +15,7 @@ a próxima** — sem pressa, vamos aos poucos. Design e decisões:
 | 4   | **Agente interno**       | Provider LLM, geração em lote de sugestões, fila de aprovação na UI, auditoria                                                            | `v2-phase4-agent`    | ✅ concluída em 17/11/2026 |
 | 5   | **MCP + opencode**       | Tools MCP, API key, **skill**, documentação; teste ponta-a-ponta com opencode conectado                                                   | `v2-phase5-mcp`     | ✅ concluída em 18/11/2026 |
 | 6   | **Polish**               | DBViewer como rota read-only, auditoria completa, preparação para deploy (notebook → labapps → Vultr `jairo.tools`)                       | `v2-phase6-polish`  | ✅ concluída em 18/11/2026 |
-| 7   | **Canvas ER visual**     | React Flow no workspace (toggle Diagrama), cards/arestas, seleção sincronizada, busca com destaque, layout persistido por nome + evento de auditoria | `v2-phase7-diagram` | 📋 especificada em 18/11/2026 (aguardando liberação) |
+| 7   | **Canvas ER visual**     | React Flow no workspace (toggle Diagrama), cards/arestas, seleção sincronizada, busca com destaque, layout persistido por nome + evento de auditoria | `v2-phase7-diagram` | ✅ concluída em 20/11/2026 |
 | 8   | **Edição no canvas**     | Criar/excluir tabela e coluna, relacionamentos com coluna FK auto-criada no mesmo PUT, popover de coluna, fila de comandos com undo/redo e indicador de save | `v2-phase8-edit` | 📋 especificada em 18/11/2026 (aguardando liberação) |
 | 9   | **Zonas/abas + polish**  | Abas `Principal`/`+`, atribuição e movimentação de tabelas, "Chaves entre modelos" derivada, export PNG/SVG, contagem de tabelas           | `v2-phase9-zones` | 📋 especificada em 18/11/2026 (aguardando liberação) |
 

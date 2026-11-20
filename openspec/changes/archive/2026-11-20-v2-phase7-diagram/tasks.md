@@ -40,4 +40,4 @@
 
 ## 8. Archive
 
-- [ ] 8.1 `openspec archive v2-phase7-diagram --yes` após o ok do Jairo, marcar o checkbox no tasks arquivado e commitar `openspec/changes` + `openspec/specs` promovidos — verificação: `openspec list` não mostra mais o change e `openspec/specs/diagram-*` existem.
+- [x] 8.1 `openspec archive v2-phase7-diagram --yes` após o ok do Jairo, marcar o checkbox no tasks arquivado e commitar `openspec/changes` + `openspec/specs` promovidos — verificação: `openspec list` não mostra mais o change e `openspec/specs/diagram-*` existem.
