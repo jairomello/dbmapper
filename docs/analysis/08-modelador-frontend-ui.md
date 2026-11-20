@@ -328,5 +328,6 @@ código é `apps/web/package.json` + `bun.lock`, via `bun install` — proibido 
   **exigem decisão antes de codar** são: (c) onde o editor fica no modo diagrama,
   (a) o novo endpoint e o evento de auditoria, (b) modelo de seleção/busca e
   (f) comportamento no viewer.
-- **Fase 8/9 tocam contrato v1, spec `semantic-editor` e spec `audit-log`** — não são só
-  "mais um componente".
+- **Fase 8/9 não mudam o contrato v1**: a Fase 8 entregue reusou o
+  `PUT /api/projects/:id` e não alterou as specs `semantic-editor` nem
+  `audit-log`; a Fase 9 trabalha no documento de layout, fora do export v1.

@@ -14,8 +14,13 @@ import { SemanticTree } from '../components/SemanticTree'
 import { StatusBar } from '../components/StatusBar'
 import { SuggestionPanel } from '../components/SuggestionPanel'
 import { UpdateWizard } from '../components/UpdateWizard'
+import { INITIAL_SAVE_STATE, type DiagramSaveState } from '../diagram/useDiagramEditing'
 import type { Selection } from '../lib/selection'
 import { PROJECTS_QUERY_KEY, projectQueryKey, useProject } from '../projects/queries'
+
+function formatSavedAt(date: Date): string {
+  return new Intl.DateTimeFormat('pt-BR', { hour: '2-digit', minute: '2-digit' }).format(date)
+}
 
 export function WorkspacePage() {
   const { id } = useParams<{ id: string }>()
@@ -32,6 +37,7 @@ export function WorkspacePage() {
   const [isWizardOpen, setIsWizardOpen] = useState(false)
   const [isAgentOpen, setIsAgentOpen] = useState(false)
   const [activeJobId, setActiveJobId] = useState<string | null>(null)
+  const [diagramSaveState, setDiagramSaveState] = useState<DiagramSaveState>(INITIAL_SAVE_STATE)
   const pendingSuggestions = usePendingSuggestions(projectId)
   const pendingCount = pendingSuggestions.data?.suggestions.length ?? 0
   const canEditDiagram = session.data?.role === 'MEMBER' || session.data?.role === 'ADMIN'
@@ -197,6 +203,26 @@ export function WorkspacePage() {
                 </button>
               </fieldset>
 
+              {view === 'diagrama' ? (
+                <div className="border-b border-slate-200 bg-white px-4 py-1.5 text-xs">
+                  <span
+                    className={
+                      diagramSaveState.status === 'error' ? 'font-medium text-red-700' : 'font-medium text-slate-600'
+                    }
+                    data-testid="diagram-save-indicator"
+                    role={diagramSaveState.status === 'error' ? 'alert' : 'status'}
+                  >
+                    {diagramSaveState.status === 'saving'
+                      ? 'Salvando...'
+                      : diagramSaveState.status === 'saved' && diagramSaveState.savedAt
+                        ? `Salvo às: ${formatSavedAt(diagramSaveState.savedAt)}`
+                        : diagramSaveState.status === 'error'
+                          ? `Falha ao salvar: ${diagramSaveState.error}`
+                          : 'Pronto'}
+                  </span>
+                </div>
+              ) : null}
+
               {view === 'editor' ? (
                 <div className="min-h-0 flex-1">
                   <MetadataEditor
@@ -215,6 +241,8 @@ export function WorkspacePage() {
                       selection={selection}
                       onSelect={setSelection}
                       canEdit={canEditDiagram}
+                      locked={isWizardOpen}
+                      onSaveStateChange={setDiagramSaveState}
                     />
                   </div>
                   <div className="border-t border-slate-200 bg-white">

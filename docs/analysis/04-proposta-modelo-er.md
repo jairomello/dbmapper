@@ -77,7 +77,7 @@
 | Modelo relacional completo (tabelas, colunas, FKs, relationships) | **Canvas visual ER** (nada gráfico hoje) |
 | Árvore semântica + editor de metadados + wizard de atualização | **Abas/zonas do modelo** |
 | Cobertura, revisão, fonte (humano/IA/MCP), auditoria | **Layout persistido** (posições/zoom) |
-| Import SQL server-side, export v1, galeria, viewer read-only | **Criar/editar relacionamentos pelo canvas** (handles + cardinalidade) |
+| Import SQL server-side, export v1, galeria, viewer read-only | **Criar/excluir relacionamentos pelo canvas** (handles + modo `1:n`) |
 | Agente (sugestões), MCP, chaves, deploy docker | Minimapa/zoom/undo-redo, menu de contexto, contagem |
 
 O backlog §10.1 da proposta v2 já previa isto: *"Desenhador de modelo ER —
@@ -134,14 +134,16 @@ diagram_layouts(id, project_id FK, zone_name, positions_json /* {table: {x,y}} *
 - **Metadados** (descrição, termos, revisão): reaproveita o padrão já pronto
   (`PATCH` de descrição com fonte/auditoria).
 - Popover de coluna do vídeo mapeado para os campos que **o modelo v1 tem**:
-  nome, tipo/tamanho, PK, FK (via relationship), descrição, termos, revisão.
+  nome, tipo/tamanho e PK; FK é derivada das relationships e aparece no card.
+  Descrição, termos e revisão continuam no painel do editor.
   As flags `NN/UQ/AI/UUID/Coluna visualizável` **não existem** no contrato v1 —
   ver perguntas abaixo.
 - **Criar relacionamento auto-cria a coluna FK** (transcrição 2, fala 30:
   *"automaticamente a ferramenta já adiciona aqui estado ID"*): diálogo com
   checkbox pré-marcado **"criar coluna `<tabela_destino>_id`"** (nome
   editável); coluna + relationship no mesmo `PUT`. Criação é **só 1:N**
-  (botão `1:n`); cardinalidade fina vive no popover de propriedades.
+  (botão `1:n`); a edição posterior de cardinalidade/propriedades do
+  relacionamento não entrou na Fase 8 entregue.
 - Undo/redo: fila local no cliente (comandos sobre o modelo em memória).
 
 ### 3.5 Encaixe na UI
@@ -156,7 +158,7 @@ diagram_layouts(id, project_id FK, zone_name, positions_json /* {table: {x,y}} *
 | # | Fase | Entrega verificável |
 |---|---|---|
 | **7** | **Canvas ER visual** | React Flow no workspace; cards com header/colunas/rodapé de chaves; arestas crow's-foot das relationships existentes; zoom/pan/minimapa/grid; busca lateral com highlight; arrasto persiste layout (`diagram_layouts` + evento); sync seleção árvore↔canvas; e2e |
-| **8** | **Edição no canvas** | Popover de coluna (campos v1), criar/excluir tabela e coluna, criar/editar/excluir relacionamento por handle ou modo `1:n` **com auto-criação da coluna FK** (`<tabela>_id`, nome editável, mesmo PUT) + popover de propriedades/cardinalidade, menu de contexto, undo/redo, validações inline |
+| **8** | **Edição no canvas** | Popover de coluna (campos v1), criar/excluir tabela e coluna, criar/excluir relacionamento por handle ou modo `1:n` **com auto-criação da coluna FK** (`<tabela>_id`, nome editável, mesmo PUT), menu de contexto, undo/redo, validações inline |
 | **9** | **Zonas/abas + polish** | Abas `Principal`/`+` com zonas, "Chaves entre modelos", mover tabela entre zonas, export PNG/SVG do diagrama, contagem no breadcrumb |
 
 Estimativa de delegações (opencode, como sempre): Fase 7 ≈ 2 runs

@@ -2,7 +2,7 @@ import { mkdtemp, readFile, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { chromium } from 'playwright'
+import { chromium, type Page } from 'playwright'
 
 const root = fileURLToPath(new URL('..', import.meta.url))
 const apiPort = Number(process.env.E2E_API_PORT ?? 3310)
@@ -65,6 +65,51 @@ async function waitUntil(predicate: () => boolean, label: string, timeoutMs = 10
   }
 
   throw new Error(`Tempo esgotado esperando ${label}.`)
+}
+
+interface PersistedColumn {
+  name: string
+  foreign_key: boolean
+}
+
+interface PersistedRelationship {
+  table: string
+  local_columns: string[]
+}
+
+interface PersistedTable {
+  name: string
+  columns: PersistedColumn[]
+  relationships: { parents: PersistedRelationship[] }
+}
+
+interface PersistedProject {
+  database: { tables: PersistedTable[] }
+}
+
+async function waitForModelSave(page: Page): Promise<void> {
+  const response = await page.waitForResponse(
+    (candidate) => {
+      if (candidate.request().method() !== 'PUT') return false
+      return /^\/api\/projects\/[^/]+$/.test(new URL(candidate.url()).pathname)
+    },
+    { timeout: 15000 },
+  )
+  if (!response.ok()) throw new Error(`PUT do modelo falhou (${response.status()}).`)
+}
+
+async function readPersistedProject(page: Page, projectId: string): Promise<PersistedProject> {
+  return page.evaluate(async (id) => {
+    const response = await fetch(`/api/projects/${id}`)
+    if (!response.ok) throw new Error(`GET /api/projects/${id} falhou (${response.status}).`)
+    return (await response.json()) as PersistedProject
+  }, projectId)
+}
+
+function persistedTable(project: PersistedProject, name: string): PersistedTable {
+  const table = project.database.tables.find((candidate) => candidate.name === name)
+  if (!table) throw new Error(`A tabela ${name} não está no modelo persistido.`)
+  return table
 }
 
 runOnce(['bun', 'run', '--cwd', 'apps/api', 'db:seed'])
@@ -291,8 +336,81 @@ try {
     throw new Error(`O viewer emitiu método(s) não-GET: ${nonGet.join(', ')}.`)
   }
 
+  await page.goto(`http://localhost:${webPort}/project/${projectId}`)
+  await page.getByTestId('table-row-users').waitFor()
+  await page.getByTestId('view-diagram').click()
+  await page.getByTestId('diagram-node-users').waitFor()
+
+  const createTable = waitForModelSave(page)
+  await page.getByTestId('diagram-add-table').click()
+  await createTable
+  await page.getByTestId('diagram-node-nova_tabela').waitFor()
+  await page.getByTestId('diagram-column-nova_tabela-id').waitFor()
+
+  await page.getByTestId('diagram-relationship-mode').click()
+  await page.getByLabel('Escolher tabela nova_tabela para relacionamento').click()
+  await page.getByLabel('Escolher tabela users para relacionamento').click()
+
+  const relationshipDialog = page.getByRole('dialog', { name: 'Novo relacionamento' })
+  await relationshipDialog.waitFor()
+  const fkInput = relationshipDialog.getByLabel('Nome da coluna estrangeira')
+  const suggestedFk = await fkInput.inputValue()
+  if (suggestedFk !== 'users_id') {
+    throw new Error(`Nome padrão da coluna FK inesperado: ${suggestedFk}.`)
+  }
+  if (!(await relationshipDialog.getByLabel('Criar coluna estrangeira').isChecked())) {
+    throw new Error('A criação da coluna estrangeira não veio pré-marcada.')
+  }
+
+  const createRelationship = waitForModelSave(page)
+  await relationshipDialog.getByRole('button', { name: 'Criar relacionamento' }).click()
+  await createRelationship
+  await page.getByTestId('diagram-column-nova_tabela-users_id').waitFor()
+
+  const afterRelationship = persistedTable(await readPersistedProject(page, projectId), 'nova_tabela')
+  const autoColumn = afterRelationship.columns.find((column) => column.name === 'users_id')
+  if (!autoColumn?.foreign_key) {
+    throw new Error('A coluna FK users_id não foi persistida como chave estrangeira.')
+  }
+  if (
+    !afterRelationship.relationships.parents.some(
+      (relationship) => relationship.table === 'users' && relationship.local_columns.includes('users_id'),
+    )
+  ) {
+    throw new Error('O relacionamento nova_tabela → users não foi persistido.')
+  }
+
+  const undoRelationship = waitForModelSave(page)
+  await page.getByTestId('diagram-undo').click()
+  await undoRelationship
+  await page.getByTestId('diagram-column-nova_tabela-users_id').waitFor({ state: 'detached' })
+
+  const afterUndo = persistedTable(await readPersistedProject(page, projectId), 'nova_tabela')
+  if (afterUndo.columns.some((column) => column.name === 'users_id')) {
+    throw new Error('O undo não removeu a coluna FK criada pelo relacionamento.')
+  }
+  if (afterUndo.relationships.parents.length > 0) {
+    throw new Error('O undo não removeu o relacionamento criado no canvas.')
+  }
+
+  await page.reload()
+  await page.getByTestId('table-row-nova_tabela').waitFor()
+  await page.getByTestId('view-diagram').click()
+  await page.getByTestId('diagram-node-nova_tabela').waitFor()
+
+  const persisted = persistedTable(await readPersistedProject(page, projectId), 'nova_tabela')
+  if (!persisted.columns.some((column) => column.name === 'id')) {
+    throw new Error('A tabela criada no canvas perdeu a coluna id após recarregar.')
+  }
+  if (persisted.columns.some((column) => column.name === 'users_id')) {
+    throw new Error('A coluna FK removida pelo undo reapareceu após recarregar.')
+  }
+  if (persisted.relationships.parents.length > 0) {
+    throw new Error('O relacionamento removido pelo undo reapareceu após recarregar.')
+  }
+
   console.log(
-    'E2E smoke ok: login, projeto via SQL, descrição, aprovação, agente (fake, projeto e tabela), diagrama (arraste, zoom e layout persistidos), export JSON e viewer read-only (somente GET).',
+    'E2E smoke ok: login, projeto via SQL, descrição, aprovação, agente (fake, projeto e tabela), diagrama (arraste, zoom e layout persistidos), export JSON, viewer read-only (somente GET) e edição no canvas (tabela, relacionamento com FK automática, undo e modelo persistido).',
   )
 } finally {
   await browser?.close()

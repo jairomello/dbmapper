@@ -1,4 +1,4 @@
-import type { DatabaseModel, TableModel } from '@dbmapper/domain'
+import type { DatabaseModel, RelationshipModel, TableModel } from '@dbmapper/domain'
 import { type Edge, type Node, type NodeHandle, Position } from '@xyflow/react'
 import type { DiagramPosition } from '../api/types'
 import type { Selection } from '../lib/selection'
@@ -21,7 +21,15 @@ export interface DiagramNodeData extends Record<string, unknown> {
   columnMatches: string[]
   searchActive: boolean
   draggable: boolean
+  canEdit?: boolean
+  relationshipMode?: boolean
   onSelect: (selection: Selection) => void
+  onPickTable?: (table: string) => void
+  onAddColumn?: (table: string) => void
+  onEditTable?: (table: string) => void
+  onEditColumn?: (table: string, column: string) => void
+  onDeleteColumn?: (table: string, column: string) => void
+  onDeleteRelationship?: (table: string, relationship: RelationshipModel) => void
 }
 
 export type DiagramNode = Node<DiagramNodeData, 'table'>
@@ -32,6 +40,10 @@ export interface DiagramEdgeData extends Record<string, unknown> {
   referencedColumns: string[]
   sourceHandleId?: string
   targetHandleId?: string
+  table?: string
+  relationship?: RelationshipModel
+  canEdit?: boolean
+  onDelete?: (table: string, relationship: RelationshipModel) => void
 }
 
 export type DiagramEdge = Edge<DiagramEdgeData, 'crowsfoot'>
@@ -139,8 +151,32 @@ export function createDiagramNodes(options: {
   query: string
   draggable: boolean
   onSelect: (selection: Selection) => void
+  canEdit?: boolean
+  relationshipMode?: boolean
+  onPickTable?: (table: string) => void
+  onAddColumn?: (table: string) => void
+  onEditTable?: (table: string) => void
+  onEditColumn?: (table: string, column: string) => void
+  onDeleteColumn?: (table: string, column: string) => void
+  onDeleteRelationship?: (table: string, relationship: RelationshipModel) => void
 }): DiagramNode[] {
-  const { database, positions, selection, matches, query, draggable, onSelect } = options
+  const {
+    database,
+    positions,
+    selection,
+    matches,
+    query,
+    draggable,
+    onSelect,
+    canEdit,
+    relationshipMode,
+    onPickTable,
+    onAddColumn,
+    onEditTable,
+    onEditColumn,
+    onDeleteColumn,
+    onDeleteRelationship,
+  } = options
   const searchActive = query.trim().length > 0
 
   return visibleTables(database).map((table, index) => {
@@ -170,7 +206,15 @@ export function createDiagramNodes(options: {
         columnMatches,
         searchActive,
         draggable,
+        canEdit,
+        relationshipMode,
         onSelect,
+        onPickTable,
+        onAddColumn,
+        onEditTable,
+        onEditColumn,
+        onDeleteColumn,
+        onDeleteRelationship,
       },
       draggable,
       dragHandle: '.diagram-drag-handle',
@@ -179,7 +223,11 @@ export function createDiagramNodes(options: {
   })
 }
 
-export function createDiagramEdges(database: DatabaseModel): DiagramEdge[] {
+export function createDiagramEdges(
+  database: DatabaseModel,
+  options: { canEdit?: boolean; onDelete?: (table: string, relationship: RelationshipModel) => void } = {},
+): DiagramEdge[] {
+  const { canEdit, onDelete } = options
   const tables = visibleTables(database)
   const byName = new Map(tables.map((table) => [table.name, table]))
   const edges: DiagramEdge[] = []
@@ -221,6 +269,10 @@ export function createDiagramEdges(database: DatabaseModel): DiagramEdge[] {
           referencedColumns: relationship.referenced_columns,
           sourceHandleId,
           targetHandleId,
+          table: table.name,
+          relationship,
+          canEdit,
+          onDelete,
         },
       })
     }

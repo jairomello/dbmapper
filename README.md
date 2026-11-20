@@ -259,6 +259,42 @@ qualquer sessão; `PUT` exige `MEMBER`/`ADMIN`. `VIEWER` vê o diagrama em modo
 somente leitura — sem arraste e sem requisições de escrita do layout. O save é
 auditado como `diagram.layout_saved` (família `diagram.` na tela de auditoria).
 
+## Edição pelo canvas (Fase 8)
+
+A view **Diagrama** também é a superfície de edição estrutural do modelo. Toda
+mutação do canvas é aplicada no cliente e persistida pelo mesmo
+`PUT /api/projects/{id}` do editor (`{ "database": {...} }`); o layout continua no
+endpoint separado `/diagram`. O backend e o contrato v1 não mudam.
+
+- **Tabelas**: **Adicionar tabela** na toolbar cria no centro da viewport; o menu
+  de contexto (botão direito no canvas) cria nas coordenadas do cursor. O mesmo
+  menu oferece **Propriedades** (renomear) e **Excluir tabela**, sempre com
+  confirmação. Uma tabela nova nasce com a coluna `id` (`serial`, PK).
+- **Colunas**: o card tem ações de adicionar, editar e excluir. O popover expõe
+  apenas os campos estruturais do contrato v1 — nome, tipo/tamanho e PK; FK é
+  derivada das relationships e marcada no card. Descrição, termos de negócio e
+  revisão continuam exclusivamente no painel **Editor de metadados**.
+- **Validações inline**: nome obrigatório e duplicado (tabela ou coluna) são
+  bloqueados antes do `PUT`; conflitos do relacionamento também aparecem no
+  diálogo.
+- **Relacionamentos**: crie arrastando de um handle até o outro ou pelo botão
+  **Relacionamento 1:n** (origem → destino). O diálogo sugere a coluna FK
+  `<tabela_destino>_id` (nome editável, tipo alinhado ao PK destino) e permite
+  reutilizar uma coluna existente. Coluna e relationship vão no **mesmo** `PUT`.
+  Para excluir, use o botão da aresta ou o rodapé de relacionamentos do card.
+- **Undo/redo e save**: cada mutação carrega seu inverso, então **Desfazer** e
+  **Refazer** reaplicam o comando pela mesma fila serializada (um `PUT` em voo
+  por vez). O indicador mostra `Salvando...` / `Salvo às: HH:MM`; em erro, o
+  envelope padrão é exibido e o modelo é ressincronizado pelo servidor.
+- **VIEWER**: nenhum controle de edição, menu de contexto de mutação ou modo
+  `1:n` é renderizado; arraste, popovers e undo/redo ficam ocultos. O servidor
+  mantém o `403` como guarda final.
+
+Os testes de componente de `apps/web` cobrem criação/exclusão, validações,
+payload único, undo/redo e o modo somente leitura; o smoke e2e exercita criar
+tabela, criar relacionamento com FK automática, desfazer e recarregar o modelo
+persistido. `bun run test:e2e` continua fora do `bun run check`.
+
 ## Agente de sugestões (Fase 4)
 
 A Fase 4 adiciona o agente embutido: geração em lote de sugestões de descrição

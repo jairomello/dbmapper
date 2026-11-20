@@ -50,9 +50,9 @@ aqui estado ID** para a gente"*.
 - **Fluxo de criação é só 1:N:** o botão deles é literalmente `1:n`
   (`newConnection('one-to-many')` no HTML); 1:1/N:M/várias cardinalidades
   vivem nas propriedades do relacionamento, não na criação. Para nós:
-  criação = 1:N com coluna auto-criada; popover de propriedades ajusta
-  cardinalidade depois. (N:M com geração de tabela de junção é ideia futura,
-  não entra.)
+  criação = 1:N com coluna auto-criada; a edição posterior de
+  cardinalidade/propriedades não entrou na Fase 8 entregue. (N:M com geração de
+  tabela de junção é ideia futura, não entra.)
 
 ## 3. Confirmações fortes (com evidência de áudio agora)
 

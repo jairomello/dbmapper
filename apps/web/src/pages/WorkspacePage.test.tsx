@@ -60,6 +60,7 @@ const emptyDiagramLayout: DiagramLayout = {
 function stubProjectWithDiagram(role: UserRole = 'MEMBER', layout: DiagramLayout = emptyDiagramLayout) {
   const project = sampleProject()
   const puts: DiagramLayout[] = []
+  const modelPuts: DatabaseModel[] = []
 
   restoreCallbacks.push(
     installFetch((url, init) => {
@@ -72,12 +73,17 @@ function stubProjectWithDiagram(role: UserRole = 'MEMBER', layout: DiagramLayout
         }
         return jsonResponse(layout)
       }
+      if (url === `/api/projects/${project.id}` && init?.method === 'PUT') {
+        const body = JSON.parse(String(init.body)) as { database: DatabaseModel }
+        modelPuts.push(body.database)
+        return jsonResponse({ ...project, database: body.database })
+      }
       if (url === `/api/projects/${project.id}`) return jsonResponse(project)
       return errorResponse('NOT_FOUND', 'Recurso não encontrado.', 404)
     }),
   )
 
-  return { project, puts }
+  return { project, puts, modelPuts }
 }
 
 describe('WorkspacePage', () => {
@@ -238,9 +244,9 @@ describe('WorkspacePage', () => {
     expect(screen.getByTestId('column-row-pedido-cliente_id').getAttribute('data-active')).toBe('true')
   })
 
-  test('VIEWER vê o diagrama somente leitura e não grava layout', async () => {
+  test('VIEWER vê o diagrama somente leitura, sem controles e sem gravar layout ou modelo', async () => {
     stubDiagramRect()
-    const { puts } = stubProjectWithDiagram('VIEWER')
+    const stub = stubProjectWithDiagram('VIEWER')
     renderApp(['/project/projeto-1'])
 
     await screen.findByTestId('table-row-cliente')
@@ -250,12 +256,19 @@ describe('WorkspacePage', () => {
     const wrapper = screen.getByTestId('diagram-node-cliente').closest('.react-flow__node')
     expect(wrapper?.className).not.toContain('draggable')
     expect(screen.getByTestId('diagram-save-status').textContent).toBe('Somente leitura')
+    expect(screen.queryByTestId('diagram-add-table')).toBeNull()
+    expect(screen.queryByTestId('diagram-relationship-mode')).toBeNull()
+    expect(screen.queryByLabelText('Adicionar coluna em cliente')).toBeNull()
+    expect(screen.queryByLabelText('Editar tabela cliente')).toBeNull()
+    expect(screen.queryByLabelText('Editar coluna cliente.id')).toBeNull()
+    expect(screen.queryByLabelText('Excluir coluna cliente.id')).toBeNull()
 
     fireEvent.click(screen.getByLabelText('Selecionar coluna cliente.id'))
     await waitFor(() => expect(screen.getByTestId('diagram-editor-panel')).toBeTruthy())
     await new Promise((resolve) => setTimeout(resolve, 700))
 
-    expect(puts).toHaveLength(0)
+    expect(stub.puts).toHaveLength(0)
+    expect(stub.modelPuts).toHaveLength(0)
   })
 
   test('rota de projeto inexistente volta para a galeria', async () => {
@@ -271,5 +284,107 @@ describe('WorkspacePage', () => {
     renderApp(['/project/missing'])
 
     expect(await screen.findByRole('heading', { name: 'Seus projetos' })).toBeTruthy()
+  })
+})
+
+function stubWorkspaceEditing(options: { holdPut?: boolean; failPut?: boolean } = {}) {
+  const project = sampleProject()
+  const modelPuts: DatabaseModel[] = []
+  let projectGets = 0
+  let releasePut: (() => void) | null = null
+  const gate = new Promise<void>((resolve) => {
+    releasePut = resolve
+  })
+
+  restoreCallbacks.push(
+    installFetch(async (url, init) => {
+      if (url === '/api/auth/me') return jsonResponse(sampleUser)
+      if (url === `/api/projects/${project.id}/diagram`) {
+        if (init?.method === 'PUT') {
+          const body = JSON.parse(String(init.body)) as DiagramLayout
+          return jsonResponse({ ...emptyDiagramLayout, ...body })
+        }
+        return jsonResponse(emptyDiagramLayout)
+      }
+      if (url === `/api/projects/${project.id}` && init?.method === 'PUT') {
+        const body = JSON.parse(String(init.body)) as { database: DatabaseModel }
+        modelPuts.push(body.database)
+        if (options.holdPut) await gate
+        if (options.failPut) return errorResponse('VALIDATION_ERROR', 'Modelo inválido.', 400)
+        return jsonResponse({ ...project, database: body.database })
+      }
+      if (url === `/api/projects/${project.id}`) {
+        projectGets += 1
+        return jsonResponse(project)
+      }
+      if (url === `/api/projects/${project.id}/agent/suggestions?status=pending`) {
+        return jsonResponse({ suggestions: [] })
+      }
+      return errorResponse('NOT_FOUND', 'Recurso não encontrado.', 404)
+    }),
+  )
+
+  return {
+    modelPuts,
+    projectGets: () => projectGets,
+    releasePut: () => releasePut?.(),
+  }
+}
+
+describe('WorkspacePage diagram editing status', () => {
+  test('mostra Salvando... durante o PUT e Salvo às: HH:MM no sucesso', async () => {
+    stubDiagramRect()
+    const stub = stubWorkspaceEditing({ holdPut: true })
+    renderApp(['/project/projeto-1'])
+
+    await screen.findByTestId('table-row-cliente')
+    fireEvent.click(screen.getByTestId('view-diagram'))
+    await screen.findByTestId('diagram-node-cliente')
+
+    fireEvent.click(screen.getByTestId('diagram-add-table'))
+    await waitFor(() => expect(screen.getByTestId('diagram-save-indicator').textContent).toBe('Salvando...'))
+    expect(stub.modelPuts).toHaveLength(1)
+
+    stub.releasePut()
+    await waitFor(() =>
+      expect(screen.getByTestId('diagram-save-indicator').textContent).toMatch(/^Salvo às: \d{2}:\d{2}$/),
+    )
+    expect(await screen.findByTestId('table-row-nova_tabela')).toBeTruthy()
+  })
+
+  test('mostra o erro do envelope e re-sincroniza o modelo após PUT rejeitado', async () => {
+    stubDiagramRect()
+    const stub = stubWorkspaceEditing({ failPut: true })
+    renderApp(['/project/projeto-1'])
+
+    await screen.findByTestId('table-row-cliente')
+    const initialGets = stub.projectGets()
+    fireEvent.click(screen.getByTestId('view-diagram'))
+    await screen.findByTestId('diagram-node-cliente')
+
+    fireEvent.click(screen.getByTestId('diagram-add-table'))
+    await waitFor(() =>
+      expect(screen.getByTestId('diagram-save-indicator').textContent).toBe('Falha ao salvar: Modelo inválido.'),
+    )
+    expect(stub.modelPuts).toHaveLength(1)
+    await waitFor(() => expect(stub.projectGets()).toBeGreaterThan(initialGets))
+    await waitFor(() => expect(screen.queryByTestId('diagram-node-nova_tabela')).toBeNull())
+  })
+
+  test('bloqueia a edição do canvas enquanto o UpdateWizard está aberto', async () => {
+    stubDiagramRect()
+    stubWorkspaceEditing()
+    renderApp(['/project/projeto-1'])
+
+    await screen.findByTestId('table-row-cliente')
+    fireEvent.click(screen.getByRole('button', { name: 'Atualizar modelo' }))
+    expect(await screen.findByRole('dialog', { name: 'Wizard de atualização' })).toBeTruthy()
+
+    fireEvent.click(screen.getByTestId('view-diagram'))
+    await screen.findByTestId('diagram-node-cliente')
+
+    expect(screen.queryByTestId('diagram-add-table')).toBeNull()
+    expect(screen.queryByTestId('diagram-relationship-mode')).toBeNull()
+    expect(screen.queryByTestId('diagram-undo')).toBeNull()
   })
 })
