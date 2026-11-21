@@ -161,6 +161,27 @@ describe('WorkspacePage', () => {
     expect(screen.queryByRole('button', { name: 'Salvar' })).toBeNull()
   })
 
+  test('o header abre o diálogo Gerar SQL', async () => {
+    const project = sampleProject()
+
+    restoreCallbacks.push(
+      installFetch((url) => {
+        if (url === '/api/auth/me') return jsonResponse(sampleUser)
+        if (url === `/api/projects/${project.id}`) return jsonResponse(project)
+        return errorResponse('NOT_FOUND', 'Recurso não encontrado.', 404)
+      }),
+    )
+
+    renderApp(['/project/projeto-1'])
+    await screen.findByTestId('table-row-cliente')
+
+    fireEvent.click(screen.getByTestId('workspace-ddl-button'))
+
+    expect(await screen.findByRole('dialog', { name: 'Gerar SQL' })).toBeTruthy()
+    expect(screen.getByLabelText('Dialeto')).toBeTruthy()
+    expect(screen.getByLabelText('Modo')).toBeTruthy()
+  })
+
   test('exibe o badge de sugestões pendentes e abre o painel do agente', async () => {
     const project = sampleProject()
 

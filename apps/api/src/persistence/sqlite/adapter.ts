@@ -16,6 +16,7 @@ import {
   loginAttempts as loginAttemptsTable,
   projects,
   relationships as relationshipsTable,
+  schemaBaselines as schemaBaselinesTable,
   tables as tablesTable,
   users as usersTable,
 } from '../../db/schema'
@@ -40,6 +41,7 @@ import type {
   CreateProjectInput,
   CreateProjectOptions,
   CreateUserInput,
+  DdlBaselineRecord,
   DecisionAudit,
   DescriptionItemType,
   DiagramDocumentIssue,
@@ -64,6 +66,7 @@ import type {
   PutDiagramDocumentInput,
   PutDiagramLayoutInput,
   RelationshipRecord,
+  SaveDdlBaselineInput,
   SetItemDescriptionInput,
   SetItemDescriptionResult,
   SuggestionDecisionResult,
@@ -114,6 +117,55 @@ function parseDiagramPositions(value: string): Record<string, DiagramPosition> {
   }
 
   return positions
+}
+
+function toDdlBaselineDocument(database: DatabaseModel): DatabaseModel {
+  return {
+    name: database.name,
+    description: '',
+    business_terms: [],
+    reviewed: false,
+    tables: (database.tables ?? []).map((table) => ({
+      name: table.name,
+      description: '',
+      business_terms: [],
+      reviewed: false,
+      status: table.status,
+      columns: (table.columns ?? []).map((column) => ({
+        name: column.name,
+        type: column.type,
+        primary_key: column.primary_key,
+        foreign_key: column.foreign_key,
+        description: '',
+        business_terms: [],
+        reviewed: false,
+        status: column.status,
+      })),
+      relationships: {
+        parents: (table.relationships?.parents ?? []).map((relationship) => ({
+          table: relationship.table,
+          local_columns: [...relationship.local_columns],
+          referenced_columns: [...relationship.referenced_columns],
+          constraint_name: relationship.constraint_name,
+          description: '',
+          reviewed: false,
+        })),
+        children: [],
+      },
+    })),
+  }
+}
+
+function parseDdlBaselineDocument(value: string): DatabaseModel | null {
+  try {
+    const parsed: unknown = JSON.parse(value)
+    if (parsed === null || typeof parsed !== 'object' || Array.isArray(parsed)) return null
+    const database = parsed as DatabaseModel
+    if (!Array.isArray(database.tables)) return null
+    return database
+  } catch {
+    return null
+  }
 }
 
 function toUserRecord(row: typeof usersTable.$inferSelect): UserRecord {
@@ -228,6 +280,31 @@ export function createSqlitePersistence(
       subjectId: row.subjectId,
       payload: input.payload ?? {},
       createdAt,
+    }
+  }
+
+  const writeDdlBaseline = (
+    tx: Tx,
+    projectId: string,
+    database: DatabaseModel,
+    capturedBy: string | null,
+    now: string,
+  ): DdlBaselineRecord => {
+    const documentJson = JSON.stringify(toDdlBaselineDocument(database))
+
+    tx.insert(schemaBaselinesTable)
+      .values({ projectId, documentJson, capturedAt: now, capturedBy })
+      .onConflictDoUpdate({
+        target: schemaBaselinesTable.projectId,
+        set: { documentJson, capturedAt: now, capturedBy },
+      })
+      .run()
+
+    return {
+      projectId,
+      database: parseDdlBaselineDocument(documentJson) ?? toDdlBaselineDocument(database),
+      capturedAt: now,
+      capturedBy,
     }
   }
 
@@ -629,6 +706,26 @@ export function createSqlitePersistence(
             createdAt: now,
           })
           .run()
+
+        writeDdlBaseline(tx, id, database, context.actorUserId ?? null, now)
+        insertEventRow(
+          tx,
+          {
+            projectId: id,
+            actorUserId: context.actorUserId ?? null,
+            action: 'ddl.baseline_captured',
+            subjectType: 'project',
+            subjectId: id,
+            payload: {
+              tables: database.tables.length,
+              columns: database.tables.reduce((total, table) => total + table.columns.length, 0),
+              source: 'import',
+            },
+            createdAt: now,
+          },
+          now,
+        )
+
         if (context.audit) {
           insertEventRow(
             tx,
@@ -1113,6 +1210,53 @@ export function createSqlitePersistence(
       })
 
       return committed ? projectRepository.getDiagramDocument(input.projectId) : null
+    },
+
+    saveDdlBaseline(input: SaveDdlBaselineInput): DdlBaselineRecord | null {
+      const now = input.now ?? new Date().toISOString()
+      const capturedBy = input.actorUserId ?? input.audit?.actorUserId ?? null
+
+      return db.transaction((tx) => {
+        const exists = tx.select({ id: projects.id }).from(projects).where(eq(projects.id, input.projectId)).get()
+        if (!exists) return null
+
+        const record = writeDdlBaseline(tx, input.projectId, input.database, capturedBy, now)
+
+        if (input.audit) {
+          insertEventRow(
+            tx,
+            {
+              ...input.audit,
+              projectId: input.projectId,
+              subjectId: input.audit.subjectId || input.projectId,
+              actorUserId: input.audit.actorUserId ?? capturedBy,
+              createdAt: now,
+            },
+            now,
+          )
+        }
+
+        return record
+      })
+    },
+
+    readDdlBaseline(projectId: string): DdlBaselineRecord | null {
+      const row = db
+        .select()
+        .from(schemaBaselinesTable)
+        .where(eq(schemaBaselinesTable.projectId, projectId))
+        .get()
+      if (!row) return null
+
+      const database = parseDdlBaselineDocument(row.documentJson)
+      if (!database) return null
+
+      return {
+        projectId: row.projectId,
+        database,
+        capturedAt: row.capturedAt,
+        capturedBy: row.capturedBy,
+      }
     },
   }
 

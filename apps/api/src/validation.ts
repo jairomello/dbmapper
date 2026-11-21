@@ -251,6 +251,35 @@ export const applyImportSchema = z
   })
   .strict()
 
+export const ddlDialectSchema = z.enum(['postgres', 'mysql'])
+export const ddlModeSchema = z.enum(['create', 'migration'])
+
+export const ddlQuerySchema = z.object({
+  dialect: ddlDialectSchema.default('postgres'),
+  mode: ddlModeSchema.default('create'),
+  renames: z.string().optional(),
+})
+
+const ddlRenameNameSchema = z.string().trim().min(1).max(200)
+
+export const ddlRenamesSchema = z
+  .object({
+    tables: z.record(z.string().trim().min(1).max(200), ddlRenameNameSchema).optional(),
+    columns: z.record(z.string().trim().min(1).max(500), ddlRenameNameSchema).optional(),
+  })
+  .strict()
+  .superRefine((value, ctx) => {
+    for (const key of Object.keys(value.columns ?? {})) {
+      if (!key.includes('.')) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['columns', key],
+          message: 'A chave de renomeação de coluna deve ser "tabela.coluna".',
+        })
+      }
+    }
+  })
+
 export const agentGenerateSchema = z.discriminatedUnion('scope', [
   z.object({ scope: z.literal('project') }).strict(),
   z

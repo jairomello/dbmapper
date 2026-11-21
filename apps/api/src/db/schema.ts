@@ -184,6 +184,15 @@ export const diagramZones = sqliteTable(
   }),
 )
 
+export const schemaBaselines = sqliteTable('schema_baselines', {
+  projectId: text('project_id')
+    .primaryKey()
+    .references(() => projects.id, { onDelete: 'cascade' }),
+  documentJson: text('document_json').notNull(),
+  capturedAt: text('captured_at').notNull().default(isoNow),
+  capturedBy: text('captured_by').references(() => users.id),
+})
+
 export const importRuns = sqliteTable(
   'import_runs',
   {

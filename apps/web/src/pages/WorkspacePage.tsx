@@ -6,6 +6,7 @@ import { authApi } from '../api/auth'
 import { projectsApi } from '../api/projects'
 import type { DatabaseModel } from '@dbmapper/domain'
 import { SESSION_QUERY_KEY, useSession } from '../auth/session'
+import { DdlDialog } from '../components/DdlDialog'
 import { DiagramCanvas } from '../components/DiagramCanvas'
 import { JsonTransfer } from '../components/JsonTransfer'
 import { MetadataEditor } from '../components/MetadataEditor'
@@ -36,6 +37,7 @@ export function WorkspacePage() {
   const [isEditorPanelOpen, setIsEditorPanelOpen] = useState(false)
   const [isCreating, setIsCreating] = useState(false)
   const [isWizardOpen, setIsWizardOpen] = useState(false)
+  const [isDdlOpen, setIsDdlOpen] = useState(false)
   const [isAgentOpen, setIsAgentOpen] = useState(false)
   const [activeJobId, setActiveJobId] = useState<string | null>(null)
   const [diagramSaveState, setDiagramSaveState] = useState<DiagramSaveState>(INITIAL_SAVE_STATE)
@@ -116,6 +118,16 @@ export function WorkspacePage() {
             disabled={!project.data}
           >
             Atualizar modelo
+          </button>
+
+          <button
+            type="button"
+            className="rounded-sm border border-slate-600 px-3 py-1.5 text-xs font-medium text-slate-200 hover:bg-slate-800 disabled:opacity-50"
+            onClick={() => setIsDdlOpen(true)}
+            disabled={!projectId || !project.data}
+            data-testid="workspace-ddl-button"
+          >
+            Gerar SQL
           </button>
 
           <button
@@ -328,6 +340,10 @@ export function WorkspacePage() {
             queryClient.invalidateQueries({ queryKey: PROJECTS_QUERY_KEY })
           }}
         />
+      ) : null}
+
+      {isDdlOpen && projectId ? (
+        <DdlDialog projectId={projectId} role={session.data?.role} onClose={() => setIsDdlOpen(false)} />
       ) : null}
 
       {isAgentOpen && projectId ? (

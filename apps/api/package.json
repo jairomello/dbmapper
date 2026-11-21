@@ -13,6 +13,7 @@
   },
   "dependencies": {
     "@dbmapper/contracts": "workspace:*",
+    "@dbmapper/ddl": "workspace:*",
     "@dbmapper/domain": "workspace:*",
     "@dbmapper/model-diff": "workspace:*",
     "@dbmapper/sql-parser": "workspace:*",

@@ -6,6 +6,7 @@ import { requireCredential } from './middleware/credential'
 import type { Persistence } from './persistence/ports'
 import { registerAgentRoutes } from './routes/agent'
 import { registerAuthRoutes } from './routes/auth'
+import { registerDdlRoutes } from './routes/ddl'
 import { registerEventRoutes } from './routes/events'
 import { registerImportRoutes } from './routes/imports'
 import { registerItemRoutes } from './routes/items'
@@ -43,6 +44,7 @@ export function createApp(persistence: Persistence, options: CreateAppOptions = 
   registerProjectRoutes(app, persistence)
   registerItemRoutes(app, persistence)
   registerImportRoutes(app, persistence)
+  registerDdlRoutes(app, persistence)
   registerUserRoutes(app, persistence)
   registerEventRoutes(app, persistence)
   registerAgentRoutes(app, persistence, { provider: agent.provider })

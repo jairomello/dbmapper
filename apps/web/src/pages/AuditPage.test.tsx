@@ -116,6 +116,49 @@ describe('AuditPage', () => {
     expect(screen.queryByTestId('audit-row-event-project')).toBeNull()
   })
 
+  test('família ddl. aparece no filtro e lista o baseline capturado com rótulo', async () => {
+    const requested: string[] = []
+
+    restoreCallbacks.push(
+      installFetch((url) => {
+        if (url === '/api/auth/me') return jsonResponse(admin)
+        if (url.startsWith('/api/events')) {
+          requested.push(url)
+          if (url.includes('action=ddl.')) {
+            return jsonResponse({
+              events: [
+                event({
+                  id: 'event-ddl',
+                  action: 'ddl.baseline_captured',
+                  subjectType: 'project',
+                  subjectId: 'projeto-1',
+                }),
+              ],
+            })
+          }
+          return jsonResponse({ events: [event({ id: 'event-project', action: 'project.saved' })] })
+        }
+        return errorResponse('NOT_FOUND', 'Recurso não encontrado.', 404)
+      }),
+    )
+
+    renderApp(['/audit'])
+
+    await screen.findByTestId('audit-row-event-project')
+    const select = screen.getByLabelText('Família de ação') as HTMLSelectElement
+    const option = Array.from(select.options).find((candidate) => candidate.value === 'ddl.')
+    expect(option).toBeTruthy()
+    expect(option!.textContent).toBe('DDL')
+
+    fireEvent.change(select, { target: { value: 'ddl.' } })
+
+    await waitFor(() => expect(requested).toContain('/api/events?action=ddl.'))
+    const ddlRow = await screen.findByTestId('audit-row-event-ddl')
+    expect(ddlRow.textContent).toContain('ddl.baseline_captured')
+    expect(ddlRow.textContent).toContain('Baseline de DDL capturado')
+    expect(screen.queryByTestId('audit-row-event-project')).toBeNull()
+  })
+
   test('mostra o estado vazio em português', async () => {
     restoreCallbacks.push(
       installFetch((url) => {

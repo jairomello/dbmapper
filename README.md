@@ -331,6 +331,46 @@ com apenas o evento `diagram.layout_saved`. Um documento de layout antigo, sem
 layout espera a fila do modelo (Fase 8) assentar antes de sair, evitando que um
 membro recém-criado chegue ao servidor antes da tabela existir.
 
+## Gerar SQL (Fase 10)
+
+O workspace fecha o ciclo importar → documentar → exportar gerando DDL a partir
+do modelo, sem conectar no banco nem guardar credenciais. O diálogo **Gerar SQL**
+fica no cabeçalho do workspace e trabalha em dois modos:
+
+- **Script completo** — `CREATE TABLE` de todas as tabelas não-`REMOVED`, com
+  colunas, `PRIMARY KEY` e as `FOREIGN KEY` ao final.
+- **Migração a partir do baseline** — calcula `ALTER TABLE` contra o baseline
+  do projeto (tabelas/colunas criadas, removidas e com tipo alterado, FKs
+  adicionadas/removidas). Renomeações só acontecem com mapeamento explícito nos
+  campos de renomeação; sem mapeamento, o par vira `DROP`+`CREATE` e aparece como
+  operação destrutiva com aviso de perda de dados.
+
+Fluxo de uso:
+
+1. Abra um projeto e clique em **Gerar SQL** no cabeçalho do workspace.
+2. Mantenha **Dialeto** `PostgreSQL` (padrão) ou escolha `MySQL` e o **Modo**
+   **Script completo**; clique em **Gerar script**.
+3. Revise o **Preview do script** (área monoespaçada, somente leitura). Tipos
+   desconhecidos e outras inconsistências aparecem em **Avisos**; no modo
+   migração, `DROP TABLE`/`DROP COLUMN` aparecem em **Operações destrutivas** e a
+   data do baseline usado é exibida acima do preview quando disponível.
+4. Para migrar, troque o **Modo** para **Migração a partir do baseline**. O
+   baseline é capturado automaticamente no *apply* do import de SQL; se o projeto
+   ainda não tiver baseline, a geração mostra uma mensagem própria e o modo
+   **Script completo** continua disponível.
+5. Use **Copiar** para a área de transferência ou **Baixar .sql** para salvar
+   `ddl-<dialeto>-<modo>.sql` com o mesmo conteúdo do preview.
+6. Depois de aplicar o script no banco, clique em **Marcar banco como
+   sincronizado** para gravar o baseline do modelo atual. No modo migração o
+   preview é regerado na hora e passa a refletir o novo baseline.
+
+O endpoint de geração é `GET /api/projects/{id}/ddl` com `dialect`
+(`postgres`/`mysql`) e `mode` (`create`/`migration`); a geração é somente leitura
+e não grava evento. A captura manual usa `PUT /api/projects/{id}/ddl/baseline`
+(`MEMBER`/`ADMIN`) e fica registrada em [`docs/AUDITORIA.md`](./docs/AUDITORIA.md)
+como `ddl.baseline_captured`. `VIEWER` vê o botão de geração (que é leitura), mas
+não a ação de sincronizar.
+
 ## Agente de sugestões (Fase 4)
 
 A Fase 4 adiciona o agente embutido: geração em lote de sugestões de descrição

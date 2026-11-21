@@ -67,6 +67,22 @@ async function waitUntil(predicate: () => boolean, label: string, timeoutMs = 10
   throw new Error(`Tempo esgotado esperando ${label}.`)
 }
 
+async function waitForDdlScript(page: Page, predicate: (script: string) => boolean, label: string): Promise<string> {
+  const deadline = Date.now() + 15000
+  let script = ''
+
+  while (Date.now() < deadline) {
+    script = await page
+      .getByTestId('ddl-script-preview')
+      .inputValue()
+      .catch(() => '')
+    if (predicate(script)) return script
+    await Bun.sleep(100)
+  }
+
+  throw new Error(`Tempo esgotado esperando ${label}. Script atual: ${JSON.stringify(script)}`)
+}
+
 interface PersistedColumn {
   name: string
   foreign_key: boolean
@@ -510,8 +526,124 @@ try {
     throw new Error('O export do diagrama emitiu requisição de save.')
   }
 
+  await page.getByTestId('workspace-ddl-button').click()
+  const ddlDialog = page.getByRole('dialog', { name: 'Gerar SQL' })
+  await ddlDialog.waitFor()
+
+  const createDdlResponse = page.waitForResponse(
+    (candidate) =>
+      candidate.request().method() === 'GET' &&
+      /^\/api\/projects\/[^/]+\/ddl$/.test(new URL(candidate.url()).pathname) &&
+      new URL(candidate.url()).searchParams.get('mode') === 'create',
+  )
+  await ddlDialog.getByRole('button', { name: 'Gerar script' }).click()
+  const createDdl = await createDdlResponse
+  if (!createDdl.ok()) throw new Error(`Geração do script completo falhou (${createDdl.status()}).`)
+
+  const createScript = await waitForDdlScript(
+    page,
+    (script) => script.includes('CREATE TABLE "users"') && script.includes('CREATE TABLE "products"'),
+    'o script completo (Postgres)',
+  )
+  if (!createScript.includes('"username" VARCHAR(50)')) {
+    throw new Error(`O script completo não trouxe users.username com o tipo do SQL importado: ${createScript}`)
+  }
+
+  await ddlDialog.getByRole('button', { name: 'Fechar' }).click()
+  await ddlDialog.waitFor({ state: 'detached' })
+
+  const updateColumn = waitForModelSave(page)
+  await page.getByRole('button', { name: 'Editar coluna users.username' }).click()
+  const columnDialog = page.getByRole('dialog', { name: 'Editar coluna' })
+  await columnDialog.waitFor()
+  await columnDialog.getByLabel('Tipo / tamanho').fill('varchar(120)')
+  await columnDialog.getByRole('button', { name: 'Salvar coluna' }).click()
+  await updateColumn
+  await columnDialog.waitFor({ state: 'detached' })
+
+  await page.getByTestId('workspace-ddl-button').click()
+  const migrationDialog = page.getByRole('dialog', { name: 'Gerar SQL' })
+  await migrationDialog.waitFor()
+  await migrationDialog.getByLabel('Modo').selectOption('migration')
+
+  const migrationResponse = page.waitForResponse(
+    (candidate) =>
+      candidate.request().method() === 'GET' &&
+      /^\/api\/projects\/[^/]+\/ddl$/.test(new URL(candidate.url()).pathname) &&
+      new URL(candidate.url()).searchParams.get('mode') === 'migration',
+  )
+  await migrationDialog.getByRole('button', { name: 'Gerar script' }).click()
+  const migration = await migrationResponse
+  if (!migration.ok()) throw new Error(`Geração da migração falhou (${migration.status()}).`)
+
+  const migrationScript = await waitForDdlScript(
+    page,
+    (script) => script.includes('ALTER TABLE "users" ALTER COLUMN "username" TYPE VARCHAR(120)'),
+    'o ALTER da edição de users.username no modo migração',
+  )
+  await migrationDialog.getByTestId('ddl-baseline-warning').waitFor()
+
+  const sqlDownload = page.waitForEvent('download')
+  await migrationDialog.getByRole('button', { name: 'Baixar .sql' }).click()
+  const downloadedSql = await sqlDownload
+  if (downloadedSql.suggestedFilename() !== 'ddl-postgres-migration.sql') {
+    throw new Error(`O download do DDL gerou um arquivo inesperado: ${downloadedSql.suggestedFilename()}.`)
+  }
+  const sqlPath = await downloadedSql.path()
+  if (!sqlPath) throw new Error('O download do DDL não gerou arquivo.')
+  const downloadedScript = await readFile(sqlPath, 'utf8')
+  if (!downloadedScript.includes('ALTER TABLE "users" ALTER COLUMN "username" TYPE VARCHAR(120)')) {
+    throw new Error(`O arquivo .sql baixado não contém o ALTER da edição: ${downloadedScript}`)
+  }
+  if (downloadedScript !== migrationScript) {
+    throw new Error('O conteúdo do .sql baixado difere do preview exibido.')
+  }
+
+  const baselinePut = page.waitForResponse(
+    (candidate) =>
+      candidate.request().method() === 'PUT' &&
+      /^\/api\/projects\/[^/]+\/ddl\/baseline$/.test(new URL(candidate.url()).pathname),
+  )
+  const regenAfterCapture = page.waitForResponse(
+    (candidate) =>
+      candidate.request().method() === 'GET' &&
+      /^\/api\/projects\/[^/]+\/ddl$/.test(new URL(candidate.url()).pathname) &&
+      new URL(candidate.url()).searchParams.get('mode') === 'migration',
+  )
+  await migrationDialog.getByTestId('ddl-baseline-action').click()
+  const baselineSaved = await baselinePut
+  if (!baselineSaved.ok()) throw new Error(`PUT do baseline falhou (${baselineSaved.status()}).`)
+  const regenerated = await regenAfterCapture
+  if (!regenerated.ok()) throw new Error(`Regeração após sincronizar falhou (${regenerated.status()}).`)
+  await migrationDialog.getByTestId('ddl-notice').waitFor()
+  await waitForDdlScript(page, (script) => script.trim() === '', 'o script vazio após marcar como sincronizado')
+
+  const afterSyncResponse = page.waitForResponse(
+    (candidate) =>
+      candidate.request().method() === 'GET' &&
+      /^\/api\/projects\/[^/]+\/ddl$/.test(new URL(candidate.url()).pathname) &&
+      new URL(candidate.url()).searchParams.get('mode') === 'migration',
+  )
+  await migrationDialog.getByRole('button', { name: 'Gerar script' }).click()
+  const afterSync = await afterSyncResponse
+  if (afterSync.status() === 409) throw new Error('Nova geração em modo migração retornou DDL_BASELINE_MISSING.')
+  if (!afterSync.ok()) throw new Error(`Nova geração em modo migração falhou (${afterSync.status()}).`)
+  const afterSyncScript = await waitForDdlScript(
+    page,
+    (script) => script.trim() === '',
+    'a nova geração sem alterações',
+  )
+  if (afterSyncScript.trim().length !== 0) {
+    throw new Error(`A migração após sincronizar deveria estar vazia: ${afterSyncScript}`)
+  }
+  if ((await migrationDialog.getByTestId('ddl-error').count()) > 0) {
+    throw new Error('A nova geração em modo migração exibiu erro após marcar o banco como sincronizado.')
+  }
+
+  await migrationDialog.getByRole('button', { name: 'Fechar' }).click()
+
   console.log(
-    'E2E smoke ok: login, projeto via SQL, descrição, aprovação, agente (fake, projeto e tabela), diagrama (arraste, zoom e layout persistidos), export JSON, viewer read-only (somente GET), edição no canvas (tabela, relacionamento com FK automática, undo e modelo persistido) e zonas da Fase 9 (criar aba, arrastar da árvore, remover sem excluir, localizar por outra zona e export PNG/SVG).',
+    'E2E smoke ok: login, projeto via SQL, descrição, aprovação, agente (fake, projeto e tabela), diagrama (arraste, zoom e layout persistidos), export JSON, viewer read-only (somente GET), edição no canvas (tabela, relacionamento com FK automática, undo e modelo persistido), zonas da Fase 9 (criar aba, arrastar da árvore, remover sem excluir, localizar por outra zona e export PNG/SVG) e DDL da Fase 10 (script completo Postgres, migração após editar tipo de coluna, download .sql e marcar banco como sincronizado).',
   )
 } finally {
   await browser?.close()

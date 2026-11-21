@@ -103,6 +103,21 @@ export interface ApplyModelResult {
   run: ImportRunRecord
 }
 
+export interface DdlBaselineRecord {
+  projectId: string
+  database: DatabaseModel
+  capturedAt: string
+  capturedBy: string | null
+}
+
+export interface SaveDdlBaselineInput {
+  projectId: string
+  database: DatabaseModel
+  actorUserId?: string | null
+  now?: string
+  audit?: InsertEventInput
+}
+
 export interface MutationContext {
   actorUserId?: string | null
   audit?: InsertEventInput
@@ -274,6 +289,8 @@ export interface ProjectRepository {
   putDiagramLayout(input: PutDiagramLayoutInput): DiagramLayoutRecord | null
   getDiagramDocument(projectId: string): DiagramDocumentRecord | null
   putDiagramDocument(input: PutDiagramDocumentInput): DiagramDocumentRecord | null
+  saveDdlBaseline(input: SaveDdlBaselineInput): DdlBaselineRecord | null
+  readDdlBaseline(projectId: string): DdlBaselineRecord | null
 }
 
 export interface ApiKeyRecord {

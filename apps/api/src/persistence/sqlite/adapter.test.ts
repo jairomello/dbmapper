@@ -482,4 +482,88 @@ describe('persistência SQLite: documento de diagrama com zonas', () => {
       persistence.close()
     }
   })
+
+  test('salva e lê o baseline de DDL apenas com a estrutura do modelo', async () => {
+    const persistence = await createPersistence()
+
+    try {
+      const created = persistence.projects.create({ name: 'Baseline' })
+      const saved = persistence.projects.saveDdlBaseline({
+        projectId: created.id,
+        database,
+        now: '2026-01-02T03:04:05.000Z',
+      })
+
+      expect(saved).not.toBeNull()
+      expect(saved!.capturedAt).toBe('2026-01-02T03:04:05.000Z')
+      expect(saved!.capturedBy).toBeNull()
+
+      const baseline = persistence.projects.readDdlBaseline(created.id)
+      expect(baseline).not.toBeNull()
+      expect(baseline!.database.tables.map((table) => table.name)).toEqual(['cliente', 'pedido'])
+
+      const cliente = baseline!.database.tables.find((table) => table.name === 'cliente')!
+      expect(cliente.description).toBe('')
+      expect(cliente.business_terms).toEqual([])
+      expect(cliente.columns[0]).toMatchObject({
+        name: 'id',
+        type: 'int',
+        primary_key: true,
+        description: '',
+        business_terms: [],
+      })
+
+      const pedido = baseline!.database.tables.find((table) => table.name === 'pedido')!
+      expect(pedido.relationships.parents[0]).toMatchObject({
+        table: 'cliente',
+        local_columns: ['cliente_id'],
+        referenced_columns: ['id'],
+        constraint_name: 'fk_pedido_cliente',
+      })
+
+      expect(persistence.projects.readDdlBaseline('projeto-inexistente')).toBeNull()
+    } finally {
+      persistence.close()
+    }
+  })
+
+  test('novo baseline substitui o anterior do mesmo projeto', async () => {
+    const persistence = await createPersistence()
+
+    try {
+      const created = persistence.projects.create({ name: 'Substituição' })
+      persistence.projects.saveDdlBaseline({
+        projectId: created.id,
+        database: { ...database, tables: database.tables.slice(0, 1) },
+        now: '2026-01-01T00:00:00.000Z',
+      })
+
+      const replaced = persistence.projects.saveDdlBaseline({
+        projectId: created.id,
+        database,
+        now: '2026-02-02T00:00:00.000Z',
+      })
+      expect(replaced!.capturedAt).toBe('2026-02-02T00:00:00.000Z')
+
+      const baseline = persistence.projects.readDdlBaseline(created.id)
+      expect(baseline!.capturedAt).toBe('2026-02-02T00:00:00.000Z')
+      expect(baseline!.database.tables.map((table) => table.name)).toEqual(['cliente', 'pedido'])
+    } finally {
+      persistence.close()
+    }
+  })
+
+  test('não grava baseline para projeto inexistente', async () => {
+    const persistence = await createPersistence()
+
+    try {
+      const saved = persistence.projects.saveDdlBaseline({
+        projectId: 'projeto-inexistente',
+        database,
+      })
+      expect(saved).toBeNull()
+    } finally {
+      persistence.close()
+    }
+  })
 })

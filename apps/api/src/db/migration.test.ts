@@ -40,9 +40,18 @@ describe('migração do domínio do dicionário', () => {
         'users',
         'login_attempts',
         'diagram_zones',
+        'schema_baselines',
       ]) {
         expect(tableNames).toContain(expected)
       }
+
+      const baselineColumns = sqlite.query("PRAGMA table_info('schema_baselines')").all() as Array<{ name: string }>
+      expect(baselineColumns.map((column) => column.name).sort()).toEqual([
+        'captured_at',
+        'captured_by',
+        'document_json',
+        'project_id',
+      ])
 
       const diagramZoneColumns = sqlite.query("PRAGMA table_info('diagram_zones')").all() as Array<{ name: string }>
       for (const expected of ['id', 'project_id', 'name', 'tab_order', 'members_json']) {
@@ -178,6 +187,7 @@ describe('migração do domínio do dicionário', () => {
       expectForeignKey('columns', 'table_id', 'tables')
       expectForeignKey('relationships', 'table_id', 'tables')
       expectForeignKey('import_runs', 'project_id', 'projects')
+      expectForeignKey('schema_baselines', 'project_id', 'projects')
     } finally {
       sqlite.close()
       await rm(directory, { recursive: true, force: true })

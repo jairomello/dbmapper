@@ -125,6 +125,12 @@ and foreign keys), never documentation.
 - **WHEN** a `VIEWER` calls the baseline endpoint
 - **THEN** the response is `403` with the error envelope and the baseline is unchanged
 
+#### Scenario: Baseline is readable back
+
+- **WHEN** an authenticated caller reads the project baseline
+- **THEN** the response carries the stored baseline document with its capture metadata
+- **AND** a project that never captured a baseline gets `baseline: null`
+
 ### Requirement: Generation access and safety
 
 Generating a script MUST be available to any authenticated caller, MUST NOT

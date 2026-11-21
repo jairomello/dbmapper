@@ -160,6 +160,14 @@ describe('auditoria: cobertura das rotas mutantes', () => {
       },
     },
     {
+      name: 'PUT /api/projects/:id/ddl/baseline',
+      action: 'ddl.baseline_captured',
+      run: async () => {
+        const response = await apiRequest(context, `/api/projects/${projectId}/ddl/baseline`, 'PUT')
+        expect(response.response.status).toBe(200)
+      },
+    },
+    {
       name: 'POST /api/projects/import',
       action: 'project.imported',
       run: async () => {

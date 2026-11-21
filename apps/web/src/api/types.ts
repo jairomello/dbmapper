@@ -118,6 +118,42 @@ export interface ProjectDocument {
   sources?: ExportSources
 }
 
+export type DdlDialect = 'postgres' | 'mysql'
+
+export type DdlMode = 'create' | 'migration'
+
+export interface DdlRenameMapping {
+  tables: Record<string, string>
+  columns: Record<string, string>
+}
+
+export interface DdlGeneration {
+  dialect: DdlDialect
+  mode: DdlMode
+  script: string
+  statements: string[]
+  destructive: string[]
+  warnings: string[]
+}
+
+export interface DdlBaseline {
+  projectId: string
+  capturedAt: string
+  capturedBy: string | null
+}
+
+export interface DdlBaselineSnapshot extends DdlBaseline {
+  database: DatabaseModel
+}
+
+export interface DdlBaselineResult {
+  baseline: DdlBaseline
+}
+
+export interface DdlBaselineReadResult {
+  baseline: DdlBaselineSnapshot | null
+}
+
 export interface AuditEvent {
   id: string
   projectId: string | null

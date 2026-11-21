@@ -14,7 +14,16 @@ const ACTION_FAMILIES = [
   { value: 'item.', label: 'Itens' },
   { value: 'agent.', label: 'Agente IA' },
   { value: 'api_key.', label: 'Chaves de API' },
+  { value: 'ddl.', label: 'DDL' },
 ] as const
+
+const ACTION_LABELS: Record<string, string> = {
+  'ddl.baseline_captured': 'Baseline de DDL capturado',
+}
+
+function actionLabel(action: string): string | null {
+  return ACTION_LABELS[action] ?? null
+}
 
 function formatTimestamp(value: string): string {
   const date = new Date(value)
@@ -110,7 +119,12 @@ export function AuditPage() {
                 {events.data?.events.map((event) => (
                   <tr key={event.id} className="border-t border-slate-100" data-testid={`audit-row-${event.id}`}>
                     <td className="px-4 py-2 text-slate-700">{event.actorEmail ?? 'sistema'}</td>
-                    <td className="px-4 py-2 font-mono text-xs text-ink">{event.action}</td>
+                    <td className="px-4 py-2 text-ink">
+                      <span className="font-mono text-xs">{event.action}</span>
+                      {actionLabel(event.action) ? (
+                        <span className="ml-2 text-xs text-slate-500">{actionLabel(event.action)}</span>
+                      ) : null}
+                    </td>
                     <td className="px-4 py-2 text-slate-600">{subjectLabel(event)}</td>
                     <td className="px-4 py-2 text-slate-500">
                       <time dateTime={event.createdAt}>{formatTimestamp(event.createdAt)}</time>
