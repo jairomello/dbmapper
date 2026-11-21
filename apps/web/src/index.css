@@ -10,6 +10,65 @@
   --radius-lg: 16px;
 }
 
+:root {
+  --diagram-edge-color: #94a3b8;
+  --diagram-edge-out: #b45309;
+  --diagram-edge-in: #1d4ed8;
+  --diagram-edge-width: 2px;
+  --diagram-edge-strong-width: 3px;
+  --diagram-edge-dash-out: 6 4;
+  --diagram-edge-dash-in: 12 6;
+  --diagram-node-muted-opacity: 0.35;
+}
+
+.diagram-edge--outgoing {
+  stroke-dasharray: var(--diagram-edge-dash-out);
+}
+
+.diagram-edge--incoming {
+  stroke-dasharray: var(--diagram-edge-dash-in);
+}
+
+.diagram-edge--muted {
+  opacity: 0.25;
+}
+
+.diagram-edge--animated.diagram-edge--outgoing {
+  animation: diagram-edge-flow-out 0.9s linear infinite;
+}
+
+.diagram-edge--animated.diagram-edge--incoming {
+  animation: diagram-edge-flow-in 1.2s linear infinite;
+}
+
+.react-flow__node.diagram-node--muted {
+  opacity: var(--diagram-node-muted-opacity);
+}
+
+@keyframes diagram-edge-flow-out {
+  from {
+    stroke-dashoffset: 10;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+@keyframes diagram-edge-flow-in {
+  from {
+    stroke-dashoffset: 18;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .diagram-edge--animated {
+    animation: none;
+  }
+}
+
 body {
   margin: 0;
   background: var(--color-bg);

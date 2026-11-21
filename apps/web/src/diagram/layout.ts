@@ -2,15 +2,16 @@ import type { DatabaseModel, RelationshipModel, TableModel } from '@dbmapper/dom
 import { type Edge, type Node, type NodeHandle, Position } from '@xyflow/react'
 import type { DiagramPosition } from '../api/types'
 import type { Selection } from '../lib/selection'
+import {
+  DIAGRAM_NODE_WIDTH,
+  estimatedTableHeight,
+  gridPosition,
+  NODE_COLUMN_HEIGHT,
+  NODE_HEADER_HEIGHT,
+} from './auto-layout'
 
-export const DIAGRAM_NODE_WIDTH = 260
-const GRID_COLUMNS = 3
-const GRID_ORIGIN_X = 80
-const GRID_ORIGIN_Y = 80
-const GRID_GAP_X = 80
-const GRID_ROW_HEIGHT = 260
-const NODE_HEADER_HEIGHT = 37
-const NODE_COLUMN_HEIGHT = 28
+export { DIAGRAM_NODE_WIDTH, gridPosition }
+
 const HANDLE_SIZE = 8
 
 export interface DiagramRelationshipKey {
@@ -28,8 +29,13 @@ export interface DiagramRelationshipKeys {
 
 export const EMPTY_RELATIONSHIP_KEYS: DiagramRelationshipKeys = { crossZone: [], foreign: [] }
 
+export type EdgeEmphasis = 'outgoing' | 'incoming' | 'none'
+
+export type TableEmphasis = 'selected' | 'incident' | 'muted' | 'none'
+
 export interface DiagramNodeData extends Record<string, unknown> {
   table: TableModel
+  emphasis: TableEmphasis
   active: boolean
   activeColumn: string | null
   tableMatch: boolean
@@ -59,14 +65,12 @@ export interface DiagramEdgeData extends Record<string, unknown> {
   table?: string
   relationship?: RelationshipModel
   canEdit?: boolean
+  emphasis: EdgeEmphasis
+  muted: boolean
   onDelete?: (table: string, relationship: RelationshipModel) => void
 }
 
 export type DiagramEdge = Edge<DiagramEdgeData, 'crowsfoot'>
-
-function estimatedNodeHeight(table: TableModel): number {
-  return NODE_HEADER_HEIGHT + table.columns.length * NODE_COLUMN_HEIGHT + 2
-}
 
 function initialHandles(table: TableModel): NodeHandle[] {
   return table.columns.flatMap((column, index) => {
@@ -96,6 +100,30 @@ function initialHandles(table: TableModel): NodeHandle[] {
 
 export function visibleTables(database: DatabaseModel): TableModel[] {
   return database.tables.filter((table) => table.status !== 'REMOVED')
+}
+
+export function incidentTableNames(database: DatabaseModel, selectedTable: string | null): Set<string> {
+  const incident = new Set<string>()
+  if (selectedTable === null) return incident
+
+  const visible = visibleTables(database)
+  const visibleNames = new Set(visible.map((table) => table.name))
+  if (!visibleNames.has(selectedTable)) return incident
+
+  incident.add(selectedTable)
+  for (const table of visible) {
+    for (const relationship of table.relationships?.parents ?? []) {
+      if (!visibleNames.has(relationship.table)) continue
+      if (table.name === selectedTable) incident.add(relationship.table)
+      else if (relationship.table === selectedTable) incident.add(table.name)
+    }
+  }
+
+  return incident
+}
+
+export function selectedTableOf(selection: Selection): string | null {
+  return selection.type === 'database' ? null : selection.table
 }
 
 export function buildRelationshipKeys(
@@ -134,13 +162,6 @@ export function buildRelationshipKeys(
   }
 
   return keys
-}
-
-export function gridPosition(index: number): DiagramPosition {
-  return {
-    x: GRID_ORIGIN_X + (index % GRID_COLUMNS) * (DIAGRAM_NODE_WIDTH + GRID_GAP_X),
-    y: GRID_ORIGIN_Y + Math.floor(index / GRID_COLUMNS) * GRID_ROW_HEIGHT,
-  }
 }
 
 export function isDiagramPosition(value: unknown): value is DiagramPosition {
@@ -247,11 +268,21 @@ export function createDiagramNodes(options: {
   } = options
   const searchActive = query.trim().length > 0
   const diagramKeys = keys ?? buildRelationshipKeys(database, () => null)
+  const selectedTable = selectedTableOf(selection)
+  const incident = incidentTableNames(database, selectedTable)
 
   return visibleTables(database).map((table, index) => {
     const active =
       (selection.type === 'table' && selection.table === table.name) ||
       (selection.type === 'column' && selection.table === table.name)
+    const emphasis: TableEmphasis =
+      selectedTable === null
+        ? 'none'
+        : table.name === selectedTable
+          ? 'selected'
+          : incident.has(table.name)
+            ? 'incident'
+            : 'muted'
     const activeColumn = selection.type === 'column' && selection.table === table.name ? selection.column : null
     const columnMatches = table.columns
       .filter((column) => matches.has(columnMatchKey(table.name, column.name)))
@@ -264,11 +295,13 @@ export function createDiagramNodes(options: {
       type: 'table',
       position,
       width: DIAGRAM_NODE_WIDTH,
-      height: estimatedNodeHeight(table),
-      measured: { width: DIAGRAM_NODE_WIDTH, height: estimatedNodeHeight(table) },
+      height: estimatedTableHeight(table),
+      measured: { width: DIAGRAM_NODE_WIDTH, height: estimatedTableHeight(table) },
       handles: initialHandles(table),
+      className: emphasis === 'none' ? undefined : `diagram-node--${emphasis}`,
       data: {
         table,
+        emphasis,
         active,
         activeColumn,
         tableMatch,
@@ -295,11 +328,16 @@ export function createDiagramNodes(options: {
 
 export function createDiagramEdges(
   database: DatabaseModel,
-  options: { canEdit?: boolean; onDelete?: (table: string, relationship: RelationshipModel) => void } = {},
+  options: {
+    canEdit?: boolean
+    selectedTable?: string | null
+    onDelete?: (table: string, relationship: RelationshipModel) => void
+  } = {},
 ): DiagramEdge[] {
-  const { canEdit, onDelete } = options
+  const { canEdit, selectedTable = null, onDelete } = options
   const tables = visibleTables(database)
   const byName = new Map(tables.map((table) => [table.name, table]))
+  const selectionActive = selectedTable !== null && byName.has(selectedTable)
   const edges: DiagramEdge[] = []
   const seen = new Set<string>()
 
@@ -309,6 +347,14 @@ export function createDiagramEdges(
     for (const relationship of table.relationships?.parents ?? []) {
       const target = byName.get(relationship.table)
       if (!target) continue
+
+      const emphasis: EdgeEmphasis = !selectionActive
+        ? 'none'
+        : selectedTable === table.name
+          ? 'outgoing'
+          : selectedTable === relationship.table
+            ? 'incoming'
+            : 'none'
 
       const targetColumns = new Set(target.columns.map((column) => column.name))
       const localColumn = relationship.local_columns.find((column) => sourceColumns.has(column))
@@ -342,6 +388,8 @@ export function createDiagramEdges(
           table: table.name,
           relationship,
           canEdit,
+          emphasis,
+          muted: selectionActive && emphasis === 'none',
           onDelete,
         },
       })

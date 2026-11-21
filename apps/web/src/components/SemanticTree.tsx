@@ -26,6 +26,36 @@ function isActive(selection: Selection, candidate: Selection): boolean {
   return false
 }
 
+function incidentNames(database: DatabaseModel, selectedTable: string | null): Set<string> {
+  const incident = new Set<string>()
+  if (selectedTable === null) return incident
+
+  const names = new Set(database.tables.filter((table) => table.status !== 'REMOVED').map((table) => table.name))
+  if (!names.has(selectedTable)) return incident
+
+  incident.add(selectedTable)
+  for (const table of database.tables) {
+    if (table.status === 'REMOVED') continue
+    for (const relationship of table.relationships?.parents ?? []) {
+      if (!names.has(relationship.table)) continue
+      if (table.name === selectedTable) incident.add(relationship.table)
+      else if (relationship.table === selectedTable) incident.add(table.name)
+    }
+  }
+
+  return incident
+}
+
+function tableEmphasis(
+  table: string,
+  selectedTable: string | null,
+  incident: Set<string>,
+): 'selected' | 'incident' | 'muted' | 'none' {
+  if (selectedTable === null) return 'none'
+  if (table === selectedTable) return 'selected'
+  return incident.has(table) ? 'incident' : 'muted'
+}
+
 export function SemanticTree({
   database,
   selection,
@@ -38,6 +68,9 @@ export function SemanticTree({
 }: SemanticTreeProps) {
   const tables = database.tables.filter((table) => table.status !== 'REMOVED')
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({})
+  const selectedTable = selection.type === 'database' ? null : selection.table
+  const selectionActive = selectedTable !== null && tables.some((table) => table.name === selectedTable)
+  const incident = incidentNames(database, selectionActive ? selectedTable : null)
 
   function zoneOfTable(table: string): string | null {
     if (!zones) return null
@@ -96,9 +129,15 @@ export function SemanticTree({
             const tableActive = isActive(selection, { type: 'table', table: table.name })
             const tableZone = zoneOfTable(table.name)
             const outside = Boolean(zones) && tableZone === null
+            const emphasis = selectionActive ? tableEmphasis(table.name, selectedTable, incident) : 'none'
 
             return (
-              <li key={table.name} data-testid={`table-item-${table.name}`}>
+              <li
+                key={table.name}
+                data-testid={`table-item-${table.name}`}
+                data-emphasis={emphasis}
+                className={emphasis === 'muted' ? 'opacity-40' : undefined}
+              >
                 <div
                   className={`flex items-center gap-1 rounded-sm ${
                     tableActive ? 'bg-indigo-50' : 'hover:bg-slate-100'

@@ -75,6 +75,31 @@ describe('SemanticTree', () => {
   })
 })
 
+function databaseWithConfig() {
+  const database = sampleDatabase()
+  database.tables.push({
+    name: 'config',
+    description: '',
+    business_terms: [],
+    reviewed: false,
+    status: 'UNCHANGED',
+    relationships: { parents: [], children: [] },
+    columns: [
+      {
+        name: 'id',
+        type: 'serial',
+        primary_key: true,
+        foreign_key: false,
+        description: '',
+        business_terms: [],
+        reviewed: false,
+        status: 'UNCHANGED',
+      },
+    ],
+  })
+  return database
+}
+
 function dragData(data: Record<string, string> = {}) {
   return {
     types: Object.keys(data),
@@ -166,5 +191,37 @@ describe('SemanticTree zones', () => {
     expect(screen.queryByTestId('table-zone-cliente')).toBeNull()
     expect(screen.queryByTestId('table-add-to-zone-pedido')).toBeNull()
     expect(screen.getByTestId('table-outside-pedido')).toBeTruthy()
+  })
+})
+
+describe('SemanticTree emphasis', () => {
+  test('marca selecionada, incidentes e esmaece tabelas sem relacionamento', () => {
+    render(
+      <SemanticTree
+        database={databaseWithConfig()}
+        selection={{ type: 'table', table: 'pedido' }}
+        onSelect={() => undefined}
+      />,
+    )
+
+    expect(screen.getByTestId('table-item-pedido').getAttribute('data-emphasis')).toBe('selected')
+    expect(screen.getByTestId('table-item-cliente').getAttribute('data-emphasis')).toBe('incident')
+    const config = screen.getByTestId('table-item-config')
+    expect(config.getAttribute('data-emphasis')).toBe('muted')
+    expect(config.className).toContain('opacity-40')
+  })
+
+  test('sem tabela selecionada não esmaece nenhuma tabela', () => {
+    render(
+      <SemanticTree
+        database={databaseWithConfig()}
+        selection={{ type: 'database' }}
+        onSelect={() => undefined}
+      />,
+    )
+
+    expect(screen.getByTestId('table-item-pedido').getAttribute('data-emphasis')).toBe('none')
+    expect(screen.getByTestId('table-item-config').getAttribute('data-emphasis')).toBe('none')
+    expect(screen.getByTestId('table-item-config').className).not.toContain('opacity-40')
   })
 })

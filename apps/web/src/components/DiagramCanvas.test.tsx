@@ -1,5 +1,5 @@
 import type { DatabaseModel } from '@dbmapper/domain'
-import { afterEach, describe, expect, test } from 'bun:test'
+import { afterEach, describe, expect, mock, test } from 'bun:test'
 import { useState } from 'react'
 import type { DiagramLayout, DiagramLayoutInput, DiagramZoneInput, DiagramZoneLayout } from '../api/types'
 import { DIAGRAM_TABLE_MIME } from '../diagram/zones'
@@ -7,11 +7,37 @@ import type { Selection } from '../lib/selection'
 import { sampleDatabase, sampleProject } from '../test/fixtures'
 import { errorResponse, installFetch, jsonResponse } from '../test/fetch'
 import { renderWithClient } from '../test/render'
-import { cleanup, fireEvent, screen, waitFor, within } from '../test/setup'
+import { cleanup, fireEvent, render, screen, waitFor, within } from '../test/setup'
 import { DiagramCanvas } from './DiagramCanvas'
+import { SemanticTree } from './SemanticTree'
 
 const restoreCallbacks: Array<() => void> = []
 const DEFAULT_MEMBERS = ['cliente', 'pedido']
+
+function databaseWithConfig(): DatabaseModel {
+  const database = sampleDatabase()
+  database.tables.push({
+    name: 'config',
+    description: '',
+    business_terms: [],
+    reviewed: false,
+    status: 'UNCHANGED',
+    relationships: { parents: [], children: [] },
+    columns: [
+      {
+        name: 'id',
+        type: 'serial',
+        primary_key: true,
+        foreign_key: false,
+        description: '',
+        business_terms: [],
+        reviewed: false,
+        status: 'UNCHANGED',
+      },
+    ],
+  })
+  return database
+}
 
 afterEach(() => {
   while (restoreCallbacks.length > 0) restoreCallbacks.pop()?.()
@@ -65,6 +91,14 @@ function twoZoneLayout(
 
 function layoutFor(input: DiagramLayoutInput, zone = 'Principal'): DiagramZoneLayout | undefined {
   return input.layouts.find((layout) => layout.zoneName === zone) as DiagramZoneLayout | undefined
+}
+
+function layoutWithMembers(members: string[]): DiagramLayout {
+  return {
+    projectId: 'projeto-1',
+    zones: [{ name: 'Principal', tabOrder: 0, members }],
+    layouts: [principalLayout()],
+  }
 }
 
 function zoneFor(input: DiagramLayoutInput, table: string): DiagramZoneInput | undefined {
@@ -692,7 +726,11 @@ function CanvasHarness({ canEdit = true }: { canEdit?: boolean }) {
   const [selection, setSelection] = useState<Selection>({ type: 'database' })
   return (
     <div>
-      <button type="button" data-testid="select-pedido" onClick={() => setSelection({ type: 'table', table: 'pedido' })}>
+      <button
+        type="button"
+        data-testid="select-pedido"
+        onClick={() => setSelection({ type: 'table', table: 'pedido' })}
+      >
         pedido
       </button>
       <div style={{ width: 1000, height: 700 }}>
@@ -706,6 +744,33 @@ function CanvasHarness({ canEdit = true }: { canEdit?: boolean }) {
       </div>
     </div>
   )
+}
+
+function CanvasSelectionHarness({
+  database,
+  initialSelection = { type: 'database' },
+}: {
+  database: DatabaseModel
+  initialSelection?: Selection
+}) {
+  const [selection, setSelection] = useState<Selection>(initialSelection)
+  return (
+    <div style={{ width: 1000, height: 700 }}>
+      <DiagramCanvas
+        projectId="projeto-1"
+        database={database}
+        selection={selection}
+        onSelect={setSelection}
+        canEdit
+      />
+    </div>
+  )
+}
+
+function edgePath(): SVGPathElement {
+  const path = document.querySelector('.react-flow__edge .react-flow__edge-path')
+  if (!(path instanceof SVGPathElement)) throw new Error('Aresta do diagrama não encontrada.')
+  return path
 }
 
 function dataTransfer(data: Record<string, string> = {}) {
@@ -980,8 +1045,236 @@ describe('DiagramCanvas zone assignment defaults', () => {
 
     dragTable('cliente')
     await waitFor(() => expect(puts.length).toBeGreaterThan(0))
-    expect(puts[puts.length - 1].zones).toEqual([
-      { name: 'Principal', tabOrder: 0, members: ['cliente', 'pedido'] },
-    ])
+    expect(puts[puts.length - 1].zones).toEqual([{ name: 'Principal', tabOrder: 0, members: ['cliente', 'pedido'] }])
+  })
+})
+
+function viewportTransform(): string {
+  const element = document.querySelector('.react-flow__viewport')
+  return element instanceof HTMLElement ? element.style.transform : ''
+}
+
+describe('DiagramCanvas toolbar', () => {
+  test('alterna Selecionar/Mover, faz pan sem selecionar e expõe labels acessíveis', async () => {
+    stubRect()
+    stubLayout(emptyLayout())
+    const onSelect = mock(() => undefined)
+    renderWithClient(
+      <div style={{ width: 1000, height: 700 }}>
+        <DiagramCanvas
+          projectId="projeto-1"
+          database={sampleDatabase()}
+          selection={{ type: 'database' }}
+          onSelect={onSelect}
+          canEdit
+        />
+      </div>,
+    )
+
+    await screen.findByTestId('diagram-node-cliente')
+    expect(screen.getByTestId('diagram-tool-select').getAttribute('aria-pressed')).toBe('true')
+    expect(screen.getByTestId('diagram-tool-move').getAttribute('aria-pressed')).toBe('false')
+    expect(screen.getByRole('button', { name: 'Selecionar' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Mover' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Aproximar' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Afastar' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Ajustar à tela' })).toBeTruthy()
+
+    fireEvent.click(screen.getByLabelText('Selecionar tabela cliente'))
+    expect(onSelect).toHaveBeenCalledWith({ type: 'table', table: 'cliente' })
+    onSelect.mockClear()
+
+    fireEvent.click(screen.getByTestId('diagram-tool-move'))
+    expect(screen.getByTestId('diagram-tool-select').getAttribute('aria-pressed')).toBe('false')
+    expect(screen.getByTestId('diagram-tool-move').getAttribute('aria-pressed')).toBe('true')
+
+    fireEvent.click(screen.getByLabelText('Selecionar tabela cliente'))
+    expect(onSelect).not.toHaveBeenCalled()
+
+    fireEvent.mouseDown(pane(), { clientX: 500, clientY: 400, button: 0 })
+    fireEvent.mouseMove(document, { clientX: 560, clientY: 440 })
+    fireEvent.mouseUp(document, { clientX: 560, clientY: 440 })
+    expect(onSelect).not.toHaveBeenCalled()
+  })
+
+  test('abre o menu de organização e delega criar tabela e relacionamento', async () => {
+    stubRect()
+    const stub = stubEditing()
+    renderCanvas()
+
+    await screen.findByTestId('diagram-node-cliente')
+    fireEvent.click(screen.getByTestId('diagram-auto-layout'))
+
+    const menu = await screen.findByRole('menu', { name: 'Organização automática' })
+    expect(within(menu).getByRole('menuitem', { name: 'Em grade' })).toBeTruthy()
+    expect(within(menu).getByRole('menuitem', { name: 'Em estrela' })).toBeTruthy()
+    fireEvent.click(within(menu).getByRole('menuitem', { name: 'Em estrela' }))
+
+    await waitFor(() => expect(stub.layoutPuts).toHaveLength(1))
+    expect(screen.queryByRole('menu')).toBeNull()
+
+    fireEvent.click(screen.getByTestId('diagram-relationship-mode'))
+    expect(screen.getByTestId('diagram-relationship-mode').getAttribute('aria-pressed')).toBe('true')
+    expect(screen.getByText('Clique na tabela de origem.')).toBeTruthy()
+
+    fireEvent.click(screen.getByTestId('diagram-add-table'))
+    await waitFor(() => expect(stub.modelPuts).toHaveLength(1))
+    expect(stub.modelPuts[0].tables.map((table) => table.name)).toContain('nova_tabela')
+  })
+
+  test('VIEWER vê apenas zoom, ajustar e exportar', async () => {
+    stubRect()
+    stubLayout(emptyLayout())
+    renderCanvas(false)
+
+    await screen.findByTestId('diagram-node-cliente')
+
+    expect(screen.getByTestId('diagram-zoom-in')).toBeTruthy()
+    expect(screen.getByTestId('diagram-zoom-out')).toBeTruthy()
+    expect(screen.getByTestId('diagram-fit-view')).toBeTruthy()
+    expect(screen.getByTestId('diagram-export-png')).toBeTruthy()
+    expect(screen.getByTestId('diagram-export-svg')).toBeTruthy()
+
+    expect(screen.queryByTestId('diagram-tool-select')).toBeNull()
+    expect(screen.queryByTestId('diagram-tool-move')).toBeNull()
+    expect(screen.queryByTestId('diagram-add-table')).toBeNull()
+    expect(screen.queryByTestId('diagram-relationship-mode')).toBeNull()
+    expect(screen.queryByTestId('diagram-auto-layout')).toBeNull()
+  })
+
+  test('aplicar organização grava um único PUT com viewport/zoom e em seguida ajusta a view', async () => {
+    stubRect()
+    const stub = stubEditing(emptyLayout({ positions: { cliente: { x: 0, y: 0 }, pedido: { x: 1200, y: 900 } } }))
+    renderCanvas()
+
+    await screen.findByTestId('diagram-node-cliente')
+    await waitFor(() => expect(nodeWrapper('pedido').style.transform).toContain('translate(1200px,900px)'))
+    const before = viewportTransform()
+
+    fireEvent.click(screen.getByTestId('diagram-auto-layout'))
+    fireEvent.click(await screen.findByTestId('diagram-layout-grid'))
+
+    await waitFor(() => expect(stub.layoutPuts).toHaveLength(1))
+    const applied = layoutFor(stub.layoutPuts[0])
+    expect(applied?.positions.cliente).toEqual({ x: 80, y: 80 })
+    expect(applied?.positions.pedido).toEqual({ x: 420, y: 80 })
+    expect(applied?.viewport).toEqual({ x: 0, y: 0 })
+    expect(applied?.zoom).toBe(1)
+
+    await waitFor(() => expect(viewportTransform()).not.toBe(before), { timeout: 2000 })
+
+    await new Promise((resolve) => setTimeout(resolve, 700))
+    expect(stub.layoutPuts).toHaveLength(1)
+  })
+})
+
+describe('DiagramCanvas layout in zones', () => {
+  test('organiza apenas as tabelas da zona ativa e preserva a outra zona', async () => {
+    stubRect()
+    const stub = stubEditing(twoZoneLayout())
+    renderCanvas()
+
+    await screen.findByTestId('diagram-node-cliente')
+    await waitFor(() => expect(nodeWrapper('cliente').style.transform).toContain('translate(100px,100px)'))
+
+    fireEvent.click(screen.getByTestId('diagram-auto-layout'))
+    fireEvent.click(await screen.findByTestId('diagram-layout-grid'))
+
+    await waitFor(() => expect(stub.layoutPuts).toHaveLength(1))
+    const put = stub.layoutPuts[0]
+    expect(layoutFor(put, 'Principal')?.positions).toEqual({ cliente: { x: 80, y: 80 } })
+    expect(layoutFor(put, 'Geografia')?.positions).toEqual({ pedido: { x: 420, y: 300 } })
+    expect(zoneFor(put, 'pedido')?.name).toBe('Geografia')
+    expect(zoneFor(put, 'cliente')?.name).toBe('Principal')
+    expect(stub.modelPuts).toHaveLength(0)
+  })
+})
+
+function stubReducedMotion(matches: boolean) {
+  const original = window.matchMedia
+  window.matchMedia = ((query: string) => ({
+    matches: query.includes('prefers-reduced-motion') ? matches : false,
+    media: query,
+    onchange: null,
+    addListener: () => undefined,
+    removeListener: () => undefined,
+    addEventListener: () => undefined,
+    removeEventListener: () => undefined,
+    dispatchEvent: () => false,
+  })) as unknown as typeof window.matchMedia
+  restoreCallbacks.push(() => {
+    window.matchMedia = original
+  })
+}
+
+describe('DiagramCanvas emphasis', () => {
+  test('selecionar pela árvore destaca o card e as arestas incidentes', async () => {
+    const database = databaseWithConfig()
+    const selections: Selection[] = []
+    const tree = render(
+      <SemanticTree
+        database={database}
+        selection={{ type: 'database' }}
+        onSelect={(selection) => selections.push(selection)}
+      />,
+    )
+    fireEvent.click(screen.getByTestId('table-row-pedido'))
+    tree.unmount()
+    expect(selections).toEqual([{ type: 'table', table: 'pedido' }])
+
+    stubLayout(layoutWithMembers(['cliente', 'pedido', 'config']))
+    renderWithClient(<CanvasSelectionHarness database={database} initialSelection={selections[0]} />)
+
+    await screen.findByTestId('diagram-node-pedido')
+    await waitFor(() => expect(nodeWrapper('pedido').className).toContain('diagram-node--selected'))
+    expect(nodeWrapper('cliente').className).toContain('diagram-node--incident')
+    expect(nodeWrapper('config').className).toContain('diagram-node--muted')
+
+    await waitFor(() => expect(edgePath().getAttribute('class')).toContain('diagram-edge--outgoing'))
+    const outgoing = edgePath()
+    expect(outgoing.getAttribute('class')).toContain('diagram-edge--animated')
+    expect(outgoing.getAttribute('style')).toContain('--diagram-edge-out')
+    expect(outgoing.getAttribute('style')).toContain('--diagram-edge-strong-width')
+  })
+
+  test('clicar no card destaca a seleção e as tabelas incidentes', async () => {
+    stubLayout(emptyLayout())
+    renderWithClient(<CanvasSelectionHarness database={sampleDatabase()} />)
+
+    await screen.findByTestId('diagram-node-pedido')
+    fireEvent.click(screen.getByLabelText('Selecionar tabela cliente'))
+    await waitFor(() => expect(nodeWrapper('cliente').className).toContain('diagram-node--selected'))
+    expect(nodeWrapper('pedido').className).toContain('diagram-node--incident')
+  })
+
+  test('selecionar pelo canvas usa a direção incoming com padrão e espessura próprios', async () => {
+    stubLayout(emptyLayout())
+    renderWithClient(
+      <CanvasSelectionHarness database={sampleDatabase()} initialSelection={{ type: 'table', table: 'cliente' }} />,
+    )
+
+    await screen.findByTestId('diagram-node-pedido')
+    await waitFor(() => expect(nodeWrapper('cliente').className).toContain('diagram-node--selected'))
+    expect(nodeWrapper('pedido').className).toContain('diagram-node--incident')
+
+    await waitFor(() => expect(edgePath().getAttribute('class')).toContain('diagram-edge--incoming'))
+    const incoming = edgePath()
+    expect(incoming.getAttribute('class')).toContain('diagram-edge--animated')
+    expect(incoming.getAttribute('style')).toContain('--diagram-edge-in')
+    expect(incoming.getAttribute('style')).toContain('--diagram-edge-strong-width')
+  })
+
+  test('não aplica a classe de animação quando o usuário prefere movimento reduzido', async () => {
+    stubLayout(emptyLayout())
+    renderWithClient(<CanvasSelectionHarness database={sampleDatabase()} />)
+
+    await screen.findByTestId('diagram-node-pedido')
+    stubReducedMotion(true)
+    fireEvent.click(screen.getByLabelText('Selecionar tabela pedido'))
+    await waitFor(() => expect(edgePath().getAttribute('class')).toContain('diagram-edge--outgoing'))
+
+    const path = edgePath()
+    expect(path.getAttribute('class')).not.toContain('diagram-edge--animated')
+    expect(path.getAttribute('class')).toContain('diagram-edge--outgoing')
   })
 })

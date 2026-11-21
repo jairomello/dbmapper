@@ -139,6 +139,30 @@ function persistedTable(project: PersistedProject, name: string): PersistedTable
   return table
 }
 
+interface PersistedDiagramLayout {
+  layouts: Array<{
+    zoneName: string
+    positions: Record<string, { x: number; y: number }>
+    zoom: number
+    viewport: { x: number; y: number }
+  }>
+}
+
+async function readPersistedDiagram(page: Page, projectId: string): Promise<PersistedDiagramLayout> {
+  return page.evaluate(async (id) => {
+    const response = await fetch(`/api/projects/${id}/diagram`)
+    if (!response.ok) throw new Error(`GET /api/projects/${id}/diagram falhou (${response.status}).`)
+    return (await response.json()) as PersistedDiagramLayout
+  }, projectId)
+}
+
+async function diagramNodeClass(page: Page, table: string): Promise<string> {
+  return page.evaluate((name) => {
+    const card = document.querySelector(`[data-testid="diagram-node-${name}"]`)
+    return card?.closest('.react-flow__node')?.getAttribute('class') ?? ''
+  }, table)
+}
+
 runOnce(['bun', 'run', '--cwd', 'apps/api', 'db:seed'])
 
 const api = Bun.spawn(['bun', 'run', '--cwd', 'apps/api', 'start'], {
@@ -642,8 +666,223 @@ try {
 
   await migrationDialog.getByRole('button', { name: 'Fechar' }).click()
 
+  await page.goto(`http://localhost:${webPort}/project/${projectId}`)
+  await page.getByTestId('table-row-users').waitFor()
+  await page.getByTestId('view-diagram').click()
+  await page.getByTestId('diagram-node-users').waitFor()
+  await page.waitForTimeout(800)
+
+  await page.getByTestId('diagram-relationship-mode').click()
+  await page.getByLabel('Escolher tabela nova_tabela para relacionamento').click()
+  await page.getByLabel('Escolher tabela users para relacionamento').click()
+  const emphasisRelationshipDialog = page.getByRole('dialog', { name: 'Novo relacionamento' })
+  await emphasisRelationshipDialog.waitFor()
+  const emphasisRelationshipSave = waitForModelSave(page)
+  await emphasisRelationshipDialog.getByRole('button', { name: 'Criar relacionamento' }).click()
+  await emphasisRelationshipSave
+  await page.getByTestId('diagram-column-nova_tabela-users_id').waitFor()
+  await page.waitForTimeout(700)
+
+  await page.getByTestId('table-row-nova_tabela').click()
+  await page.waitForFunction(
+    () =>
+      document.querySelector('.react-flow__edge-path')?.getAttribute('class')?.includes('diagram-edge--outgoing') ??
+      false,
+  )
+
+  const outgoingEdge = page.locator('.react-flow__edge-path').first()
+  const outgoingClass = (await outgoingEdge.getAttribute('class')) ?? ''
+  const outgoingStyle = (await outgoingEdge.getAttribute('style')) ?? ''
+  if (!outgoingClass.includes('diagram-edge--outgoing') || outgoingClass.includes('diagram-edge--incoming')) {
+    throw new Error(`A aresta de saída não recebeu o destaque esperado: ${outgoingClass}`)
+  }
+  if (!outgoingStyle.includes('diagram-edge-out') || !outgoingStyle.includes('diagram-edge-strong-width')) {
+    throw new Error(`A aresta de saída não aplicou cor/espessura da direção: ${outgoingStyle}`)
+  }
+  if (!outgoingClass.includes('diagram-edge--animated')) {
+    throw new Error('A aresta de saída não recebeu a animação de sentido FK → PK.')
+  }
+  if (!(await diagramNodeClass(page, 'nova_tabela')).includes('diagram-node--selected')) {
+    throw new Error('O card nova_tabela não foi marcado como selecionado.')
+  }
+  if (!(await diagramNodeClass(page, 'users')).includes('diagram-node--incident')) {
+    throw new Error('O card users não foi marcado como incidente.')
+  }
+  if ((await page.getByTestId('table-item-orders').getAttribute('data-emphasis')) !== 'muted') {
+    throw new Error('A tabela orders deveria ficar esmaecida na árvore enquanto nova_tabela está selecionada.')
+  }
+
+  await page.getByTestId('table-row-users').click()
+  await page.waitForFunction(
+    () =>
+      document.querySelector('.react-flow__edge-path')?.getAttribute('class')?.includes('diagram-edge--incoming') ??
+      false,
+  )
+
+  const incomingEdge = page.locator('.react-flow__edge-path').first()
+  const incomingClass = (await incomingEdge.getAttribute('class')) ?? ''
+  const incomingStyle = (await incomingEdge.getAttribute('style')) ?? ''
+  if (!incomingClass.includes('diagram-edge--incoming') || incomingClass.includes('diagram-edge--outgoing')) {
+    throw new Error(`A aresta de entrada não recebeu o destaque esperado: ${incomingClass}`)
+  }
+  if (!incomingStyle.includes('diagram-edge-in') || !incomingStyle.includes('diagram-edge-strong-width')) {
+    throw new Error(`A aresta de entrada não aplicou cor/espessura da direção: ${incomingStyle}`)
+  }
+  if (!incomingClass.includes('diagram-edge--animated')) {
+    throw new Error('A aresta de entrada não recebeu a animação de sentido FK → PK.')
+  }
+  if (!(await diagramNodeClass(page, 'users')).includes('diagram-node--selected')) {
+    throw new Error('O card users não foi marcado como selecionado.')
+  }
+  if (!(await diagramNodeClass(page, 'nova_tabela')).includes('diagram-node--incident')) {
+    throw new Error('O card nova_tabela não foi marcado como incidente.')
+  }
+
+  await page.waitForTimeout(1500)
+  const beforeStar = await readPersistedDiagram(page, projectId)
+  const beforeStarPrincipal = beforeStar.layouts.find((layout) => layout.zoneName === 'Principal')
+  if (!beforeStarPrincipal) throw new Error('O layout salvo não contém a zona Principal antes da organização.')
+
+  let starSaves = 0
+  const trackStarSaves = (response: import('playwright').Response) => {
+    const request = response.request()
+    if (request.method() !== 'PUT') return
+    if (!/^\/api\/projects\/[^/]+\/diagram$/.test(new URL(response.url()).pathname)) return
+    if (!response.ok()) return
+    starSaves += 1
+  }
+  page.on('response', trackStarSaves)
+
+  const starSaved = waitForDiagramSave(page)
+  await page.getByTestId('diagram-auto-layout').click()
+  await page.getByTestId('diagram-layout-star').click()
+  await starSaved
+  await page.waitForTimeout(1200)
+  page.off('response', trackStarSaves)
+  if (starSaves !== 1) {
+    throw new Error(`A organização Em estrela deveria concluir um único PUT do diagrama; concluiu ${starSaves}.`)
+  }
+
+  const starLayout = await readPersistedDiagram(page, projectId)
+  const starPrincipal = starLayout.layouts.find((layout) => layout.zoneName === 'Principal')
+  if (!starPrincipal) throw new Error('O layout salvo não contém a zona Principal após a organização.')
+  for (const table of ['users', 'nova_tabela', 'orders']) {
+    if (!starPrincipal.positions[table]) {
+      throw new Error(`A organização Em estrela não gravou a posição de ${table}.`)
+    }
+  }
+  const moved = ['users', 'nova_tabela', 'orders'].some((table) => {
+    const before = beforeStarPrincipal.positions[table]
+    const after = starPrincipal.positions[table]
+    return !before || Math.abs(before.x - after.x) > 0.01 || Math.abs(before.y - after.y) > 0.01
+  })
+  if (!moved) throw new Error('A organização Em estrela não alterou as posições salvas do diagrama.')
+
+  await page.reload()
+  await page.getByTestId('table-row-users').waitFor()
+  await page.getByTestId('view-diagram').click()
+  await page.getByTestId('diagram-node-users').waitFor()
+  await page.waitForTimeout(1000)
+
+  const restoredStar = await readPersistedDiagram(page, projectId)
+  const restoredStarPrincipal = restoredStar.layouts.find((layout) => layout.zoneName === 'Principal')
+  if (!restoredStarPrincipal) throw new Error('O layout salvo não contém a zona Principal após recarregar.')
+  for (const table of ['users', 'nova_tabela', 'orders']) {
+    const expected = starPrincipal.positions[table]
+    const actual = restoredStarPrincipal.positions[table]
+    if (!actual || Math.abs(actual.x - expected.x) > 0.01 || Math.abs(actual.y - expected.y) > 0.01) {
+      throw new Error(
+        `A posição de ${table} não foi mantida após recarregar (${JSON.stringify(expected)} -> ${JSON.stringify(actual)}).`,
+      )
+    }
+  }
+
+  const restoredStarNodes = await page.evaluate(
+    (tables) => {
+      const result: Record<string, { x: number; y: number }> = {}
+      for (const table of tables) {
+        const node = document.querySelector(`[data-testid="rf__node-${table}"]`)
+        const translate = node instanceof HTMLElement ? node.style.transform.match(/-?[\d.]+/g) : null
+        result[table] = {
+          x: translate ? Number(translate[0]) : Number.NaN,
+          y: translate ? Number(translate[1]) : Number.NaN,
+        }
+      }
+      return result
+    },
+    ['users', 'nova_tabela', 'orders'],
+  )
+  for (const table of ['users', 'nova_tabela', 'orders']) {
+    const expected = starPrincipal.positions[table]
+    const actual = restoredStarNodes[table]
+    if (Math.abs(actual.x - expected.x) > 3 || Math.abs(actual.y - expected.y) > 3) {
+      throw new Error(
+        `O card ${table} não voltou na posição do layout Em estrela (${JSON.stringify(expected)} -> ${JSON.stringify(actual)}).`,
+      )
+    }
+  }
+
+  const viewerEmail = 'viewer@e2e.local'
+  const viewerPassword = 'e2e-viewer-password'
+  const viewerStatus = await page.evaluate(
+    async (input) => {
+      const response = await fetch('/api/users', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify(input),
+      })
+      if (!response.ok && response.status !== 409) {
+        throw new Error(`POST /api/users falhou (${response.status}).`)
+      }
+      return response.status
+    },
+    { email: viewerEmail, password: viewerPassword, role: 'VIEWER' },
+  )
+  if (viewerStatus !== 201 && viewerStatus !== 409) {
+    throw new Error(`Status inesperado ao criar o VIEWER: ${viewerStatus}.`)
+  }
+
+  const viewerContext = await browser.newContext()
+  const viewerPage = await viewerContext.newPage()
+  viewerPage.setDefaultTimeout(20000)
+  try {
+    await viewerPage.goto(`http://localhost:${webPort}/login`)
+    await viewerPage.getByLabel('E-mail').fill(viewerEmail)
+    await viewerPage.getByLabel('Senha').fill(viewerPassword)
+    await viewerPage.getByRole('button', { name: 'Entrar' }).click()
+    await viewerPage.getByRole('heading', { name: 'Seus projetos' }).waitFor()
+
+    await viewerPage.goto(`http://localhost:${webPort}/project/${projectId}`)
+    await viewerPage.getByTestId('table-row-users').waitFor()
+    await viewerPage.getByTestId('view-diagram').click()
+    await viewerPage.getByTestId('diagram-node-users').waitFor()
+    await viewerPage.getByTestId('diagram-toolbar').waitFor()
+
+    for (const testId of ['diagram-add-table', 'diagram-relationship-mode', 'diagram-auto-layout']) {
+      if ((await viewerPage.getByTestId(testId).count()) !== 0) {
+        throw new Error(`O VIEWER viu o controle de edição ${testId}.`)
+      }
+    }
+    for (const testId of ['diagram-tool-select', 'diagram-tool-move']) {
+      if ((await viewerPage.getByTestId(testId).count()) !== 0) {
+        throw new Error(`O VIEWER viu o modo de ferramenta de edição ${testId}.`)
+      }
+    }
+    for (const testId of [
+      'diagram-zoom-in',
+      'diagram-zoom-out',
+      'diagram-fit-view',
+      'diagram-export-png',
+      'diagram-export-svg',
+    ]) {
+      await viewerPage.getByTestId(testId).waitFor()
+    }
+  } finally {
+    await viewerContext.close()
+  }
+
   console.log(
-    'E2E smoke ok: login, projeto via SQL, descrição, aprovação, agente (fake, projeto e tabela), diagrama (arraste, zoom e layout persistidos), export JSON, viewer read-only (somente GET), edição no canvas (tabela, relacionamento com FK automática, undo e modelo persistido), zonas da Fase 9 (criar aba, arrastar da árvore, remover sem excluir, localizar por outra zona e export PNG/SVG) e DDL da Fase 10 (script completo Postgres, migração após editar tipo de coluna, download .sql e marcar banco como sincronizado).',
+    'E2E smoke ok: login, projeto via SQL, descrição, aprovação, agente (fake, projeto e tabela), diagrama (arraste, zoom e layout persistidos), export JSON, viewer read-only (somente GET), edição no canvas (tabela, relacionamento com FK automática, undo e modelo persistido), zonas da Fase 9 (criar aba, arrastar da árvore, remover sem excluir, localizar por outra zona e export PNG/SVG), DDL da Fase 10 (script completo Postgres, migração após editar tipo de coluna, download .sql e marcar banco como sincronizado) e experiência do canvas da Fase 11 (destaque de arestas outgoing/incoming com animação, organização Em estrela num único PUT persistida após reload e VIEWER sem controles de edição).',
   )
 } finally {
   await browser?.close()

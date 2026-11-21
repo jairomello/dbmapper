@@ -371,6 +371,47 @@ e não grava evento. A captura manual usa `PUT /api/projects/{id}/ddl/baseline`
 como `ddl.baseline_captured`. `VIEWER` vê o botão de geração (que é leitura), mas
 não a ação de sincronizar.
 
+## Experiência do canvas (Fase 11)
+
+O diagrama ganhou uma toolbar de ferramentas acima do canvas e passou a destacar
+os relacionamentos da tabela em foco, além de organizar o layout automaticamente.
+Tudo continua no frontend: posições, viewport e zoom são gravados pelo mesmo
+`PUT /api/projects/{id}/diagram`; modelo e export v1 não mudam.
+
+- **Toolbar**: **Selecionar** (padrão) e **Mover** alternam o modo pelo
+  `aria-pressed`; `Mover` faz pan sem selecionar. Zoom **+**/**−**, **Ajustar à
+  tela**, **Exportar PNG/SVG** e, para `MEMBER`/`ADMIN`, **Adicionar tabela**,
+  **Relacionamento 1:n**, **Organizar** e **Desfazer/Refazer**. `VIEWER` vê
+  apenas zoom, ajustar e exportar.
+- **Destaque ao selecionar**: clicar num card (ou numa tabela/coluna da árvore)
+  realça o card selecionado, mantém visíveis os cards incidentes e esmaece o
+  restante no canvas e na árvore. As arestas incidentes ganham direção explícita:
+  **saída** (a tabela selecionada emite a FK) em âmbar com tracejado curto e
+  **entrada** (outras tabelas apontam para a selecionada) em azul com tracejado
+  longo. A cor é sempre acompanhada de padrão e da animação de sentido FK → PK,
+  que fica estática em `prefers-reduced-motion`. As arestas medem 2 px (3 px
+  quando destacadas), com as marcas de cardinalidade proporcionais.
+- **Organizar**: o menu **Organizar** oferece **Em grade** (linhas e colunas) e
+  **Em estrela** (a tabela mais conectada vai ao centro, as vizinhas formam anéis
+  por nível de relacionamento e as isoladas ficam numa faixa lateral). Os dois
+  algoritmos são determinísticos e evitam sobreposição; a organização atua só na
+  zona ativa, grava posições/viewport/zoom num único `PUT` e enquadra a view
+  (`fitView`) em seguida.
+
+Fluxo de uso:
+
+1. Abra um projeto e clique em **Diagrama**.
+2. Use **Selecionar** para clicar num card ou escolha uma tabela/coluna na
+   árvore; confira as arestas de saída e de entrada destacadas e o restante
+   esmaecido.
+3. Clique em **Organizar** e escolha **Em estrela** (ou **Em grade**); espere o
+   indicador de save e o enquadramento da view.
+4. Recarregue a página ou reabra o diagrama: as posições da organização são
+   restauradas do layout salvo.
+5. Entre como `VIEWER` para confirmar que a toolbar mantém zoom/ajustar/exportar
+   e esconde os controles de edição (adicionar tabela, relacionamento e
+   organizar).
+
 ## Agente de sugestões (Fase 4)
 
 A Fase 4 adiciona o agente embutido: geração em lote de sugestões de descrição

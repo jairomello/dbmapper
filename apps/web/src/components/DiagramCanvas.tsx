@@ -15,8 +15,17 @@ import {
   ReactFlowProvider,
   useReactFlow,
 } from '@xyflow/react'
-import { type DragEvent, type MouseEvent as ReactMouseEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import {
+  type DragEvent,
+  type MouseEvent as ReactMouseEvent,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react'
 import type { DiagramPosition } from '../api/types'
+import { layoutGrid, layoutStar, type LayoutRelationship } from '../diagram/auto-layout'
 import { CrowFootEdge } from '../diagram/CrowFootEdge'
 import { CanvasContextMenu, type CanvasMenuItem } from '../diagram/CanvasContextMenu'
 import { ColumnPopover, type ColumnDraft, TablePopover } from '../diagram/ColumnPopover'
@@ -76,6 +85,10 @@ type OpenPopover =
   | { kind: 'new-column'; table: string }
 
 type RelationshipMode = 'off' | 'source' | 'target'
+
+type CanvasTool = 'select' | 'move'
+
+type LayoutAlgorithm = 'grid' | 'star'
 
 export interface DiagramCanvasProps {
   projectId: string
@@ -137,6 +150,9 @@ function DiagramCanvasInner({
   const [relationshipSource, setRelationshipSource] = useState<string | null>(null)
   const [exporting, setExporting] = useState<DiagramExportFormat | null>(null)
   const [exportError, setExportError] = useState<string | null>(null)
+  const [tool, setTool] = useState<CanvasTool>('select')
+  const [layoutMenuOpen, setLayoutMenuOpen] = useState(false)
+  const moveMode = tool === 'move'
 
   const wrapperRef = useRef<HTMLDivElement | null>(null)
   const viewportRef = useRef({ x: 0, y: 0, zoom: 1 })
@@ -145,7 +161,10 @@ function DiagramCanvasInner({
   const skipViewportSaveRef = useRef(false)
   const previousZoneRef = useRef(zones.activeZone)
 
-  const { setViewport, setCenter, getNode, fitView, screenToFlowPosition } = useReactFlow<DiagramNode, DiagramEdge>()
+  const { setViewport, setCenter, getNode, fitView, screenToFlowPosition, zoomIn, zoomOut } = useReactFlow<
+    DiagramNode,
+    DiagramEdge
+  >()
 
   const zoneDatabase = useMemo(() => {
     const members = new Set(zones.activeMembers)
@@ -411,7 +430,53 @@ function DiagramCanvasInner({
     }
   }
 
+  const selectFromCanvas = useCallback(
+    (next: Selection) => {
+      if (moveMode) return
+      onSelect(next)
+    },
+    [moveMode, onSelect],
+  )
+
+  const activeRelationships = useMemo<LayoutRelationship[]>(() => {
+    const names = new Set(zoneDatabase.tables.map((table) => table.name))
+    const seen = new Set<string>()
+    const relationships: LayoutRelationship[] = []
+    for (const table of zoneDatabase.tables) {
+      for (const relationship of table.relationships?.parents ?? []) {
+        if (!names.has(relationship.table) || relationship.table === table.name) continue
+        const key = `${table.name}\u0000${relationship.table}`
+        if (seen.has(key)) continue
+        seen.add(key)
+        relationships.push({ source: table.name, target: relationship.table })
+      }
+    }
+    return relationships
+  }, [zoneDatabase])
+
+  const applyAutoLayout = useCallback(
+    (algorithm: LayoutAlgorithm) => {
+      setLayoutMenuOpen(false)
+      if (!effectiveCanEdit || zoneDatabase.tables.length === 0) return
+      const nextPositions =
+        algorithm === 'grid' ? layoutGrid(zoneDatabase.tables) : layoutStar(zoneDatabase.tables, activeRelationships)
+      const applied = zones.applyActiveLayout(
+        nextPositions,
+        { x: viewportRef.current.x, y: viewportRef.current.y },
+        viewportRef.current.zoom,
+      )
+      if (!applied) return
+      skipViewportSaveRef.current = true
+      void fitView({ padding: 0.2 })
+      setTimeout(() => {
+        skipViewportSaveRef.current = false
+      }, 400)
+    },
+    [effectiveCanEdit, zoneDatabase, activeRelationships, zones, fitView],
+  )
+
   const matches = useMemo(() => diagramMatches(zoneDatabase, query), [zoneDatabase, query])
+  const selectedTable = selection.type === 'database' ? null : selection.table
   const nodes = useMemo(
     () =>
       createDiagramNodes({
@@ -420,11 +485,11 @@ function DiagramCanvasInner({
         selection,
         matches,
         query,
-        draggable: effectiveCanEdit,
+        draggable: effectiveCanEdit && !moveMode,
         keys: relationshipKeys,
-        onSelect,
+        onSelect: selectFromCanvas,
         canEdit: effectiveCanEdit,
-        relationshipMode: relationshipMode !== 'off',
+        relationshipMode: relationshipMode !== 'off' && !moveMode,
         onPickTable: handlePickTable,
         onAddColumn: (table) => setOpenPopover({ kind: 'new-column', table }),
         onEditTable: (table) => setOpenPopover({ kind: 'table', table }),
@@ -439,7 +504,8 @@ function DiagramCanvasInner({
       matches,
       query,
       effectiveCanEdit,
-      onSelect,
+      moveMode,
+      selectFromCanvas,
       relationshipMode,
       handlePickTable,
       requestDeleteRelationship,
@@ -447,8 +513,13 @@ function DiagramCanvasInner({
     ],
   )
   const edges = useMemo(
-    () => createDiagramEdges(zoneDatabase, { canEdit: effectiveCanEdit, onDelete: requestDeleteRelationship }),
-    [zoneDatabase, effectiveCanEdit, requestDeleteRelationship],
+    () =>
+      createDiagramEdges(zoneDatabase, {
+        canEdit: effectiveCanEdit,
+        selectedTable,
+        onDelete: requestDeleteRelationship,
+      }),
+    [zoneDatabase, effectiveCanEdit, selectedTable, requestDeleteRelationship],
   )
 
   const layoutStatus = !canEdit
@@ -517,7 +588,6 @@ function DiagramCanvasInner({
           ?.columns.find((column) => column.name === openPopover.column)
       : undefined
 
-  const selectedTable = selection.type === 'database' ? null : selection.table
   const selectedOutsideZone =
     selectedTable !== null &&
     zones.zoneOf(selectedTable) === null &&
@@ -525,7 +595,8 @@ function DiagramCanvasInner({
 
   function handleDragOver(event: DragEvent<HTMLDivElement>) {
     if (!effectiveCanEdit) return
-    if (!event.dataTransfer.types.includes(DIAGRAM_TABLE_MIME) && !event.dataTransfer.types.includes('text/plain')) return
+    if (!event.dataTransfer.types.includes(DIAGRAM_TABLE_MIME) && !event.dataTransfer.types.includes('text/plain'))
+      return
     event.preventDefault()
     event.dataTransfer.dropEffect = 'move'
   }
@@ -578,166 +649,275 @@ function DiagramCanvasInner({
         onReorder={zones.reorderZones}
       />
       <div className="relative min-h-0 flex-1">
-      <ReactFlow<DiagramNode, DiagramEdge>
-        nodes={nodes}
-        edges={edges}
-        nodeTypes={NODE_TYPES}
-        edgeTypes={EDGE_TYPES}
-        onNodesChange={handleNodesChange}
-        onNodeDragStop={handleNodeDragStop}
-        onMoveEnd={handleMoveEnd}
-        onInit={handleInit}
-        onConnect={handleConnect}
-        onNodeContextMenu={handleNodeContextMenu}
-        onPaneContextMenu={handlePaneContextMenu}
-        nodesDraggable={effectiveCanEdit}
-        nodesConnectable={effectiveCanEdit}
+        <ReactFlow<DiagramNode, DiagramEdge>
+          nodes={nodes}
+          edges={edges}
+          nodeTypes={NODE_TYPES}
+          edgeTypes={EDGE_TYPES}
+          onNodesChange={handleNodesChange}
+          onNodeDragStop={handleNodeDragStop}
+          onMoveEnd={handleMoveEnd}
+          onInit={handleInit}
+          onConnect={handleConnect}
+          onNodeContextMenu={handleNodeContextMenu}
+          onPaneContextMenu={handlePaneContextMenu}
+          nodesDraggable={effectiveCanEdit && !moveMode}
+          nodesConnectable={effectiveCanEdit && !moveMode}
+        panOnDrag={moveMode || !effectiveCanEdit}
         elementsSelectable={false}
-        edgesFocusable={false}
-        deleteKeyCode={null}
-        minZoom={0.2}
-        maxZoom={2}
-        fitView={false}
-        defaultViewport={{ x: 0, y: 0, zoom: 1 }}
-        className="bg-slate-50"
-        aria-label="Diagrama do modelo"
-      >
-        <Background variant={BackgroundVariant.Dots} gap={16} size={1} />
-        <Controls showInteractive={false} />
-        <MiniMap pannable zoomable />
-        <Panel position="top-left" className="flex w-72 flex-col gap-1">
-          <label className="flex flex-col gap-1 text-[11px] font-medium text-slate-600">
-            Buscar no diagrama
-            <input
-              type="search"
-              className="nodrag nopan w-full rounded-sm border border-slate-300 bg-white px-2 py-1.5 text-xs text-ink outline-none focus:border-accent"
-              aria-label="Buscar no diagrama"
-              placeholder="Tabela ou campo"
-              value={query}
-              onChange={(event) => setQuery(event.target.value)}
-            />
-          </label>
-          <div className="flex flex-wrap gap-1" data-testid="diagram-export-actions">
-            <button
-              type="button"
-              className="nodrag nopan rounded-sm border border-slate-300 bg-white px-2 py-1 text-[11px] font-medium text-slate-600 hover:bg-slate-100 disabled:opacity-50"
-              onClick={() => void handleExport('png')}
-              disabled={exporting !== null}
-              data-testid="diagram-export-png"
+          edgesFocusable={false}
+          deleteKeyCode={null}
+          minZoom={0.2}
+          maxZoom={2}
+          fitView={false}
+          defaultViewport={{ x: 0, y: 0, zoom: 1 }}
+          className="bg-slate-50"
+          aria-label="Diagrama do modelo"
+        >
+          <Background variant={BackgroundVariant.Dots} gap={16} size={1} />
+          <Controls showInteractive={false} />
+          <MiniMap pannable zoomable />
+          <Panel position="top-left" className="flex w-72 flex-col gap-1">
+            <label className="flex flex-col gap-1 text-[11px] font-medium text-slate-600">
+              Buscar no diagrama
+              <input
+                type="search"
+                className="nodrag nopan w-full rounded-sm border border-slate-300 bg-white px-2 py-1.5 text-xs text-ink outline-none focus:border-accent"
+                aria-label="Buscar no diagrama"
+                placeholder="Tabela ou campo"
+                value={query}
+                onChange={(event) => setQuery(event.target.value)}
+              />
+            </label>
+            {relationshipMode !== 'off' ? (
+              <p className="rounded-sm bg-indigo-50 px-2 py-1 text-[11px] text-indigo-700" role="status">
+                {relationshipMode === 'source'
+                  ? 'Clique na tabela de origem.'
+                  : `Origem ${relationshipSource}. Clique na tabela de destino.`}
+              </p>
+            ) : null}
+            <p
+              className={`rounded-sm px-2 py-1 text-[11px] ${
+                zones.saveState.error || editor.saveState.status === 'error'
+                  ? 'bg-red-50 text-red-700'
+                  : 'bg-white/90 text-slate-500'
+              }`}
+              data-testid="diagram-save-status"
+              role={zones.saveState.error || editor.saveState.status === 'error' ? 'alert' : 'status'}
             >
-              {exporting === 'png' ? 'Exportando…' : 'Exportar PNG'}
-            </button>
-            <button
-              type="button"
-              className="nodrag nopan rounded-sm border border-slate-300 bg-white px-2 py-1 text-[11px] font-medium text-slate-600 hover:bg-slate-100 disabled:opacity-50"
-              onClick={() => void handleExport('svg')}
-              disabled={exporting !== null}
-              data-testid="diagram-export-svg"
-            >
-              {exporting === 'svg' ? 'Exportando…' : 'Exportar SVG'}
-            </button>
-          </div>
-          {exportError ? (
-            <p className="rounded-sm bg-red-50 px-2 py-1 text-[11px] text-red-700" role="alert">
-              {exportError}
+              {saveStatus}
             </p>
-          ) : null}
-          {effectiveCanEdit ? (
-            <div className="flex flex-wrap gap-1">
+            {zones.isError ? (
+              <p className="rounded-sm bg-amber-50 px-2 py-1 text-[11px] text-amber-700">
+                Não foi possível carregar o layout salvo.
+              </p>
+            ) : null}
+          </Panel>
+          <Panel
+            position="top-center"
+            className="flex max-w-[min(92vw,860px)] flex-wrap items-center gap-1 rounded-md border border-slate-200 bg-white/95 px-2 py-1.5 shadow-sm"
+            data-testid="diagram-toolbar"
+            role="toolbar"
+            aria-label="Ferramentas do diagrama"
+          >
+            {effectiveCanEdit ? (
+              <div className="flex items-center gap-1">
+                <button
+                  type="button"
+                  className={`nodrag nopan rounded-sm border px-2 py-1 text-[11px] font-medium ${
+                    tool === 'select'
+                      ? 'border-accent bg-indigo-50 text-accent'
+                      : 'border-slate-300 bg-white text-slate-600 hover:bg-slate-100'
+                  }`}
+                  aria-pressed={tool === 'select'}
+                  onClick={() => setTool('select')}
+                  data-testid="diagram-tool-select"
+                >
+                  Selecionar
+                </button>
+                <button
+                  type="button"
+                  className={`nodrag nopan rounded-sm border px-2 py-1 text-[11px] font-medium ${
+                    tool === 'move'
+                      ? 'border-accent bg-indigo-50 text-accent'
+                      : 'border-slate-300 bg-white text-slate-600 hover:bg-slate-100'
+                  }`}
+                  aria-pressed={tool === 'move'}
+                  onClick={() => setTool('move')}
+                  data-testid="diagram-tool-move"
+                >
+                  Mover
+                </button>
+              </div>
+            ) : null}
+            <div className="flex items-center gap-1">
+              <button
+                type="button"
+                className="nodrag nopan rounded-sm border border-slate-300 bg-white px-2 py-1 text-[11px] font-semibold text-slate-600 hover:bg-slate-100"
+                aria-label="Aproximar"
+                title="Aproximar"
+                onClick={() => void zoomIn()}
+                data-testid="diagram-zoom-in"
+              >
+                +
+              </button>
+              <button
+                type="button"
+                className="nodrag nopan rounded-sm border border-slate-300 bg-white px-2 py-1 text-[11px] font-semibold text-slate-600 hover:bg-slate-100"
+                aria-label="Afastar"
+                title="Afastar"
+                onClick={() => void zoomOut()}
+                data-testid="diagram-zoom-out"
+              >
+                −
+              </button>
               <button
                 type="button"
                 className="nodrag nopan rounded-sm border border-slate-300 bg-white px-2 py-1 text-[11px] font-medium text-slate-600 hover:bg-slate-100"
-                onClick={addTableAtViewportCenter}
-                data-testid="diagram-add-table"
+                aria-label="Ajustar à tela"
+                title="Ajustar à tela"
+                onClick={() => void fitView({ padding: 0.2 })}
+                data-testid="diagram-fit-view"
               >
-                Adicionar tabela
+                Ajustar
+              </button>
+            </div>
+            <div className="flex flex-wrap gap-1" data-testid="diagram-export-actions">
+              <button
+                type="button"
+                className="nodrag nopan rounded-sm border border-slate-300 bg-white px-2 py-1 text-[11px] font-medium text-slate-600 hover:bg-slate-100 disabled:opacity-50"
+                onClick={() => void handleExport('png')}
+                disabled={exporting !== null}
+                data-testid="diagram-export-png"
+              >
+                {exporting === 'png' ? 'Exportando…' : 'Exportar PNG'}
               </button>
               <button
                 type="button"
-                className={`nodrag nopan rounded-sm border px-2 py-1 text-[11px] font-medium ${
-                  relationshipMode === 'off'
-                    ? 'border-slate-300 bg-white text-slate-600 hover:bg-slate-100'
-                    : 'border-accent bg-indigo-50 text-accent'
-                }`}
-                onClick={toggleRelationshipMode}
-                aria-pressed={relationshipMode !== 'off'}
-                data-testid="diagram-relationship-mode"
+                className="nodrag nopan rounded-sm border border-slate-300 bg-white px-2 py-1 text-[11px] font-medium text-slate-600 hover:bg-slate-100 disabled:opacity-50"
+                onClick={() => void handleExport('svg')}
+                disabled={exporting !== null}
+                data-testid="diagram-export-svg"
               >
-                Relacionamento 1:n
+                {exporting === 'svg' ? 'Exportando…' : 'Exportar SVG'}
               </button>
-              {editor.canUndo ? (
-                <button
-                  type="button"
-                  className="nodrag nopan rounded-sm border border-slate-300 bg-white px-2 py-1 text-[11px] font-medium text-slate-600 hover:bg-slate-100"
-                  onClick={() => editor.undo()}
-                  data-testid="diagram-undo"
-                >
-                  Desfazer
-                </button>
-              ) : null}
-              {editor.canRedo ? (
-                <button
-                  type="button"
-                  className="nodrag nopan rounded-sm border border-slate-300 bg-white px-2 py-1 text-[11px] font-medium text-slate-600 hover:bg-slate-100"
-                  onClick={() => editor.redo()}
-                  data-testid="diagram-redo"
-                >
-                  Refazer
-                </button>
-              ) : null}
             </div>
-          ) : null}
-          {relationshipMode !== 'off' ? (
-            <p className="rounded-sm bg-indigo-50 px-2 py-1 text-[11px] text-indigo-700" role="status">
-              {relationshipMode === 'source'
-                ? 'Clique na tabela de origem.'
-                : `Origem ${relationshipSource}. Clique na tabela de destino.`}
-            </p>
-          ) : null}
-          <p
-            className={`rounded-sm px-2 py-1 text-[11px] ${
-              zones.saveState.error || editor.saveState.status === 'error'
-                ? 'bg-red-50 text-red-700'
-                : 'bg-white/90 text-slate-500'
-            }`}
-            data-testid="diagram-save-status"
-            role={zones.saveState.error || editor.saveState.status === 'error' ? 'alert' : 'status'}
-          >
-            {saveStatus}
-          </p>
-          {zones.isError ? (
-            <p className="rounded-sm bg-amber-50 px-2 py-1 text-[11px] text-amber-700">
-              Não foi possível carregar o layout salvo.
-            </p>
-          ) : null}
-        </Panel>
-      </ReactFlow>
+            {effectiveCanEdit ? (
+              <div className="flex flex-wrap items-center gap-1">
+                <button
+                  type="button"
+                  className="nodrag nopan rounded-sm border border-slate-300 bg-white px-2 py-1 text-[11px] font-medium text-slate-600 hover:bg-slate-100"
+                  onClick={addTableAtViewportCenter}
+                  data-testid="diagram-add-table"
+                >
+                  Adicionar tabela
+                </button>
+                <button
+                  type="button"
+                  className={`nodrag nopan rounded-sm border px-2 py-1 text-[11px] font-medium ${
+                    relationshipMode === 'off'
+                      ? 'border-slate-300 bg-white text-slate-600 hover:bg-slate-100'
+                      : 'border-accent bg-indigo-50 text-accent'
+                  }`}
+                  onClick={toggleRelationshipMode}
+                  aria-pressed={relationshipMode !== 'off'}
+                  data-testid="diagram-relationship-mode"
+                >
+                  Relacionamento 1:n
+                </button>
+                <div className="relative">
+                  <button
+                    type="button"
+                    className="nodrag nopan rounded-sm border border-slate-300 bg-white px-2 py-1 text-[11px] font-medium text-slate-600 hover:bg-slate-100"
+                    aria-haspopup="menu"
+                    aria-expanded={layoutMenuOpen}
+                    onClick={() => setLayoutMenuOpen((open) => !open)}
+                    data-testid="diagram-auto-layout"
+                  >
+                    Organizar
+                  </button>
+                  {layoutMenuOpen ? (
+                    <div
+                      role="menu"
+                      aria-label="Organização automática"
+                      className="absolute left-0 top-full z-20 mt-1 flex w-40 flex-col rounded-md border border-slate-200 bg-white py-1 shadow-lg"
+                    >
+                      <button
+                        type="button"
+                        role="menuitem"
+                        className="nodrag nopan px-3 py-1.5 text-left text-[11px] font-medium text-slate-600 hover:bg-slate-100"
+                        onClick={() => applyAutoLayout('grid')}
+                        data-testid="diagram-layout-grid"
+                      >
+                        Em grade
+                      </button>
+                      <button
+                        type="button"
+                        role="menuitem"
+                        className="nodrag nopan px-3 py-1.5 text-left text-[11px] font-medium text-slate-600 hover:bg-slate-100"
+                        onClick={() => applyAutoLayout('star')}
+                        data-testid="diagram-layout-star"
+                      >
+                        Em estrela
+                      </button>
+                    </div>
+                  ) : null}
+                </div>
+                {editor.canUndo ? (
+                  <button
+                    type="button"
+                    className="nodrag nopan rounded-sm border border-slate-300 bg-white px-2 py-1 text-[11px] font-medium text-slate-600 hover:bg-slate-100"
+                    onClick={() => editor.undo()}
+                    data-testid="diagram-undo"
+                  >
+                    Desfazer
+                  </button>
+                ) : null}
+                {editor.canRedo ? (
+                  <button
+                    type="button"
+                    className="nodrag nopan rounded-sm border border-slate-300 bg-white px-2 py-1 text-[11px] font-medium text-slate-600 hover:bg-slate-100"
+                    onClick={() => editor.redo()}
+                    data-testid="diagram-redo"
+                  >
+                    Refazer
+                  </button>
+                ) : null}
+              </div>
+            ) : null}
+            {exportError ? (
+              <p className="w-full rounded-sm bg-red-50 px-2 py-1 text-[11px] text-red-700" role="alert">
+                {exportError}
+              </p>
+            ) : null}
+          </Panel>
+        </ReactFlow>
 
-      {selectedOutsideZone && selectedTable ? (
-        <div
-          className="absolute bottom-4 left-1/2 z-10 flex -translate-x-1/2 items-center gap-2 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-900 shadow-md"
-          data-testid="diagram-outside-zone"
-          role="status"
-        >
-          <span>
-            {effectiveCanEdit
-              ? `A tabela ${selectedTable} está fora do diagrama.`
-              : `A tabela ${selectedTable} está fora do diagrama.`}
-          </span>
-          {effectiveCanEdit ? (
-            <button
-              type="button"
-              className="rounded-sm border border-amber-400 bg-white px-2 py-1 text-[11px] font-semibold text-amber-900 hover:bg-amber-100"
-              onClick={() => {
-                zones.addTableToActiveZone(selectedTable)
-              }}
-              data-testid="diagram-add-to-zone"
-            >
-              Adicionar à aba atual
-            </button>
-          ) : null}
-        </div>
-      ) : null}
+        {selectedOutsideZone && selectedTable ? (
+          <div
+            className="absolute bottom-4 left-1/2 z-10 flex -translate-x-1/2 items-center gap-2 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-900 shadow-md"
+            data-testid="diagram-outside-zone"
+            role="status"
+          >
+            <span>
+              {effectiveCanEdit
+                ? `A tabela ${selectedTable} está fora do diagrama.`
+                : `A tabela ${selectedTable} está fora do diagrama.`}
+            </span>
+            {effectiveCanEdit ? (
+              <button
+                type="button"
+                className="rounded-sm border border-amber-400 bg-white px-2 py-1 text-[11px] font-semibold text-amber-900 hover:bg-amber-100"
+                onClick={() => {
+                  zones.addTableToActiveZone(selectedTable)
+                }}
+                data-testid="diagram-add-to-zone"
+              >
+                Adicionar à aba atual
+              </button>
+            ) : null}
+          </div>
+        ) : null}
       </div>
 
       {menu ? <CanvasContextMenu x={menu.x} y={menu.y} items={menuItems} onClose={() => setMenu(null)} /> : null}

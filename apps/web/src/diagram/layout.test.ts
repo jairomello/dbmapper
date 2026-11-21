@@ -122,4 +122,110 @@ describe('diagram layout', () => {
     expect(nodes.find((node) => node.id === 'cliente')?.data.tableMatch).toBe(true)
     expect(nodes.find((node) => node.id === 'pedido')?.data.columnMatches).toEqual(['cliente_id'])
   })
+
+  test('marca ênfase outgoing, incoming e none por nome de tabela selecionada', () => {
+    const database = sampleDatabase()
+    database.tables.push({
+      name: 'nota',
+      description: '',
+      business_terms: [],
+      reviewed: false,
+      status: 'UNCHANGED',
+      relationships: {
+        parents: [
+          {
+            table: 'pedido',
+            local_columns: ['pedido_id'],
+            referenced_columns: ['id'],
+            constraint_name: 'fk_nota_pedido',
+            description: '',
+            reviewed: false,
+          },
+        ],
+        children: [],
+      },
+      columns: [
+        {
+          name: 'id',
+          type: 'serial',
+          primary_key: true,
+          foreign_key: false,
+          description: '',
+          business_terms: [],
+          reviewed: false,
+          status: 'UNCHANGED',
+        },
+        {
+          name: 'pedido_id',
+          type: 'int',
+          primary_key: false,
+          foreign_key: true,
+          description: '',
+          business_terms: [],
+          reviewed: false,
+          status: 'UNCHANGED',
+        },
+      ],
+    })
+    database.tables.push({
+      name: 'config',
+      description: '',
+      business_terms: [],
+      reviewed: false,
+      status: 'UNCHANGED',
+      relationships: { parents: [], children: [] },
+      columns: [],
+    })
+
+    const selected = createDiagramEdges(database, { selectedTable: 'pedido' })
+    const outgoing = selected.find((edge) => edge.source === 'pedido' && edge.target === 'cliente')
+    const incoming = selected.find((edge) => edge.source === 'nota' && edge.target === 'pedido')
+
+    expect(outgoing?.data?.emphasis).toBe('outgoing')
+    expect(outgoing?.data?.muted).toBe(false)
+    expect(incoming?.data?.emphasis).toBe('incoming')
+    expect(incoming?.data?.muted).toBe(false)
+
+    const none = createDiagramEdges(database)
+    expect(none.every((edge) => edge.data?.emphasis === 'none' && edge.data?.muted === false)).toBe(true)
+
+    const unrelated = createDiagramEdges(database, { selectedTable: 'config' })
+    expect(unrelated.every((edge) => edge.data?.emphasis === 'none' && edge.data?.muted === true)).toBe(true)
+  })
+
+  test('realça o card selecionado, marca incidentes e esmaece as demais tabelas', () => {
+    const database = sampleDatabase()
+    database.tables.push({
+      name: 'config',
+      description: '',
+      business_terms: [],
+      reviewed: false,
+      status: 'UNCHANGED',
+      relationships: { parents: [], children: [] },
+      columns: [],
+    })
+
+    const nodes = createDiagramNodes({
+      database,
+      positions: buildPositions(database),
+      selection: { type: 'table', table: 'pedido' },
+      matches: diagramMatches(database, ''),
+      query: '',
+      draggable: true,
+      onSelect: () => undefined,
+    })
+
+    expect(nodes.find((node) => node.id === 'pedido')).toMatchObject({
+      className: 'diagram-node--selected',
+      data: { emphasis: 'selected' },
+    })
+    expect(nodes.find((node) => node.id === 'cliente')).toMatchObject({
+      className: 'diagram-node--incident',
+      data: { emphasis: 'incident' },
+    })
+    expect(nodes.find((node) => node.id === 'config')).toMatchObject({
+      className: 'diagram-node--muted',
+      data: { emphasis: 'muted' },
+    })
+  })
 })

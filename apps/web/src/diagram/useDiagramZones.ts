@@ -2,12 +2,7 @@ import type { DatabaseModel } from '@dbmapper/domain'
 import { useMutation, useQuery } from '@tanstack/react-query'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { diagramApi } from '../api/diagram'
-import type {
-  DiagramDocument,
-  DiagramLayoutInput,
-  DiagramPosition,
-  DiagramZone,
-} from '../api/types'
+import type { DiagramDocument, DiagramLayoutInput, DiagramPosition, DiagramZone } from '../api/types'
 import { visibleTables } from './layout'
 import {
   addMembers,
@@ -59,6 +54,7 @@ export interface DiagramZones {
   syncDatabase: (database: DatabaseModel) => void
   updatePositions: (positions: Record<string, DiagramPosition>) => void
   updateViewport: (viewport: DiagramPosition, zoom: number) => void
+  applyActiveLayout: (positions: Record<string, DiagramPosition>, viewport: DiagramPosition, zoom: number) => boolean
   scheduleSave: () => void
   setModelSaving: (saving: boolean) => void
 }
@@ -458,6 +454,35 @@ export function useDiagramZones({
     [canEdit, locked, commit, schedule],
   )
 
+  const applyActiveLayout = useCallback(
+    (positions: Record<string, DiagramPosition>, viewport: DiagramPosition, zoom: number) => {
+      if (!canEdit || locked) return false
+      const current = stateRef.current
+      const name = activeZoneRef.current
+      const layout = current.layouts[name] ?? EMPTY_ZONE_LAYOUT
+      const next: ZoneState = {
+        zones: current.zones,
+        layouts: {
+          ...current.layouts,
+          [name]: { ...layout, positions, viewport: { x: viewport.x, y: viewport.y }, zoom },
+        },
+      }
+      commit(next)
+      if (timerRef.current) {
+        clearTimeout(timerRef.current)
+        timerRef.current = null
+      }
+      if (modelSavingRef.current) {
+        dirtyRef.current = true
+        return true
+      }
+      dirtyRef.current = false
+      mutateRef.current(buildDocumentInput(next.zones, next.layouts))
+      return true
+    },
+    [canEdit, locked, commit],
+  )
+
   const activeMembers = useMemo(
     () => state.zones.find((zone) => zone.name === activeZone)?.members ?? [],
     [state.zones, activeZone],
@@ -491,6 +516,7 @@ export function useDiagramZones({
     syncDatabase,
     updatePositions,
     updateViewport,
+    applyActiveLayout,
     scheduleSave: schedule,
     setModelSaving,
   }

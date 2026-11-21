@@ -19,7 +19,7 @@ a próxima** — sem pressa, vamos aos poucos. Design e decisões:
 | 8   | **Edição no canvas**     | Criar/excluir tabela e coluna, relacionamentos com coluna FK auto-criada no mesmo PUT, popover de coluna, fila de comandos com undo/redo e indicador de save | `v2-phase8-edit` | ✅ concluída em 20/11/2026 |
 | 9   | **Zonas/abas + polish**  | Abas `Principal`/`+`, atribuição e movimentação de tabelas, drag da árvore para a aba, "Remover do diagrama", "Chaves entre modelos" derivada, localizar tabela por zona, export PNG/SVG, contagem de tabelas | `v2-phase9-zones` | ✅ concluída em 20/11/2026 |
 | 10  | **Gerar SQL (DDL)**      | Script completo e migração por dialeto (`postgres`/`mysql`) a partir do modelo, baseline por projeto (capturado no import e manual), renames explícitos, avisos/destrutivos e download `.sql` | `v2-phase10-ddl` | ✅ concluída em 20/11/2026 |
-| 11  | **Experiência do canvas** | Toolbar (selecionar/mover/zoom/criar/organizar/exportar), destaque das arestas da tabela selecionada com cor e direção, tracejado animado, arestas mais grossas e auto-layout grade/estrela | `v2-phase11-canvas-ux` | 📋 especificada em 20/11/2026 (aguardando liberação) |
+| 11  | **Experiência do canvas** | Toolbar (selecionar/mover/zoom/criar/organizar/exportar), destaque das arestas da tabela selecionada com cor e direção, tracejado animado, arestas mais grossas e auto-layout grade/estrela | `v2-phase11-canvas-ux` | ✅ concluída em 21/11/2026 |
 
 ## Como funciona
 
@@ -31,6 +31,13 @@ a próxima** — sem pressa, vamos aos poucos. Design e decisões:
   entre elas.
 - Implementação delegada ao opencode, com revisão antes de aplicar no share
   (fluxo da skill `trabalhar-projetos`).
+- Fluxo do canvas (Fase 11): abra **Diagrama** → alterne **Selecionar**/**Mover**
+  e use zoom/**Ajustar** na toolbar → selecione um card ou uma tabela/coluna na
+  árvore para realçar as arestas de **saída** (FK emitida) e de **entrada** (FK
+  recebida), com o restante esmaecido → **Organizar → Em estrela** (ou **Em
+  grade**) grava posições, viewport e zoom num único `PUT` e enquadra a view →
+  recarregue para confirmar o layout mantido. `VIEWER` vê só
+  zoom/ajustar/exportar.
 - Ao terminar a fase: marcar ✅ nesta tabela, commit de encerramento, **parar e
   esperar o ok** do Jairo para a próxima.
 - Fora do roadmap (backlog pós-v2): versionamento do modelo com scripts de
