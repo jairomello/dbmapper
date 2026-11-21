@@ -37,4 +37,4 @@
 
 ## 7. Archive
 
-- [ ] 7.1 `openspec archive v2-phase11-canvas-ux --yes` após o ok do Jairo, marcar o checkbox e commitar — verificação: `openspec list` sem o change e specs `diagram-canvas`/`diagram-layout` atualizadas.
+- [x] 7.1 `openspec archive v2-phase11-canvas-ux --yes` após o ok do Jairo, marcar o checkbox e commitar — verificação: `openspec list` sem o change e specs `diagram-canvas`/`diagram-layout` atualizadas.
