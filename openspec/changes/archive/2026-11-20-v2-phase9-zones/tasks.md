@@ -41,4 +41,4 @@
 
 ## 8. Archive
 
-- [ ] 8.1 `openspec archive v2-phase9-zones --yes` após o ok do Jairo (só depois do archive da Fase 7, que promove `diagram-canvas`), marcar o checkbox e commitar — verificação: `openspec list` sem o change e `openspec/specs/diagram-zones` existente.
+- [x] 8.1 `openspec archive v2-phase9-zones --yes` após o ok do Jairo (só depois do archive da Fase 7, que promove `diagram-canvas`), marcar o checkbox e commitar — verificação: `openspec list` sem o change e `openspec/specs/diagram-zones` existente.

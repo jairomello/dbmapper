@@ -11,13 +11,22 @@ v1 export contract.
 ### Requirement: Layout endpoints
 
 The API MUST expose `GET /api/projects/:id/diagram` returning the saved layout
-for the project and `PUT /api/projects/:id/diagram` replacing it. An unknown
-project MUST return `404` with the standard error envelope and change nothing.
+document `{ projectId, zones, layouts }` — one `layouts` entry per zone with
+its `positions`, `viewport` and `zoom` — and `PUT /api/projects/:id/diagram`
+replacing it. The PUT accepts that zone document or the legacy flat layout
+(`positions`, `viewport`, `zoom`), which is stored as zone `Principal`. An
+unknown project MUST return `404` with the standard error envelope and change
+nothing.
 
 #### Scenario: Save and read back
 
 - **WHEN** a `MEMBER` PUTs a layout and then GETs it
-- **THEN** the response contains exactly the positions, viewport and zoom that were sent
+- **THEN** the response carries exactly the positions, viewport and zoom that were sent, inside the `layouts` entry of their zone
+
+#### Scenario: Legacy flat layout is accepted
+
+- **WHEN** a `MEMBER` PUTs the flat document without `zones` and then GETs it
+- **THEN** the layout is stored for zone `Principal` and `zones` lists `Principal` holding every table of the model
 
 #### Scenario: Unknown project is rejected
 
