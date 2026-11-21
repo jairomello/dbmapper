@@ -7,7 +7,7 @@ A complete, append-only audit trail of every mutation — who changed what, when
 
 ### Requirement: Mutations emit events
 
-Every mutating endpoint MUST append a row to `events` inside the same transaction as the mutation, with the acting user id, a namespaced action (`domain.verb`), the subject ids and a timestamp. Coverage includes: project create/save/JSON import, SQL model import apply, diagram layout save, item description write, agent decisions, key create/revoke, user create and role change. A mutation that rolls back MUST NOT leave an event.
+Every mutating endpoint MUST append a row to `events` inside the same transaction as the mutation, with the acting user id, a namespaced action (`domain.verb`), the subject ids and a timestamp. Coverage includes: project create/save/JSON import, SQL model import apply, diagram layout save, item description write, agent decisions, key create/revoke, user create and role change, and DDL baseline capture. A mutation that rolls back MUST NOT leave an event.
 
 #### Scenario: Project save is recorded
 
@@ -18,6 +18,11 @@ Every mutating endpoint MUST append a row to `events` inside the same transactio
 
 - **WHEN** a `MEMBER` saves a project's diagram layout
 - **THEN** an `events` row MUST exist with action `diagram.layout_saved`, the actor id and the project id
+
+#### Scenario: DDL baseline capture is recorded
+
+- **WHEN** a `MEMBER` captures or refreshes a project's DDL baseline
+- **THEN** an `events` row MUST exist with action `ddl.baseline_captured`, the actor id and the project id
 
 #### Scenario: User role change is recorded
 

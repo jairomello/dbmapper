@@ -39,4 +39,4 @@
 
 ## 6. Archive
 
-- [ ] 6.1 `openspec archive v2-phase10-ddl --yes` após o ok do Jairo, marcar o checkbox e commitar — verificação: `openspec list` sem o change e `openspec/specs/schema-ddl` existente.
+- [x] 6.1 `openspec archive v2-phase10-ddl --yes` após o ok do Jairo, marcar o checkbox e commitar — verificação: `openspec list` sem o change e `openspec/specs/schema-ddl` existente.
