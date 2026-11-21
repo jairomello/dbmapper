@@ -83,7 +83,7 @@ export function ViewerPage() {
 
   return (
     <div className="flex min-h-screen flex-col bg-bg">
-      <header className="flex flex-wrap items-center gap-3 border-b border-slate-800 bg-ink px-4 py-3 text-white">
+      <header className="flex flex-wrap items-center gap-3 border-b border-white/10 bg-header px-4 py-3 text-header-ink">
         <Link
           to="/"
           className="rounded-sm border border-slate-600 px-3 py-1.5 text-xs font-medium text-slate-200 hover:bg-slate-800"
@@ -93,7 +93,7 @@ export function ViewerPage() {
 
         <div className="flex items-center gap-2">
           <span className="text-sm font-semibold tracking-wide">DBMapper</span>
-          <span className="rounded-full bg-white/10 px-2 py-0.5 text-[10px] uppercase tracking-widest text-slate-300">
+          <span className="rounded-full bg-white/10 px-2 py-0.5 text-[10px] uppercase tracking-widest text-white/70">
             {project.data.database.name}
           </span>
           <span className="rounded-full bg-emerald-500/20 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-widest text-emerald-200">

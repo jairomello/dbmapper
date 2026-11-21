@@ -15,14 +15,14 @@ interface MetadataEditorProps {
   isSaving?: boolean
 }
 
-const INDENT = { database: '', table: 'Tabela', column: 'Coluna' } as const
+const INDENT = { database: 'Banco', table: 'Tabela', column: 'Campo' } as const
 
 export function MetadataEditor({ database, selection, onSave, isSaving = false }: MetadataEditorProps) {
   const resolved = resolveSelection(database, selection)
 
   if (!resolved) {
     return (
-      <section className="flex h-full items-center justify-center p-8 text-sm text-slate-500">
+      <section className="flex h-full items-center justify-center p-8 text-sm text-muted">
         Selecione um item na árvore para editar seus metadados.
       </section>
     )
@@ -35,6 +35,7 @@ export function MetadataEditor({ database, selection, onSave, isSaving = false }
       selection={selection}
       kind={resolved.kind}
       name={resolved.item.name}
+      itemType={'type' in resolved.item ? resolved.item.type : null}
       initialDescription={resolved.item.description ?? ''}
       initialTerms={[...resolved.item.business_terms]}
       reviewed={Boolean(resolved.item.reviewed)}
@@ -49,6 +50,7 @@ interface EditorFormProps {
   selection: Selection
   kind: Selection['type']
   name: string
+  itemType: string | null
   initialDescription: string
   initialTerms: string[]
   reviewed: boolean
@@ -61,6 +63,7 @@ function EditorForm({
   selection,
   kind,
   name,
+  itemType,
   initialDescription,
   initialTerms,
   reviewed,
@@ -134,50 +137,69 @@ function EditorForm({
   }
 
   return (
-    <section className="flex h-full flex-col overflow-auto" aria-label="Editor de metadados">
-      <header className="border-b border-slate-200 px-5 py-3">
-        <nav className="flex flex-wrap items-center gap-1 text-xs text-slate-500" aria-label="Breadcrumb">
+    <section className="flex h-full flex-col overflow-auto bg-surface" aria-label="Editor de metadados">
+      <header className="border-b border-line px-5 py-4">
+        <nav
+          className="flex flex-wrap items-center gap-1.5 text-[10px] uppercase tracking-[0.14em] text-muted"
+          aria-label="Breadcrumb"
+        >
           {breadcrumb.map((entry, index) => (
-            <span key={entry.key} className="flex items-center gap-1">
+            <span key={entry.key} className="flex items-center gap-1.5">
               {index > 0 ? <span aria-hidden="true">/</span> : null}
-              <span className={index === breadcrumb.length - 1 ? 'font-medium text-slate-700' : undefined}>
+              <span className={index === breadcrumb.length - 1 ? 'font-semibold text-ink' : undefined}>
                 {entry.label}
               </span>
             </span>
           ))}
         </nav>
-        <div className="mt-1 flex items-center gap-2">
-          <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-slate-600">
+        <h2 className="mt-2 truncate font-serif text-2xl leading-tight text-ink">{name}</h2>
+        <div className="mt-2 flex flex-wrap items-center gap-1.5">
+          <span className="rounded-full border border-line-strong px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-muted">
             {INDENT[kind]}
           </span>
-          <h2 className="truncate text-lg font-semibold text-ink">{name}</h2>
+          {itemType ? (
+            <span className="rounded-full bg-surface-2 px-2 py-0.5 text-[10px] font-medium text-ink">{itemType}</span>
+          ) : null}
+          <span
+            className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${
+              reviewed ? 'bg-success-soft text-success' : 'bg-warning-soft text-warning'
+            }`}
+            data-testid="metadata-review-state"
+          >
+            {reviewed ? 'aprovado' : 'revisar'}
+          </span>
         </div>
       </header>
 
       <div className="flex-1 space-y-6 px-5 py-5">
-        <label className="block text-sm font-medium text-slate-700">
-          Descrição
-          <textarea
-            className="mt-1 min-h-32 w-full rounded-sm border border-slate-300 bg-white px-3 py-2 text-sm text-ink outline-none focus:border-accent"
-            value={description}
-            onChange={(event) => setDescription(event.target.value)}
-            placeholder="Descreva o significado deste item para o negócio."
-          />
-        </label>
+        <div>
+          <label className="block text-sm font-medium text-ink">
+            Descrição
+            <textarea
+              className="mt-1 min-h-32 w-full rounded-lg border border-line-strong bg-surface px-3 py-2 text-sm text-ink outline-none transition focus:border-accent"
+              value={description}
+              onChange={(event) => setDescription(event.target.value)}
+              placeholder="Descreva o significado deste item para o negócio."
+            />
+          </label>
+          <span className="mt-1 block text-[10px] text-muted">
+            Rascunho local — clique em Salvar para publicar no dicionário.
+          </span>
+        </div>
 
         <div>
-          <h3 className="text-sm font-medium text-slate-700">Termos de negócio</h3>
+          <h3 className="text-sm font-medium text-ink">Termos de negócio</h3>
           <div className="mt-2 flex flex-wrap gap-2">
-            {terms.length === 0 ? <p className="text-xs text-slate-400">Nenhum termo adicionado.</p> : null}
+            {terms.length === 0 ? <p className="text-xs text-muted">Nenhum termo adicionado.</p> : null}
             {terms.map((term) => (
               <span
                 key={term}
-                className="inline-flex items-center gap-1 rounded-full bg-indigo-50 px-2 py-1 text-xs text-indigo-700"
+                className="inline-flex items-center gap-1 rounded-full bg-accent-soft px-2.5 py-1 text-xs text-accent"
               >
                 {term}
                 <button
                   type="button"
-                  className="rounded-full text-indigo-500 hover:text-indigo-800"
+                  className="rounded-full text-accent/70 hover:text-accent"
                   aria-label={`Remover termo ${term}`}
                   onClick={() => removeTerm(term)}
                 >
@@ -189,7 +211,7 @@ function EditorForm({
 
           <div className="mt-2 flex gap-2">
             <input
-              className="min-w-0 flex-1 rounded-sm border border-slate-300 bg-white px-3 py-1.5 text-sm text-ink outline-none focus:border-accent"
+              className="min-w-0 flex-1 rounded-lg border border-line-strong bg-surface px-3 py-1.5 text-sm text-ink outline-none transition focus:border-accent"
               aria-label="Adicionar termo de negócio"
               placeholder="Adicionar termo"
               value={termDraft}
@@ -198,7 +220,7 @@ function EditorForm({
             />
             <button
               type="button"
-              className="rounded-sm border border-slate-300 px-3 py-1.5 text-sm font-medium text-slate-600 hover:bg-slate-100"
+              className="rounded-lg border border-line-strong px-3 py-1.5 text-sm font-medium text-ink transition hover:bg-surface-2"
               onClick={addTerm}
             >
               Adicionar
@@ -207,27 +229,27 @@ function EditorForm({
         </div>
 
         {feedback ? (
-          <p className="rounded-sm bg-emerald-50 px-3 py-2 text-sm text-emerald-700" role="status">
+          <p className="rounded-lg bg-success-soft px-3 py-2 text-sm text-success" role="status">
             {feedback}
           </p>
         ) : null}
         {error ? (
-          <p className="rounded-sm bg-red-50 px-3 py-2 text-sm text-red-700" role="alert">
+          <p className="rounded-lg bg-danger-soft px-3 py-2 text-sm text-danger" role="alert">
             {error}
           </p>
         ) : null}
 
         {!canReview ? (
-          <p className="text-xs text-amber-700" role="status">
+          <p className="text-xs text-warning" role="status">
             Preencha a descrição antes de aprovar.
           </p>
         ) : null}
       </div>
 
-      <footer className="flex flex-wrap items-center gap-2 border-t border-slate-200 px-5 py-3">
+      <footer className="flex flex-wrap items-center gap-2 border-t border-line px-5 py-4">
         <button
           type="button"
-          className="rounded-sm bg-accent px-4 py-2 text-sm font-semibold text-white transition hover:bg-indigo-600 disabled:cursor-not-allowed disabled:opacity-60"
+          className="rounded-lg bg-accent px-4 py-2 text-sm font-semibold text-accent-ink transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
           onClick={handleSave}
           disabled={isSaving}
         >
@@ -235,10 +257,10 @@ function EditorForm({
         </button>
         <button
           type="button"
-          className={`rounded-sm border px-4 py-2 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-60 ${
+          className={`rounded-lg border px-4 py-2 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-60 ${
             reviewed
-              ? 'border-amber-300 text-amber-700 hover:bg-amber-50'
-              : 'border-emerald-300 text-emerald-700 hover:bg-emerald-50'
+              ? 'border-warning/50 text-warning hover:bg-warning-soft'
+              : 'border-success/50 text-success hover:bg-success-soft'
           }`}
           onClick={handleReview}
           disabled={!canReview || isSaving}

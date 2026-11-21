@@ -10,42 +10,62 @@ export function StatusBar({ database }: { database: DatabaseModel }) {
 
   return (
     <footer
-      className="flex flex-wrap items-center gap-x-4 gap-y-1 border-t border-slate-200 bg-white px-4 py-2 text-xs text-slate-600"
+      className="flex flex-wrap items-center gap-x-4 gap-y-1 border-t border-line bg-surface px-4 py-2 text-xs text-muted"
       aria-label="Barra de cobertura"
       role="status"
     >
-      <span className="font-semibold text-slate-800" data-testid="coverage-db-name">
+      <span className="font-semibold text-ink" data-testid="coverage-db-name">
         {stats.dbName}
       </span>
       <span data-testid="coverage-tables">
-        Tabelas: <strong>{stats.totalTables}</strong>
+        Tabelas: <strong className="text-ink">{stats.totalTables}</strong>
       </span>
       <span data-testid="coverage-columns">
-        Campos: <strong>{stats.totalCols}</strong>
+        Campos: <strong className="text-ink">{stats.totalCols}</strong>
       </span>
       <span data-testid="coverage-fks">
-        FKs: <strong>{stats.totalFks}</strong>
+        FKs: <strong className="text-ink">{stats.totalFks}</strong>
       </span>
       <span data-testid="coverage-described">
-        Descritas: <strong>{stats.descTables}/{stats.totalTables}</strong> tab ({descTablesPct}%) ·{' '}
-        <strong>{stats.descCols}/{stats.totalCols}</strong> campos ({descColsPct}%)
+        Descritas:{' '}
+        <strong className="text-ink">
+          {stats.descTables}/{stats.totalTables}
+        </strong>{' '}
+        tab ({descTablesPct}%) ·{' '}
+        <strong className="text-ink">
+          {stats.descCols}/{stats.totalCols}
+        </strong>{' '}
+        campos ({descColsPct}%)
       </span>
       <span data-testid="coverage-reviewed">
-        Revisados: <strong>{stats.revTables}/{stats.totalTables}</strong> tab ({revTablesPct}%) ·{' '}
-        <strong>{stats.revCols}/{stats.totalCols}</strong> campos ({revColsPct}%)
+        Revisados:{' '}
+        <strong className="text-ink">
+          {stats.revTables}/{stats.totalTables}
+        </strong>{' '}
+        tab ({revTablesPct}%) ·{' '}
+        <strong className="text-ink">
+          {stats.revCols}/{stats.totalCols}
+        </strong>{' '}
+        campos ({revColsPct}%)
       </span>
       <span data-testid="coverage-fk-described">
-        FKs descritas: <strong>{stats.fksDesc}/{stats.totalFks}</strong>
+        FKs descritas:{' '}
+        <strong className="text-ink">
+          {stats.fksDesc}/{stats.totalFks}
+        </strong>
       </span>
       <span data-testid="coverage-fk-reviewed">
-        FKs revisadas: <strong>{stats.fksRev}/{stats.totalFks}</strong>
+        FKs revisadas:{' '}
+        <strong className="text-ink">
+          {stats.fksRev}/{stats.totalFks}
+        </strong>
       </span>
-      <span className="font-medium text-amber-700" data-testid="coverage-pending">
+      <span className="font-medium text-warning" data-testid="coverage-pending">
         Pendentes: <strong>{stats.pendingTotal}</strong>
       </span>
       <span className="ml-auto flex items-center gap-2" data-testid="coverage-progress">
         <span>Progresso</span>
-        <span className="h-2 w-32 overflow-hidden rounded-full bg-slate-200">
+        <span className="h-1.5 w-32 overflow-hidden rounded-full bg-surface-2">
           <span
             className={`block h-full ${
               stats.pct < 30 ? 'bg-amber-500' : stats.pct < 70 ? 'bg-indigo-500' : 'bg-emerald-500'
@@ -53,7 +73,7 @@ export function StatusBar({ database }: { database: DatabaseModel }) {
             style={{ width: `${stats.pct}%` }}
           />
         </span>
-        <strong>{stats.pct}%</strong>
+        <strong className="text-ink">{stats.pct}%</strong>
       </span>
     </footer>
   )

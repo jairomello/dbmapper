@@ -88,6 +88,24 @@ describe('TableNode', () => {
     expect(screen.getByLabelText('Selecionar coluna pedido.id')).toBeTruthy()
   })
 
+  test('recolhe e expande a seção de chaves estrangeiras', () => {
+    renderNode(true)
+
+    const toggle = screen.getByTestId('diagram-foreign-toggle-pedido')
+    const section = screen.getByTestId('diagram-foreign-keys-pedido')
+    expect(toggle.getAttribute('aria-expanded')).toBe('true')
+    expect(toggle.getAttribute('aria-controls')).toBe('diagram-foreign-rows-pedido')
+    expect(section.textContent).toContain('cliente')
+
+    fireEvent.click(toggle)
+    expect(toggle.getAttribute('aria-expanded')).toBe('false')
+    expect(section.textContent).not.toContain('cliente (cliente_id)')
+
+    fireEvent.click(toggle)
+    expect(toggle.getAttribute('aria-expanded')).toBe('true')
+    expect(section.textContent).toContain('cliente')
+  })
+
   test('no modo 1:n o clique no cabeçalho escolhe a tabela em vez de selecionar', () => {
     const picks: string[] = []
     const selections: string[] = []

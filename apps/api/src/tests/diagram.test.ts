@@ -11,7 +11,7 @@ import {
 
 interface DiagramLayoutBody {
   zoneName: string
-  positions: Record<string, { x: number; y: number }>
+  positions: Record<string, { x: number; y: number; width?: number; height?: number }>
   viewport: { x: number; y: number }
   zoom: number
   updatedAt: string | null
@@ -34,7 +34,7 @@ interface DiagramDocumentInputBody {
   zones: DiagramZoneBody[]
   layouts: Array<{
     zoneName: string
-    positions: Record<string, { x: number; y: number }>
+    positions: Record<string, { x: number; y: number; width?: number; height?: number }>
     viewport: { x: number; y: number }
     zoom: number
   }>
@@ -125,6 +125,51 @@ describe('diagram-api: documento de layout com zonas', () => {
     expect(loaded.body.layouts.map((layout) => layout.zoneName)).toEqual(['Principal', 'Vendas'])
     expect(loaded.body.layouts[1].positions).toEqual({ pedido: { x: 300.5, y: 40 } })
     expect(layoutSavedEvents(context)).toHaveLength(1)
+  })
+
+  test('aceita tamanho opcional do card por zona e devolve no GET', async () => {
+    const id = await seedProject(context, sampleDatabase())
+    const input: DiagramDocumentInputBody = {
+      zones: [
+        { name: 'Principal', tabOrder: 0, members: ['cliente'] },
+        { name: 'Vendas', tabOrder: 1, members: ['pedido'] },
+      ],
+      layouts: [
+        {
+          zoneName: 'Principal',
+          positions: { cliente: { x: 10, y: 20, width: 420, height: 520 } },
+          viewport: { x: 0, y: 0 },
+          zoom: 1,
+        },
+        {
+          zoneName: 'Vendas',
+          positions: { pedido: { x: 30, y: 40, width: 300, height: 280 } },
+          viewport: { x: 0, y: 0 },
+          zoom: 1,
+        },
+      ],
+    }
+
+    const saved = await apiRequest<DiagramDocumentBody>(context, `/api/projects/${id}/diagram`, 'PUT', input)
+    expect(saved.response.status).toBe(200)
+
+    const loaded = await getJson<DiagramDocumentBody>(context, `/api/projects/${id}/diagram`)
+    expect(loaded.body.layouts[0].positions).toEqual({ cliente: { x: 10, y: 20, width: 420, height: 520 } })
+    expect(loaded.body.layouts[1].positions).toEqual({ pedido: { x: 30, y: 40, width: 300, height: 280 } })
+  })
+
+  test('rejeita tamanho fora dos limites com envelope e sem gravar evento', async () => {
+    const id = await seedProject(context, sampleDatabase())
+    const input = {
+      positions: { cliente: { x: 0, y: 0, width: 50, height: 9000 } },
+      viewport: { x: 0, y: 0 },
+      zoom: 1,
+    }
+
+    const response = await apiRequest<ErrorBody>(context, `/api/projects/${id}/diagram`, 'PUT', input)
+    expect(response.response.status).toBe(400)
+    expect(response.body.error.code).toBe('VALIDATION_ERROR')
+    expect(layoutSavedEvents(context)).toHaveLength(0)
   })
 
   test('aceita o documento legado da Fase 7 sem zones e o lê como Principal', async () => {

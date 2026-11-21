@@ -2,7 +2,9 @@
 
 ## Purpose
 Provides a read-only data dictionary page (`dbviewer.html`) that consumes the same JSON project format produced by `project-persistence` and exported by DBMapper. The viewer renders every non-`REMOVED` table with its columns and a relationships panel labeled "Filha de" and "Mãe de", supports search and per-table navigation, copies per-table anchor links, and persists a light/dark theme preference in `localStorage`. Unlike the editor, it deliberately omits internal review and approval status. The executable contract is `tests/dbviewer.test.js`.
+
 ## Requirements
+
 ### Requirement: Project JSON loading
 
 The page MUST accept a project JSON file as input and render its database, tables, and columns in a read-only layout. The internal helpers used by the renderer MUST be defined in the external `dbviewer.js` script that `dbviewer.html` loads.
@@ -127,3 +129,24 @@ The viewer MUST ship under the spelling `DBViewer` (in-page brand and `<title>`)
 - **THEN** none of these files MUST contain the substrings `dbviewr` or `DBViewr`
 - **AND** the `localStorage` key used by the theme toggle MUST be `dbviewer-theme`
 
+### Requirement: Column rendering order in table view
+
+The viewer MUST render each table's columns with the primary key column(s) first, followed by all other columns sorted alphabetically by name. The sort is case-insensitive and stable.
+
+#### Scenario: Table with a single primary key column
+- **WHEN** a table has exactly one column with `primary_key: true`
+- **THEN** that column MUST appear first in the rendered column list
+- **AND** all other columns MUST follow in alphabetical order by name
+
+#### Scenario: Table with no primary key column
+- **WHEN** a table has no column with `primary_key: true`
+- **THEN** all columns MUST be rendered in alphabetical order by name
+
+#### Scenario: Table with composite primary key
+- **WHEN** a table has multiple columns with `primary_key: true`
+- **THEN** all PK columns MUST appear first (preserving their original relative order)
+- **AND** all non-PK columns MUST follow in alphabetical order by name
+
+#### Scenario: Column sort is case-insensitive
+- **WHEN** column names differ only by case (e.g., `createdAt` vs `created_at`)
+- **THEN** the sort MUST treat them as equivalent for ordering purposes

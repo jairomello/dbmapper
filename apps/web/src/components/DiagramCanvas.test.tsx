@@ -56,10 +56,10 @@ function principalLayout(overrides: Partial<DiagramZoneLayout> = {}): DiagramZon
   }
 }
 
-function emptyLayout(overrides: Partial<DiagramZoneLayout> = {}): DiagramLayout {
+function emptyLayout(overrides: Partial<DiagramZoneLayout> = {}, members = DEFAULT_MEMBERS): DiagramLayout {
   return {
     projectId: 'projeto-1',
-    zones: [{ name: 'Principal', tabOrder: 0, members: [...DEFAULT_MEMBERS] }],
+    zones: [{ name: 'Principal', tabOrder: 0, members: [...members] }],
     layouts: [principalLayout(overrides)],
   }
 }
@@ -195,6 +195,79 @@ describe('DiagramCanvas', () => {
     expect(screen.getByTestId('diagram-pk-pedido-id').textContent).toBe('PK')
     expect(screen.getByTestId('diagram-fk-pedido-cliente_id').textContent).toBe('FK')
     expect(document.querySelectorAll('.react-flow__edge')).toHaveLength(1)
+  })
+
+  test('minimapa ampliado mostra os cards e a seleção', async () => {
+    stubLayout(emptyLayout())
+    renderCanvas()
+
+    await screen.findByTestId('diagram-node-cliente')
+    const minimap = document.querySelector('.react-flow__minimap') as HTMLElement | null
+    expect(minimap?.style.width).toBe('240px')
+    expect(minimap?.style.height).toBe('180px')
+    expect(document.querySelectorAll('.react-flow__minimap-node').length).toBeGreaterThan(0)
+  })
+
+  test('mostra alças de redimensionamento no card selecionado só para quem edita', async () => {
+    stubRect()
+    stubLayout(emptyLayout())
+    renderWithClient(<CanvasHarness />)
+
+    await screen.findByTestId('diagram-node-pedido')
+    expect(document.querySelectorAll('.react-flow__resize-control')).toHaveLength(0)
+
+    fireEvent.click(screen.getByTestId('select-pedido'))
+    await waitFor(() =>
+      expect(document.querySelectorAll('.react-flow__resize-control').length).toBeGreaterThan(0),
+    )
+
+    cleanup()
+    stubRect()
+    stubLayout(emptyLayout())
+    renderWithClient(<CanvasHarness canEdit={false} />)
+    await screen.findByTestId('diagram-node-pedido')
+    fireEvent.click(screen.getByTestId('select-pedido'))
+    await waitFor(() => expect(screen.getByTestId('diagram-node-pedido').dataset.active).toBe('true'))
+    expect(document.querySelectorAll('.react-flow__resize-control')).toHaveLength(0)
+  })
+
+  test('modo compacto esconde campos e expande pelo atalho acessível', async () => {
+    stubRect()
+    stubLayout(emptyLayout())
+    renderWithClient(<CanvasHarness database={databaseWithExtras()} />)
+
+    await screen.findByTestId('diagram-node-pedido')
+    expect(screen.getByTestId('diagram-column-pedido-observacao')).toBeTruthy()
+
+    fireEvent.click(screen.getByTestId('diagram-detail-toggle'))
+    await waitFor(() => expect(screen.queryByTestId('diagram-column-pedido-observacao')).toBeNull())
+    expect(screen.getByTestId('diagram-expand-pedido').textContent).toContain('4')
+    expect(screen.getByTestId('diagram-detail-toggle').getAttribute('aria-pressed')).toBe('true')
+
+    fireEvent.click(screen.getByTestId('diagram-expand-pedido'))
+    await waitFor(() => expect(screen.getByTestId('diagram-column-pedido-observacao')).toBeTruthy())
+  })
+
+  test('foco na vizinhança reduz o canvas, restaura a zona e não grava layout', async () => {
+    stubRect()
+    const puts = stubLayout(emptyLayout({}, ['cliente', 'pedido', 'estoque']))
+    renderWithClient(<CanvasHarness database={databaseWithExtras()} />)
+
+    await screen.findByTestId('diagram-node-pedido')
+    fireEvent.click(screen.getByTestId('select-pedido'))
+    await waitFor(() => expect(screen.getByTestId('diagram-node-pedido').dataset.active).toBe('true'))
+
+    fireEvent.click(screen.getByTestId('diagram-focus'))
+    await waitFor(() => expect(screen.queryByTestId('diagram-node-estoque')).toBeNull())
+    expect(screen.getByTestId('diagram-node-cliente')).toBeTruthy()
+    expect(screen.getByTestId('diagram-focus-chip')).toBeTruthy()
+    expect(screen.queryByTestId('diagram-add-table')).toBeNull()
+    expect(screen.queryByTestId('diagram-undo')).toBeNull()
+
+    fireEvent.click(screen.getByTestId('diagram-focus-exit'))
+    await waitFor(() => expect(screen.queryByTestId('diagram-focus-chip')).toBeNull())
+    expect(screen.getByTestId('diagram-node-estoque')).toBeTruthy()
+    expect(puts).toHaveLength(0)
   })
 
   test('aplica posições salvas e ignora entrada órfã sem erro', async () => {
@@ -722,7 +795,57 @@ describe('DiagramCanvas editing', () => {
   })
 })
 
-function CanvasHarness({ canEdit = true }: { canEdit?: boolean }) {
+function databaseWithExtras(): DatabaseModel {
+  const database = sampleDatabase()
+  const pedido = database.tables.find((table) => table.name === 'pedido')
+  if (pedido) {
+    pedido.columns.push(
+      {
+        name: 'observacao',
+        type: 'varchar',
+        primary_key: false,
+        foreign_key: false,
+        description: '',
+        business_terms: [],
+        reviewed: false,
+        status: 'UNCHANGED',
+      },
+      {
+        name: 'total',
+        type: 'float',
+        primary_key: false,
+        foreign_key: false,
+        description: '',
+        business_terms: [],
+        reviewed: false,
+        status: 'UNCHANGED',
+      },
+    )
+  }
+  database.tables.push({
+    name: 'estoque',
+    description: '',
+    business_terms: [],
+    reviewed: false,
+    status: 'UNCHANGED',
+    relationships: { parents: [], children: [] },
+    columns: [
+      {
+        name: 'id',
+        type: 'serial',
+        primary_key: true,
+        foreign_key: false,
+        description: '',
+        business_terms: [],
+        reviewed: false,
+        status: 'UNCHANGED',
+      },
+    ],
+  })
+  return database
+}
+
+function CanvasHarness({ canEdit = true, database = sampleDatabase() }: { canEdit?: boolean; database?: DatabaseModel }) {
   const [selection, setSelection] = useState<Selection>({ type: 'database' })
   return (
     <div>
@@ -736,7 +859,7 @@ function CanvasHarness({ canEdit = true }: { canEdit?: boolean }) {
       <div style={{ width: 1000, height: 700 }}>
         <DiagramCanvas
           projectId="projeto-1"
-          database={sampleDatabase()}
+          database={database}
           selection={selection}
           onSelect={setSelection}
           canEdit={canEdit}

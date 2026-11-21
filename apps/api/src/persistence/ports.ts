@@ -194,6 +194,8 @@ export interface CreateProjectOptions {
 export interface DiagramPosition {
   x: number
   y: number
+  width?: number
+  height?: number
 }
 
 export const DEFAULT_DIAGRAM_ZONE = 'Principal'

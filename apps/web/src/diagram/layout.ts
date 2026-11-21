@@ -1,9 +1,10 @@
-import type { DatabaseModel, RelationshipModel, TableModel } from '@dbmapper/domain'
+import type { ColumnModel, DatabaseModel, RelationshipModel, TableModel } from '@dbmapper/domain'
 import { type Edge, type Node, type NodeHandle, Position } from '@xyflow/react'
 import type { DiagramPosition } from '../api/types'
 import type { Selection } from '../lib/selection'
 import {
   DIAGRAM_NODE_WIDTH,
+  estimatedFooterHeight,
   estimatedTableHeight,
   gridPosition,
   NODE_COLUMN_HEIGHT,
@@ -13,6 +14,7 @@ import {
 export { DIAGRAM_NODE_WIDTH, gridPosition }
 
 const HANDLE_SIZE = 8
+const HANDLE_INSET = 4
 
 export interface DiagramRelationshipKey {
   table: string
@@ -31,10 +33,15 @@ export const EMPTY_RELATIONSHIP_KEYS: DiagramRelationshipKeys = { crossZone: [],
 
 export type EdgeEmphasis = 'outgoing' | 'incoming' | 'none'
 
+export type DiagramDetail = 'detailed' | 'compact'
+
 export type TableEmphasis = 'selected' | 'incident' | 'muted' | 'none'
 
 export interface DiagramNodeData extends Record<string, unknown> {
   table: TableModel
+  columns: ColumnModel[]
+  hiddenColumns: number
+  compact: boolean
   emphasis: TableEmphasis
   active: boolean
   activeColumn: string | null
@@ -52,6 +59,8 @@ export interface DiagramNodeData extends Record<string, unknown> {
   onEditColumn?: (table: string, column: string) => void
   onDeleteColumn?: (table: string, column: string) => void
   onDeleteRelationship?: (table: string, relationship: RelationshipModel) => void
+  onResize?: (table: string, width: number, height: number) => void
+  onExpand?: (table: string) => void
 }
 
 export type DiagramNode = Node<DiagramNodeData, 'table'>
@@ -72,15 +81,15 @@ export interface DiagramEdgeData extends Record<string, unknown> {
 
 export type DiagramEdge = Edge<DiagramEdgeData, 'crowsfoot'>
 
-function initialHandles(table: TableModel): NodeHandle[] {
-  return table.columns.flatMap((column, index) => {
+function initialHandles(columns: readonly ColumnModel[]): NodeHandle[] {
+  return columns.flatMap((column, index) => {
     const y = NODE_HEADER_HEIGHT + index * NODE_COLUMN_HEIGHT + NODE_COLUMN_HEIGHT / 2 - HANDLE_SIZE / 2
     return [
       {
         id: `col:${column.name}`,
         type: 'target' as const,
         position: Position.Left,
-        x: 0,
+        x: HANDLE_INSET,
         y,
         width: HANDLE_SIZE,
         height: HANDLE_SIZE,
@@ -89,13 +98,33 @@ function initialHandles(table: TableModel): NodeHandle[] {
         id: `col:${column.name}`,
         type: 'source' as const,
         position: Position.Right,
-        x: DIAGRAM_NODE_WIDTH - HANDLE_SIZE,
+        x: DIAGRAM_NODE_WIDTH - HANDLE_SIZE - HANDLE_INSET,
         y,
         width: HANDLE_SIZE,
         height: HANDLE_SIZE,
       },
     ]
   })
+}
+
+export function compactColumns(table: TableModel): ColumnModel[] {
+  const keep = new Set<string>()
+  for (const column of table.columns) {
+    if (column.primary_key) keep.add(column.name)
+  }
+  for (const parent of table.relationships?.parents ?? []) {
+    for (const column of parent.local_columns) keep.add(column)
+  }
+  for (const child of table.relationships?.children ?? []) {
+    for (const column of child.referenced_columns) keep.add(column)
+  }
+
+  const visible = table.columns.filter((column) => keep.has(column.name))
+  return visible.length > 0 ? visible : table.columns.slice(0, 3)
+}
+
+export function compactTableHeight(table: TableModel, columns: readonly ColumnModel[]): number {
+  return NODE_HEADER_HEIGHT + columns.length * NODE_COLUMN_HEIGHT + estimatedFooterHeight(table) + 2
 }
 
 export function visibleTables(database: DatabaseModel): TableModel[] {
@@ -175,6 +204,13 @@ export function isDiagramPosition(value: unknown): value is DiagramPosition {
   )
 }
 
+function positionFromSaved(saved: DiagramPosition): DiagramPosition {
+  const position: DiagramPosition = { x: saved.x, y: saved.y }
+  if (typeof saved.width === 'number' && Number.isFinite(saved.width)) position.width = saved.width
+  if (typeof saved.height === 'number' && Number.isFinite(saved.height)) position.height = saved.height
+  return position
+}
+
 export function buildPositions(
   database: DatabaseModel,
   savedPositions: Record<string, DiagramPosition> = {},
@@ -182,7 +218,7 @@ export function buildPositions(
   const positions: Record<string, DiagramPosition> = {}
   visibleTables(database).forEach((table, index) => {
     const saved = savedPositions[table.name]
-    positions[table.name] = isDiagramPosition(saved) ? { x: saved.x, y: saved.y } : gridPosition(index)
+    positions[table.name] = isDiagramPosition(saved) ? positionFromSaved(saved) : gridPosition(index)
   })
   return positions
 }
@@ -194,7 +230,7 @@ export function buildZonePositions(
   const positions: Record<string, DiagramPosition> = {}
   members.forEach((name, index) => {
     const saved = savedPositions[name]
-    positions[name] = isDiagramPosition(saved) ? { x: saved.x, y: saved.y } : gridPosition(index)
+    positions[name] = isDiagramPosition(saved) ? positionFromSaved(saved) : gridPosition(index)
   })
   return positions
 }
@@ -238,6 +274,8 @@ export function createDiagramNodes(options: {
   query: string
   draggable: boolean
   keys?: Record<string, DiagramRelationshipKeys>
+  detail?: DiagramDetail
+  expandedTables?: ReadonlySet<string>
   onSelect: (selection: Selection) => void
   canEdit?: boolean
   relationshipMode?: boolean
@@ -247,6 +285,8 @@ export function createDiagramNodes(options: {
   onEditColumn?: (table: string, column: string) => void
   onDeleteColumn?: (table: string, column: string) => void
   onDeleteRelationship?: (table: string, relationship: RelationshipModel) => void
+  onResize?: (table: string, width: number, height: number) => void
+  onExpand?: (table: string) => void
 }): DiagramNode[] {
   const {
     database,
@@ -256,6 +296,8 @@ export function createDiagramNodes(options: {
     query,
     draggable,
     keys,
+    detail = 'detailed',
+    expandedTables,
     onSelect,
     canEdit,
     relationshipMode,
@@ -265,6 +307,8 @@ export function createDiagramNodes(options: {
     onEditColumn,
     onDeleteColumn,
     onDeleteRelationship,
+    onResize,
+    onExpand,
   } = options
   const searchActive = query.trim().length > 0
   const diagramKeys = keys ?? buildRelationshipKeys(database, () => null)
@@ -289,18 +333,27 @@ export function createDiagramNodes(options: {
       .map((column) => column.name)
     const tableMatch = matches.has(tableMatchKey(table.name)) || columnMatches.length > 0
     const position = isDiagramPosition(positions[table.name]) ? positions[table.name] : gridPosition(index)
+    const compact = detail === 'compact' && !expandedTables?.has(table.name)
+    const columns = compact ? compactColumns(table) : table.columns
+    const width = Math.round(position.width ?? DIAGRAM_NODE_WIDTH)
+    const fullHeight = position.height ?? estimatedTableHeight(table)
+    const height = Math.round(compact ? Math.min(fullHeight, compactTableHeight(table, columns)) : fullHeight)
 
     return {
       id: table.name,
       type: 'table',
-      position,
-      width: DIAGRAM_NODE_WIDTH,
-      height: estimatedTableHeight(table),
-      measured: { width: DIAGRAM_NODE_WIDTH, height: estimatedTableHeight(table) },
-      handles: initialHandles(table),
+      position: { x: position.x, y: position.y },
+      width,
+      height,
+      style: { width, height },
+      measured: { width, height },
+      handles: initialHandles(columns),
       className: emphasis === 'none' ? undefined : `diagram-node--${emphasis}`,
       data: {
         table,
+        columns,
+        hiddenColumns: table.columns.length - columns.length,
+        compact,
         emphasis,
         active,
         activeColumn,
@@ -318,6 +371,8 @@ export function createDiagramNodes(options: {
         onEditColumn,
         onDeleteColumn,
         onDeleteRelationship,
+        onResize,
+        onExpand,
       },
       draggable,
       dragHandle: '.diagram-drag-handle',

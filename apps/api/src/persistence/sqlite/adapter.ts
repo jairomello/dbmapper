@@ -110,10 +110,13 @@ function parseDiagramPositions(value: string): Record<string, DiagramPosition> {
 
   for (const [name, raw] of Object.entries(parseJsonObject(value))) {
     if (raw === null || typeof raw !== 'object' || Array.isArray(raw)) continue
-    const { x, y } = raw as { x?: unknown; y?: unknown }
-    if (typeof x === 'number' && typeof y === 'number' && Number.isFinite(x) && Number.isFinite(y)) {
-      positions[name] = { x, y }
-    }
+    const { x, y, width, height } = raw as { x?: unknown; y?: unknown; width?: unknown; height?: unknown }
+    if (typeof x !== 'number' || typeof y !== 'number' || !Number.isFinite(x) || !Number.isFinite(y)) continue
+
+    const position: DiagramPosition = { x, y }
+    if (typeof width === 'number' && Number.isFinite(width)) position.width = width
+    if (typeof height === 'number' && Number.isFinite(height)) position.height = height
+    positions[name] = position
   }
 
   return positions

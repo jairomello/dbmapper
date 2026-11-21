@@ -68,9 +68,11 @@ export function SemanticTree({
 }: SemanticTreeProps) {
   const tables = database.tables.filter((table) => table.status !== 'REMOVED')
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({})
+  const [query, setQuery] = useState('')
   const selectedTable = selection.type === 'database' ? null : selection.table
   const selectionActive = selectedTable !== null && tables.some((table) => table.name === selectedTable)
   const incident = incidentNames(database, selectionActive ? selectedTable : null)
+  const needle = query.trim().toLowerCase()
 
   function zoneOfTable(table: string): string | null {
     if (!zones) return null
@@ -92,21 +94,56 @@ export function SemanticTree({
   }
 
   const rowClass = (active: boolean) =>
-    `flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left text-sm transition ${
-      active ? 'bg-indigo-50 font-medium text-accent' : 'text-slate-700 hover:bg-slate-100'
+    `flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm transition ${
+      active ? 'bg-accent-soft font-medium text-accent' : 'text-ink hover:bg-surface-2'
     }`
+
+  const visibleTables = needle
+    ? tables.filter(
+        (table) =>
+          table.name.toLowerCase().includes(needle) ||
+          table.columns.some(
+            (column) =>
+              column.name.toLowerCase().includes(needle) || column.type.toLowerCase().includes(needle),
+          ),
+      )
+    : tables
 
   return (
     <section className="flex h-full flex-col overflow-hidden" aria-label="Árvore semântica">
-      <div className="flex items-center justify-between border-b border-slate-200 px-3 py-2">
-        <h2 className="text-sm font-semibold text-ink">Estrutura</h2>
+      <div className="flex items-center justify-between gap-2 border-b border-line px-3 py-2.5">
+        <h2 className="text-sm font-semibold text-ink">Explorador</h2>
         <button
           type="button"
-          className="rounded-sm border border-slate-300 px-2 py-1 text-xs font-medium text-slate-600 hover:bg-slate-100"
+          className="rounded-md border border-line-strong px-2 py-1 text-[11px] font-medium text-muted transition hover:bg-surface-2 hover:text-ink"
           onClick={toggleAll}
         >
           {allCollapsed ? 'Expandir tudo' : 'Recolher tudo'}
         </button>
+      </div>
+
+      <div className="border-b border-line px-3 py-2">
+        <label className="flex items-center gap-2 rounded-lg border border-line-strong bg-surface px-2 py-1.5">
+          <span aria-hidden="true" className="text-muted">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" aria-hidden="true" focusable="false">
+              <circle cx="11" cy="11" r="6.5" stroke="currentColor" strokeWidth="1.8" />
+              <path d="m16 16 4 4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+            </svg>
+          </span>
+          <input
+            type="search"
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+            placeholder="Buscar tabela ou campo"
+            aria-label="Buscar na árvore"
+            className="min-w-0 flex-1 bg-transparent text-xs text-ink outline-none placeholder:text-muted"
+          />
+        </label>
+      </div>
+
+      <div className="flex items-center justify-between px-3 pt-2.5 text-[10px] font-semibold uppercase tracking-[0.16em] text-muted">
+        <span>Tabelas</span>
+        <span data-testid="tree-table-count">{visibleTables.length}</span>
       </div>
 
       <div className="flex-1 overflow-auto px-2 py-2">
@@ -119,17 +156,28 @@ export function SemanticTree({
               data-testid="database-row"
               data-active={isActive(selection, { type: 'database' })}
             >
+              <span aria-hidden="true" className="text-muted">
+                ▦
+              </span>
               <span className="truncate font-semibold">{database.name}</span>
               <SemanticBadge item={database} />
             </button>
           </li>
 
-          {tables.map((table) => {
+          {visibleTables.map((table) => {
             const tableCollapsed = Boolean(collapsed[table.name])
             const tableActive = isActive(selection, { type: 'table', table: table.name })
             const tableZone = zoneOfTable(table.name)
             const outside = Boolean(zones) && tableZone === null
             const emphasis = selectionActive ? tableEmphasis(table.name, selectedTable, incident) : 'none'
+            const tableMatchesQuery = Boolean(needle) && table.name.toLowerCase().includes(needle)
+            const columns = needle && !tableMatchesQuery
+              ? table.columns.filter(
+                  (column) =>
+                    column.name.toLowerCase().includes(needle) ||
+                    column.type.toLowerCase().includes(needle),
+                )
+              : table.columns
 
             return (
               <li
@@ -138,14 +186,10 @@ export function SemanticTree({
                 data-emphasis={emphasis}
                 className={emphasis === 'muted' ? 'opacity-40' : undefined}
               >
-                <div
-                  className={`flex items-center gap-1 rounded-sm ${
-                    tableActive ? 'bg-indigo-50' : 'hover:bg-slate-100'
-                  }`}
-                >
+                <div className={`flex items-center gap-1 rounded-md ${tableActive ? 'bg-accent-soft' : 'hover:bg-surface-2'}`}>
                   <button
                     type="button"
-                    className="ml-1 flex h-6 w-6 shrink-0 items-center justify-center rounded-sm text-slate-500 hover:bg-slate-200"
+                    className="ml-1 flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-muted hover:bg-surface-2"
                     aria-label={`${tableCollapsed ? 'Expandir' : 'Recolher'} tabela ${table.name}`}
                     onClick={() => toggleTable(table.name)}
                   >
@@ -154,7 +198,7 @@ export function SemanticTree({
                   <button
                     type="button"
                     className={`flex min-w-0 flex-1 items-center gap-2 py-1.5 pr-2 text-left text-sm ${
-                      tableActive ? 'font-medium text-accent' : 'text-slate-700'
+                      tableActive ? 'font-medium text-accent' : 'text-ink'
                     }`}
                     onClick={() => onSelect({ type: 'table', table: table.name })}
                     data-testid={`table-row-${table.name}`}
@@ -167,7 +211,12 @@ export function SemanticTree({
                       event.dataTransfer.effectAllowed = 'move'
                     }}
                   >
-                    <span className="truncate">{table.name}</span>
+                    <span aria-hidden="true" className="text-muted">
+                      ▤
+                    </span>
+                    <span className="truncate" title={table.name}>
+                      {table.name}
+                    </span>
                     <SemanticBadge item={table} />
                   </button>
                 </div>
@@ -176,7 +225,7 @@ export function SemanticTree({
                   <div className="ml-8 flex flex-wrap items-center gap-1 px-1 pb-1">
                     {outside ? (
                       <span
-                        className="rounded-sm bg-amber-100 px-1.5 py-0.5 text-[10px] font-medium text-amber-800"
+                        className="rounded-full bg-warning-soft px-1.5 py-0.5 text-[10px] font-medium text-warning"
                         data-testid={`table-outside-${table.name}`}
                       >
                         fora do diagrama
@@ -184,7 +233,7 @@ export function SemanticTree({
                     ) : null}
                     {canMoveTables && zones.length > 0 ? (
                       <select
-                        className="rounded-sm border border-slate-300 bg-white px-1 py-0.5 text-[10px] text-slate-600"
+                        className="rounded-md border border-line-strong bg-surface px-1 py-0.5 text-[10px] text-muted"
                         aria-label={`Mover tabela ${table.name} para zona`}
                         data-testid={`table-zone-${table.name}`}
                         value={tableZone ?? ''}
@@ -204,7 +253,7 @@ export function SemanticTree({
                     {outside && canMoveTables && onAddToActiveZone ? (
                       <button
                         type="button"
-                        className="rounded-sm border border-amber-300 bg-white px-1.5 py-0.5 text-[10px] font-medium text-amber-800 hover:bg-amber-50"
+                        className="rounded-md border border-warning/40 bg-surface px-1.5 py-0.5 text-[10px] font-medium text-warning hover:bg-warning-soft"
                         aria-label={`Adicionar ${table.name} à aba atual`}
                         data-testid={`table-add-to-zone-${table.name}`}
                         onClick={() => {
@@ -219,8 +268,8 @@ export function SemanticTree({
                 ) : null}
 
                 {tableCollapsed ? null : (
-                  <ul className="ml-6 border-l border-slate-200 pl-1">
-                    {table.columns.map((column) => {
+                  <ul className="ml-6 border-l border-line pl-1">
+                    {columns.map((column) => {
                       const columnSelection: Selection = {
                         type: 'column',
                         table: table.name,
@@ -237,8 +286,10 @@ export function SemanticTree({
                             data-testid={`column-row-${table.name}-${column.name}`}
                             data-active={columnActive}
                           >
-                            <span className="truncate">{column.name}</span>
-                            <span className="shrink-0 text-[10px] text-slate-400">{column.type}</span>
+                            <span className="truncate" title={`${table.name}.${column.name}`}>
+                              {column.name}
+                            </span>
+                            <span className="shrink-0 text-[10px] text-muted">{column.type}</span>
                             <SemanticBadge item={column} />
                           </button>
                         </li>
@@ -250,6 +301,9 @@ export function SemanticTree({
             )
           })}
         </ul>
+        {visibleTables.length === 0 ? (
+          <p className="px-2 py-6 text-center text-xs text-muted">Nenhuma tabela encontrada.</p>
+        ) : null}
       </div>
     </section>
   )

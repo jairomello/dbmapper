@@ -60,16 +60,16 @@ export function JsonTransfer({ projectId, onImported }: JsonTransferProps) {
   }
 
   return (
-    <div className="flex flex-wrap items-center gap-2">
+    <div className="flex flex-col gap-1">
       <button
         type="button"
-        className="rounded-sm border border-slate-600 px-3 py-1.5 text-xs font-medium text-slate-200 hover:bg-slate-800 disabled:opacity-60"
+        className="w-full rounded-md px-3 py-2 text-left text-xs font-medium text-ink transition hover:bg-surface-2 disabled:opacity-60"
         onClick={() => void handleExport()}
         disabled={isExporting}
       >
         {isExporting ? 'Exportando…' : 'Exportar JSON'}
       </button>
-      <label className="cursor-pointer rounded-sm border border-slate-600 px-3 py-1.5 text-xs font-medium text-slate-200 hover:bg-slate-800">
+      <label className="w-full cursor-pointer rounded-md px-3 py-2 text-left text-xs font-medium text-ink transition hover:bg-surface-2">
         {isImporting ? 'Importando…' : 'Importar JSON'}
         <input
           className="hidden"
@@ -81,7 +81,7 @@ export function JsonTransfer({ projectId, onImported }: JsonTransferProps) {
         />
       </label>
       {error ? (
-        <p className="text-xs text-red-300" role="alert">
+        <p className="px-3 text-xs text-danger" role="alert">
           {error}
         </p>
       ) : null}

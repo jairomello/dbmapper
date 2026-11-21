@@ -62,10 +62,11 @@ export function GalleryPage() {
 
   return (
     <div className="flex min-h-screen flex-col bg-bg">
-      <header className="flex flex-wrap items-center gap-3 border-b border-slate-800 bg-ink px-4 py-3 text-white">
+      <header className="flex flex-wrap items-center gap-3 border-b border-white/10 bg-header px-4 py-3 text-header-ink">
         <div className="flex items-center gap-2">
+          <img src="/icon.svg" alt="" width={24} height={24} className="h-6 w-6" />
           <span className="text-sm font-semibold tracking-wide">DBMapper</span>
-          <span className="rounded-full bg-white/10 px-2 py-0.5 text-[10px] uppercase tracking-widest text-slate-300">
+          <span className="rounded-full bg-white/10 px-2 py-0.5 text-[10px] uppercase tracking-widest text-white/70">
             Semantic Layer
           </span>
         </div>
@@ -78,7 +79,7 @@ export function GalleryPage() {
           Novo projeto
         </button>
 
-        <div className="ml-auto flex items-center gap-3 text-xs text-slate-300">
+        <div className="ml-auto flex items-center gap-3 text-xs text-white/70">
           <span>{session.data?.email}</span>
           <button
             type="button"

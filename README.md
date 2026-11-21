@@ -230,19 +230,44 @@ O smoke sobe API + web em portas isoladas, cria o admin, faz login, abre a galer
 cria um projeto importando `legacy/example.sql`, descreve/aprova uma coluna e valida o
 JSON exportado.
 
+## Redesenho do workspace e temas
+
+O workspace adota duas linguagens visuais complementares: **Órbita** no
+diagrama (grafite, acento verde-menta, cartões densos) e **Caderno** no
+dicionário e na ficha de metadados (papel quente, acento ameixa, tipografia
+serifada nos títulos). Os tokens ficam em `apps/web/src/index.css` e são
+aplicados por `[data-theme]`.
+
+- **Tema claro/escuro**: alternância pelo botão de tema no cabeçalho
+  (`data-testid="theme-toggle"`). A escolha é salva em `localStorage`
+  (`dbmapper-theme`); sem preferência, segue o `prefers-color-scheme` e cai no
+  claro. Se o storage estiver bloqueado, a troca vale para a sessão.
+- **Cabeçalho**: projeto em breadcrumb, ações primárias visíveis
+  (**Sugestões IA**, **Atualizar modelo**) e **Ações do projeto** com
+  **Novo projeto**, **Gerar SQL**, **Exportar/Importar JSON** e **Somente
+  leitura**.
+- **Explorador**: busca própria na árvore (filtra tabelas/campos sem alterar o
+  canvas), contagem de tabelas, zona da tabela e marcação de "fora do
+  diagrama".
+- **Ficha do item**: no modo Diagrama, o editor de metadados abre como painel
+  lateral **Caderno** (`Abrir ficha`/`Ocultar ficha`), com breadcrumb, tipo e
+  estado de revisão. Abaixo de `xl` o painel sobrepõe o canvas e fecha com
+  **Fechar** ou `Esc`; a seleção continua sincronizada entre árvore, canvas e
+  ficha.
+
 ## Diagrama do modelo (Fase 7)
 
-O workspace oferece duas views no topo da área principal: **Editor** (padrão) e
-**Diagrama**. A view Diagrama renderiza o modelo como um canvas ER com React
-Flow (`@xyflow/react`): um card por tabela não removida (colunas na ordem do
-modelo, marcas `PK`/`FK`), arestas crow's-foot para cada relacionamento,
-minimapa, controles de zoom e grade. A árvore semântica, o header e a barra de
-cobertura continuam visíveis e funcionais.
+O workspace oferece duas views no topo da área principal: **Dicionário**
+(editor, padrão) e **Diagrama**. A view Diagrama renderiza o modelo como um
+canvas ER com React Flow (`@xyflow/react`): um card por tabela não removida
+(colunas na ordem do modelo, marcas `PK`/`FK`), arestas crow's-foot para cada
+relacionamento, minimapa, controles de zoom e grade. A árvore semântica, o
+header e a barra de cobertura continuam visíveis e funcionais.
 
 Fluxo de uso:
 
 1. Abra um projeto e clique em **Diagrama**.
-2. Clique em um card (ou em uma coluna) para selecionar; a árvore e o editor
+2. Clique em um card (ou em uma coluna) para selecionar; a árvore e a ficha
    acompanham. Selecionar na árvore destaca e centraliza o card correspondente.
 3. Use **Buscar no diagrama** para destacar tabelas/campos; nenhum card é
    removido ou escondido.
@@ -250,8 +275,16 @@ Fluxo de uso:
    (`PUT /api/projects/{id}/diagram`) com debounce e o indicador mostra
    `Salvando...` / `Salvo às: HH:MM`. Ao reabrir o diagrama, posições, viewport
    e zoom salvos são restaurados.
-5. O painel inferior **Editor de metadados** abre na seleção e pode ser
-   recolhido; voltar para **Editor** mantém a seleção atual.
+5. **Detalhes/Compacto** alterna o nível de detalhe dos cards: no compacto só
+   aparecem PK e colunas de extremidade de relacionamento, com o atalho
+   "Mostrar todos os N campos" (selecionar um campo na árvore ou na busca já
+   expande o card). O nível de detalhe não grava layout.
+6. Com uma tabela selecionada, **Focar relações** mostra só a vizinhança direta
+   (indicador `Vizinhança direta`); **Zona completa** restaura o viewport
+   anterior. O foco é navegação temporária: não grava posições, membros nem
+   viewport.
+7. **Abrir ficha** mostra o painel Caderno ao lado do canvas; voltar para
+   **Dicionário** mantém a seleção atual.
 
 O layout é indexado pelo **nome** da tabela (ids internos regeneram a cada save
 do modelo) e fica fora do export v1. `GET /api/projects/{id}/diagram` aceita
@@ -391,12 +424,26 @@ Tudo continua no frontend: posições, viewport e zoom são gravados pelo mesmo
   longo. A cor é sempre acompanhada de padrão e da animação de sentido FK → PK,
   que fica estática em `prefers-reduced-motion`. As arestas medem 2 px (3 px
   quando destacadas), com as marcas de cardinalidade proporcionais.
-- **Organizar**: o menu **Organizar** oferece **Em grade** (linhas e colunas) e
-  **Em estrela** (a tabela mais conectada vai ao centro, as vizinhas formam anéis
-  por nível de relacionamento e as isoladas ficam numa faixa lateral). Os dois
-  algoritmos são determinísticos e evitam sobreposição; a organização atua só na
+- **Organizar**: o menu **Organizar** oferece **Em grade** (linhas e colunas,
+  com número de colunas adaptado à quantidade de tabelas) e **Em estrela** (a
+  tabela mais conectada vai ao centro, as demais ocupam, na ordem dos níveis de
+  relacionamento, as células mais próximas do centro e as isoladas ficam numa
+  faixa lateral). Os dois algoritmos são determinísticos, evitam sobreposição e
+  produzem arranjos compactos — a extensão fica na mesma ordem de grandeza de
+  uma grade empacotada, mesmo com cards muito altos. A organização atua só na
   zona ativa, grava posições/viewport/zoom num único `PUT` e enquadra a view
   (`fitView`) em seguida.
+- **Cards do diagrama**: cada card reserva espaço para cabeçalho, campos e
+  rodapé de relacionamentos — nada é cortado nas laterais ou na base. Quando o
+  card é menor que o conteúdo, a lista de campos rola (o cabeçalho e o rodapé
+  ficam fixos). Com a tabela selecionada, `MEMBER`+ arrasta as alças das bordas
+  e cantos para ajustar largura/altura (mínimo 180×100); o tamanho é gravado por
+  aba/zona, então a mesma tabela pode ter tamanhos diferentes em `Principal`,
+  `Financeiro` etc. As seções **Chaves entre modelos** e **Chaves estrangeiras**
+  são accordions independentes por card.
+- **Zoom e minimapa**: o canvas aceita zoom mínimo de `0.05` (4× mais que antes)
+  para enquadrar modelos grandes, e o minimapa é ampliado (240×180), destacando
+  a seleção e mantendo o arranjo inteiro visível.
 
 Fluxo de uso:
 

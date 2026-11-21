@@ -2,6 +2,8 @@ import type { ColumnModel, TableModel } from '@dbmapper/domain'
 import { describe, expect, test } from 'bun:test'
 import type { DiagramPosition } from '../api/types'
 import {
+  adaptiveColumns,
+  GRID_GAP_X,
   DIAGRAM_NODE_WIDTH,
   estimatedTableHeight,
   layoutGrid,
@@ -34,9 +36,6 @@ function table(name: string, columnCount = 2): TableModel {
   }
 }
 
-function center(position: DiagramPosition, height: number): DiagramPosition {
-  return { x: position.x + DIAGRAM_NODE_WIDTH / 2, y: position.y + height / 2 }
-}
 
 function overlappingPairs(
   tables: readonly TableModel[],
@@ -143,27 +142,40 @@ describe('layoutStar', () => {
     { source: 'projeto', target: 'empresa' },
   ]
 
-  test('coloca o hub no centro e as vizinhas diretas no primeiro anel', () => {
-    const positions = layoutStar(tables, relationships)
-    const hubPosition = positions.alocacao
-    const hubCenter = center(hubPosition, estimatedTableHeight(tables[0]))
+  function ringFixture(): { tables: TableModel[]; relationships: LayoutRelationship[] } {
+    const fixtureTables = [table('hub', 2)]
+    for (let index = 1; index <= 8; index++) fixtureTables.push(table(`n${String(index).padStart(2, '0')}`, 2))
+    for (let index = 1; index <= 16; index++) fixtureTables.push(table(`g${String(index).padStart(2, '0')}`, 2))
 
-    const directNeighbors = ['async_job', 'projeto', 'usuario']
-    const ringDistances = directNeighbors.map((name) => {
-      const card = tables.find((candidate) => candidate.name === name)
-      if (!card) throw new Error(`Tabela ${name} ausente.`)
-      const cardCenter = center(positions[name], estimatedTableHeight(card))
-      return Math.hypot(cardCenter.x - hubCenter.x, cardCenter.y - hubCenter.y)
-    })
+    const fixtureRelationships: LayoutRelationship[] = []
+    for (let index = 1; index <= 8; index++) {
+      fixtureRelationships.push({ source: 'hub', target: `n${String(index).padStart(2, '0')}` })
+    }
+    for (let index = 1; index <= 4; index++) {
+      for (let child = 1; child <= 4; child++) {
+        const group = (index - 1) * 4 + child
+        fixtureRelationships.push({ source: `n0${index}`, target: `g${String(group).padStart(2, '0')}` })
+      }
+    }
+    return { tables: fixtureTables, relationships: fixtureRelationships }
+  }
 
-    expect(new Set(ringDistances.map((distance) => distance.toFixed(2))).size).toBe(1)
-    expect(ringDistances[0]).toBeGreaterThan(DIAGRAM_NODE_WIDTH / 2)
+  test('coloca o hub no centro e os níveis em anéis ao redor', () => {
+    const fixture = ringFixture()
+    const positions = layoutStar(fixture.tables, fixture.relationships, { columns: 5 })
+    const rowTops = [...new Set(Object.values(positions).map((position) => position.y))].sort((a, b) => a - b)
+    const rowOf = (name: string) => rowTops.indexOf(positions[name].y)
+    const columnOf = (name: string) =>
+      Math.round((positions[name].x - positions.hub.x) / (DIAGRAM_NODE_WIDTH + GRID_GAP_X))
+    const ringOf = (name: string) =>
+      Math.max(Math.abs(rowOf(name) - rowOf('hub')), Math.abs(columnOf(name)))
 
-    const ringTwoCard = tables.find((candidate) => candidate.name === 'empresa')
-    if (!ringTwoCard) throw new Error('Tabela empresa ausente.')
-    const ringTwoCenter = center(positions.empresa, estimatedTableHeight(ringTwoCard))
-    const ringTwoDistance = Math.hypot(ringTwoCenter.x - hubCenter.x, ringTwoCenter.y - hubCenter.y)
-    expect(ringTwoDistance).toBeGreaterThan(ringDistances[0])
+    const levelOne = Array.from({ length: 8 }, (_value, index) => `n${String(index + 1).padStart(2, '0')}`)
+    const levelTwo = Array.from({ length: 16 }, (_value, index) => `g${String(index + 1).padStart(2, '0')}`)
+
+    expect(levelOne.every((name) => ringOf(name) === 1)).toBe(true)
+    expect(levelTwo.every((name) => ringOf(name) === 2)).toBe(true)
+    expect(layoutStar([...fixture.tables].reverse(), [...fixture.relationships].reverse(), { columns: 5 })).toEqual(positions)
   })
 
   test('coloca as isoladas na faixa lateral e é determinístico', () => {
@@ -183,6 +195,16 @@ describe('layoutStar', () => {
   })
 })
 
+describe('adaptiveColumns', () => {
+  test('mantém a grade aproximadamente quadrada', () => {
+    expect(adaptiveColumns(1)).toBe(1)
+    expect(adaptiveColumns(4)).toBe(2)
+    expect(adaptiveColumns(9)).toBe(3)
+    expect(adaptiveColumns(100)).toBe(10)
+    expect(adaptiveColumns(108)).toBe(11)
+  })
+})
+
 describe('layout sem sobreposição em modelo grande', () => {
   test('108 tabelas e 203 relacionamentos: zero pares sobrepostos e tempo limitado', () => {
     const { tables, relationships } = realModelFixture()
@@ -190,7 +212,7 @@ describe('layout sem sobreposição em modelo grande', () => {
     expect(relationships).toHaveLength(203)
 
     const gridStarted = performance.now()
-    const gridPositions = layoutGrid(tables)
+    const gridPositions = layoutGrid(tables, { columns: adaptiveColumns(tables.length) })
     const gridElapsed = performance.now() - gridStarted
 
     const starStarted = performance.now()
@@ -201,5 +223,30 @@ describe('layout sem sobreposição em modelo grande', () => {
     expect(overlappingPairs(tables, starPositions)).toEqual([])
     expect(gridElapsed).toBeLessThan(1500)
     expect(starElapsed).toBeLessThan(1500)
+  })
+
+  test('escolhe colunas que reduzem a extensão total', () => {
+    const { tables, relationships } = realModelFixture()
+    const positions = layoutStar(tables, relationships)
+    const xs = Object.values(positions).map((position) => position.x)
+    const ys = Object.values(positions).map((position) => position.y)
+    const width = Math.max(...xs) - Math.min(...xs)
+    const height = Math.max(...ys) - Math.min(...ys)
+
+    expect(Math.max(width, height)).toBeLessThan(8000)
+  })
+
+  test('card muito alto não infla a extensão do layout', () => {
+    const { tables, relationships } = realModelFixture()
+    const tall = tables.map((entry, index) => (index === 5 ? table(entry.name, 100) : entry))
+    const positions = layoutStar(tall, relationships)
+    const xs = Object.values(positions).map((position) => position.x)
+    const ys = Object.values(positions).map((position) => position.y)
+
+    const width = Math.max(...xs) - Math.min(...xs)
+    const height = Math.max(...ys) - Math.min(...ys)
+
+    expect(overlappingPairs(tall, positions)).toEqual([])
+    expect(Math.max(width, height)).toBeLessThan(10000)
   })
 })

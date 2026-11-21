@@ -2,17 +2,27 @@ import type { TableModel } from '@dbmapper/domain'
 import type { DiagramPosition } from '../api/types'
 
 export const DIAGRAM_NODE_WIDTH = 260
-export const NODE_HEADER_HEIGHT = 37
-export const NODE_COLUMN_HEIGHT = 28
+export const NODE_HEADER_HEIGHT = 38
+export const NODE_COLUMN_HEIGHT = 29
 export const GRID_COLUMNS = 3
 export const GRID_ORIGIN_X = 80
 export const GRID_ORIGIN_Y = 80
 export const GRID_GAP_X = 80
 export const GRID_ROW_HEIGHT = 260
 export const LAYOUT_MIN_GAP = 40
+export const NODE_FOOTER_HEADER_HEIGHT = 20
+export const NODE_FOOTER_ROW_HEIGHT = 20
+export const NODE_FOOTER_PADDING = 16
+
+export function estimatedFooterHeight(table: TableModel): number {
+  const rows = (table.relationships?.parents.length ?? 0) + (table.relationships?.children.length ?? 0)
+  if (rows === 0) return 0
+  const sections = 2
+  return NODE_FOOTER_PADDING + sections * NODE_FOOTER_HEADER_HEIGHT + rows * NODE_FOOTER_ROW_HEIGHT
+}
 
 export function estimatedTableHeight(table: TableModel): number {
-  return NODE_HEADER_HEIGHT + table.columns.length * NODE_COLUMN_HEIGHT + 2
+  return NODE_HEADER_HEIGHT + table.columns.length * NODE_COLUMN_HEIGHT + estimatedFooterHeight(table) + 2
 }
 
 export function compareNames(a: string, b: string): number {
@@ -59,6 +69,7 @@ export interface StarLayoutOptions {
   originX?: number
   originY?: number
   gap?: number
+  columns?: number
 }
 
 interface LayoutBox {
@@ -139,6 +150,10 @@ export function layoutGrid(
   return toPositions(boxes)
 }
 
+export function adaptiveColumns(count: number): number {
+  return Math.max(1, Math.ceil(Math.sqrt(Math.max(1, count))))
+}
+
 export function layoutStar(
   tables: readonly TableModel[],
   relationships: readonly LayoutRelationship[],
@@ -198,67 +213,92 @@ export function layoutStar(
     frontier = next
   }
 
-  const levelExtent = (level: readonly string[]): number =>
-    Math.max(DIAGRAM_NODE_WIDTH, ...level.map((name) => estimatedTableHeight(byName.get(name)!)))
+  const connected = levels.flat()
+  const isolated = ordered.map((table) => table.name).filter((name) => !visited.has(name))
 
-  const levelBoundingRadius = (level: readonly string[]): number =>
-    Math.max(...level.map((name) => Math.hypot(DIAGRAM_NODE_WIDTH / 2, estimatedTableHeight(byName.get(name)!) / 2)))
-
-  const hubExtent = levelExtent(levels[0] ?? [])
-  const ringRadii: number[] = []
-  let previousRadius = 0
-  let previousExtent = levelBoundingRadius(levels[0] ?? [])
-
-  for (let ring = 1; ring < levels.length; ring++) {
-    const extent = levelBoundingRadius(levels[ring])
-    const radiusByGap = previousRadius + previousExtent + gap + extent
-    const count = levels[ring].length
-    const radiusByCircumference = count > 1 ? (2 * extent + gap) / (2 * Math.sin(Math.PI / count)) : 0
-    const radius = Math.max(radiusByGap, radiusByCircumference)
-    ringRadii[ring] = radius
-    previousRadius = radius
-    previousExtent = extent
+  interface ConnectedPlacement {
+    boxes: LayoutBox[]
+    width: number
+    height: number
+    right: number
   }
 
-  const outerRadius = levels.length > 1 ? ringRadii[levels.length - 1] : hubExtent / 2
-  const maxExtent = Math.max(...levels.map((level) => levelExtent(level)))
-  const centerX = originX + outerRadius + DIAGRAM_NODE_WIDTH / 2
-  const centerY = originY + outerRadius + maxExtent / 2
-  const boxes: LayoutBox[] = []
-  const hubHeight = estimatedTableHeight(byName.get(hub)!)
-  boxes.push({
-    name: hub,
-    x: centerX - DIAGRAM_NODE_WIDTH / 2,
-    y: centerY - hubHeight / 2,
-    width: DIAGRAM_NODE_WIDTH,
-    height: hubHeight,
-  })
+  function placeConnected(columns: number): ConnectedPlacement {
+    const rows = Math.ceil(connected.length / columns)
+    const centerRow = Math.floor((rows - 1) / 2)
+    const centerColumn = Math.floor((columns - 1) / 2)
 
-  for (let ring = 1; ring < levels.length; ring++) {
-    const radius = ringRadii[ring]
-    const step = (2 * Math.PI) / levels[ring].length
-    levels[ring].forEach((name, index) => {
-      const angle = -Math.PI / 2 + index * step
+    const cells: Array<{ row: number; column: number; ring: number }> = []
+    for (let row = 0; row < rows; row++) {
+      for (let column = 0; column < columns; column++) {
+        cells.push({
+          row,
+          column,
+          ring: Math.max(Math.abs(row - centerRow), Math.abs(column - centerColumn)),
+        })
+      }
+    }
+    cells.sort((a, b) => a.ring - b.ring || a.row - b.row || a.column - b.column)
+
+    const placement = new Map<string, { row: number; column: number }>()
+    connected.forEach((name, index) => {
+      const cell = cells[index]
+      if (cell) placement.set(name, { row: cell.row, column: cell.column })
+    })
+
+    const rowHeights: number[] = Array.from({ length: rows }, () => 0)
+    for (const [name, cell] of placement) {
       const height = estimatedTableHeight(byName.get(name)!)
+      rowHeights[cell.row] = Math.max(rowHeights[cell.row] ?? 0, height)
+    }
+
+    const rowTops: number[] = []
+    let nextRowTop = originY
+    for (let row = 0; row < rows; row++) {
+      rowTops[row] = nextRowTop
+      nextRowTop += (rowHeights[row] ?? 0) + gap
+    }
+
+    const boxes: LayoutBox[] = []
+    for (const [name, cell] of placement) {
+      const height = estimatedTableHeight(byName.get(name)!)
+      const rowTop = rowTops[cell.row] ?? originY
+      const rowHeight = rowHeights[cell.row] ?? height
       boxes.push({
         name,
-        x: centerX + radius * Math.cos(angle) - DIAGRAM_NODE_WIDTH / 2,
-        y: centerY + radius * Math.sin(angle) - height / 2,
+        x: originX + cell.column * (DIAGRAM_NODE_WIDTH + GRID_GAP_X),
+        y: rowTop + (rowHeight - height) / 2,
         width: DIAGRAM_NODE_WIDTH,
         height,
       })
-    })
+    }
+
+    const width = columns * (DIAGRAM_NODE_WIDTH + GRID_GAP_X) - GRID_GAP_X
+    const height = Math.max(0, nextRowTop - gap - originY)
+    return { boxes, width, height, right: originX + width }
   }
 
-  const remaining = ordered.map((table) => table.name).filter((name) => !visited.has(name))
-  const stripX = centerX + outerRadius + DIAGRAM_NODE_WIDTH / 2 + gap
+  const baseColumns = Math.ceil(Math.sqrt(connected.length))
+  const candidateColumns = options.columns
+    ? [Math.max(1, Math.floor(options.columns))]
+    : Array.from({ length: baseColumns * 2 }, (_value, index) => Math.max(2, Math.floor(baseColumns / 2) + index))
+        .filter((value) => value <= connected.length)
+        .concat(connected.length === 1 ? [1] : [])
+
+  let chosen = placeConnected(candidateColumns[0] ?? 1)
+  for (const columns of candidateColumns.slice(1)) {
+    const candidate = placeConnected(columns)
+    if (Math.max(candidate.width, candidate.height) < Math.max(chosen.width, chosen.height)) chosen = candidate
+  }
+
+  const boxes = [...chosen.boxes]
+  const stripX = chosen.right + GRID_GAP_X
   let stripY = originY
-  for (const name of remaining) {
+  for (const name of isolated) {
     const height = estimatedTableHeight(byName.get(name)!)
     boxes.push({ name, x: stripX, y: stripY, width: DIAGRAM_NODE_WIDTH, height })
     stripY += height + gap
   }
 
-  resolveOverlaps(boxes, 0)
   return toPositions(boxes)
 }

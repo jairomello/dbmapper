@@ -138,3 +138,61 @@ exactly one save, and MUST fit the view to the arranged cards afterwards. A
 
 - **WHEN** a `VIEWER` opens the diagram
 - **THEN** the automatic layout actions are not available and no save is sent
+
+### Requirement: Optional card size in the layout document
+
+Each saved position MUST accept an optional `width` and `height` for the card, in
+addition to `x` and `y`. Sizes MUST be validated within configured minimum and
+maximum bounds, MUST be stored per zone, and MUST be returned unchanged by the
+layout `GET`. Documents without sizes MUST remain valid.
+
+#### Scenario: Size round-trips
+
+- **WHEN** a `MEMBER` saves a zone layout with a card at `{ x, y, width, height }`
+- **THEN** reading the layout back returns the same width and height for that table
+
+#### Scenario: Out-of-range size is rejected
+
+- **WHEN** a layout PUT carries a width or height outside the allowed bounds
+- **THEN** the response is `400` with the standard error envelope and nothing is stored
+
+#### Scenario: Position-only document is accepted
+
+- **WHEN** a layout PUT carries positions with only `x` and `y`
+- **THEN** it is accepted and the diagram applies the default size
+
+#### Scenario: Sizes are independent per zone
+
+- **WHEN** two zones store different sizes for the same table
+- **THEN** each zone's GET returns its own size
+
+### Requirement: Compact automatic layout
+
+Automatic layout MUST produce a compact arrangement: the bounding box of the
+arranged cards MUST stay within the same order of magnitude as a packed grid of
+the same tables, regardless of how tall the tallest card is. Ring placement MUST
+NOT scale the radius by the tallest card's height, and cards MUST NOT overlap
+after organizing.
+
+#### Scenario: Tall card does not inflate the layout
+
+- **WHEN** a zone contains one very tall table (over 2 000 px) among average cards
+- **THEN** the arranged bounding box stays within roughly the area the same tables would occupy in a packed grid
+- **AND** no card overlaps another
+
+#### Scenario: Star rings keep neighbors close
+
+- **WHEN** `Em estrela` is applied
+- **THEN** the table with the most connections is centered
+- **AND** the cards most related to it occupy the positions nearest the center, in relationship-level order
+- **AND** tables with no relationship are placed in a side strip
+
+#### Scenario: Grid adapts to table count
+
+- **WHEN** `Em grade` is applied to a zone with one hundred tables
+- **THEN** the number of columns is derived from the count so the result is roughly square instead of a narrow column
+
+#### Scenario: Layout stays deterministic
+
+- **WHEN** the same zone is organized twice, or with the tables in a different input order
+- **THEN** the resulting positions are identical

@@ -17,10 +17,10 @@
 
 ## 3. Validate
 
-- [ ] 3.1 Open `dbviewer.html` in the browser, load a project JSON, and visually confirm that columns are sorted PK-first + alphabetical
-- [ ] 3.2 Test with a table that has a composite PK (multiple PK columns) and confirm they all appear first
-- [ ] 3.3 Test with a table that has no PK and confirm alphabetical order
+- [x] 3.1 Open `dbviewer.html` in the browser, load a project JSON, and visually confirm that columns are sorted PK-first + alphabetical
+- [x] 3.2 Test with a table that has a composite PK (multiple PK columns) and confirm they all appear first
+- [x] 3.3 Test with a table that has no PK and confirm alphabetical order
 
 ## 4. Archive
 
-- [ ] 4.1 Run `/opsx-archive` to finalize the change
+- [x] 4.1 Run `/opsx-archive` to finalize the change

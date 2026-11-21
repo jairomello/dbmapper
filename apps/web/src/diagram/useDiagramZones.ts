@@ -460,11 +460,19 @@ export function useDiagramZones({
       const current = stateRef.current
       const name = activeZoneRef.current
       const layout = current.layouts[name] ?? EMPTY_ZONE_LAYOUT
+      const merged: Record<string, DiagramPosition> = {}
+      for (const [table, position] of Object.entries(positions)) {
+        const previous = layout.positions[table]
+        merged[table] =
+          previous && (previous.width !== undefined || previous.height !== undefined)
+            ? { ...position, width: previous.width, height: previous.height }
+            : position
+      }
       const next: ZoneState = {
         zones: current.zones,
         layouts: {
           ...current.layouts,
-          [name]: { ...layout, positions, viewport: { x: viewport.x, y: viewport.y }, zoom },
+          [name]: { ...layout, positions: merged, viewport: { x: viewport.x, y: viewport.y }, zoom },
         },
       }
       commit(next)

@@ -25,6 +25,14 @@ const env = {
   NODE_ENV: 'development',
 }
 
+async function openProjectMenu(page: Page): Promise<void> {
+  const menu = page.getByRole('menu', { name: 'Ações do projeto' })
+  if (!(await menu.isVisible().catch(() => false))) {
+    await page.getByTestId('project-actions-menu').click()
+  }
+  await menu.waitFor()
+}
+
 function reviewedColumnCount(label: string): number {
   const match = label.match(/·\s*(\d+)\/(\d+)\s*campos/)
   if (!match) throw new Error(`Não foi possível ler a cobertura revisada: ${label}`)
@@ -342,6 +350,7 @@ try {
     throw new Error(`O zoom do diagrama não foi preservado após recarregar (${savedZone.zoom} -> ${restored.zoom}).`)
   }
 
+  await openProjectMenu(page)
   const downloadPromise = page.waitForEvent('download')
   await page.getByRole('button', { name: 'Exportar JSON' }).click()
   const download = await downloadPromise
@@ -550,6 +559,7 @@ try {
     throw new Error('O export do diagrama emitiu requisição de save.')
   }
 
+  await openProjectMenu(page)
   await page.getByTestId('workspace-ddl-button').click()
   const ddlDialog = page.getByRole('dialog', { name: 'Gerar SQL' })
   await ddlDialog.waitFor()
@@ -585,6 +595,7 @@ try {
   await updateColumn
   await columnDialog.waitFor({ state: 'detached' })
 
+  await openProjectMenu(page)
   await page.getByTestId('workspace-ddl-button').click()
   const migrationDialog = page.getByRole('dialog', { name: 'Gerar SQL' })
   await migrationDialog.waitFor()
@@ -822,6 +833,63 @@ try {
     }
   }
 
+  // Redesenho do workspace: tema persistido, foco reversível e níveis de detalhe.
+  const themeBefore = await page.evaluate(() => document.documentElement.dataset.theme)
+  await page.getByTestId('theme-toggle').click()
+  await page.waitForTimeout(300)
+  const themeAfter = await page.evaluate(() => document.documentElement.dataset.theme)
+  if (themeAfter === themeBefore) {
+    throw new Error('O botão de tema não alterou o tema aplicado.')
+  }
+
+  await page.reload()
+  await page.getByTestId('table-row-users').waitFor()
+  const themeReloaded = await page.evaluate(() => document.documentElement.dataset.theme)
+  if (themeReloaded !== themeAfter) {
+    throw new Error(`O tema não foi preservado após recarregar (${themeAfter} -> ${themeReloaded}).`)
+  }
+  await page.getByTestId('view-diagram').click()
+  await page.getByTestId('diagram-node-users').waitFor()
+
+  const focusWrites = { count: 0 }
+  const trackFocusWrites = (response: { request: () => { method: () => string }; url: () => string }) => {
+    if (response.request().method() !== 'PUT') return
+    if (!/^\/api\/projects\/[^/]+\/diagram$/.test(new URL(response.url()).pathname)) return
+    focusWrites.count += 1
+  }
+  page.on('response', trackFocusWrites)
+
+  await page.getByTestId('table-row-users').click()
+  await page.getByTestId('diagram-focus').waitFor()
+  const nodesBeforeFocus = await page.locator('.react-flow__node').count()
+  await page.getByTestId('diagram-focus').click()
+  await page.getByTestId('diagram-focus-chip').waitFor()
+  const nodesInFocus = await page.locator('.react-flow__node').count()
+  if (nodesInFocus >= nodesBeforeFocus) {
+    throw new Error(`O foco não reduziu o canvas (${nodesBeforeFocus} -> ${nodesInFocus}).`)
+  }
+  if ((await page.getByTestId('diagram-add-table').count()) !== 0) {
+    throw new Error('O foco expôs controles de edição.')
+  }
+  await page.getByTestId('diagram-focus-exit').click()
+  await page.getByTestId('diagram-focus-chip').waitFor({ state: 'detached' })
+  const nodesRestored = await page.locator('.react-flow__node').count()
+  if (nodesRestored !== nodesBeforeFocus) {
+    throw new Error(`O foco não restaurou a zona (${nodesBeforeFocus} -> ${nodesRestored}).`)
+  }
+  page.off('response', trackFocusWrites)
+  if (focusWrites.count > 0) {
+    throw new Error(`O foco em relações gravou ${focusWrites.count} layout(s), mas deveria ser só leitura.`)
+  }
+
+  await page.getByTestId('diagram-detail-toggle').click()
+  await page.waitForTimeout(400)
+  if ((await page.getByTestId('diagram-detail-toggle').getAttribute('aria-pressed')) !== 'true') {
+    throw new Error('O modo compacto não ficou ativo após alternar os detalhes.')
+  }
+  await page.getByTestId('diagram-detail-toggle').click()
+  await page.waitForTimeout(300)
+
   const viewerEmail = 'viewer@e2e.local'
   const viewerPassword = 'e2e-viewer-password'
   const viewerStatus = await page.evaluate(
@@ -882,7 +950,7 @@ try {
   }
 
   console.log(
-    'E2E smoke ok: login, projeto via SQL, descrição, aprovação, agente (fake, projeto e tabela), diagrama (arraste, zoom e layout persistidos), export JSON, viewer read-only (somente GET), edição no canvas (tabela, relacionamento com FK automática, undo e modelo persistido), zonas da Fase 9 (criar aba, arrastar da árvore, remover sem excluir, localizar por outra zona e export PNG/SVG), DDL da Fase 10 (script completo Postgres, migração após editar tipo de coluna, download .sql e marcar banco como sincronizado) e experiência do canvas da Fase 11 (destaque de arestas outgoing/incoming com animação, organização Em estrela num único PUT persistida após reload e VIEWER sem controles de edição).',
+    'E2E smoke ok: login, projeto via SQL, descrição, aprovação, agente (fake, projeto e tabela), diagrama (arraste, zoom e layout persistidos), export JSON, viewer read-only (somente GET), edição no canvas (tabela, relacionamento com FK automática, undo e modelo persistido), zonas da Fase 9 (criar aba, arrastar da árvore, remover sem excluir, localizar por outra zona e export PNG/SVG), DDL da Fase 10 (script completo Postgres, migração após editar tipo de coluna, download .sql e marcar banco como sincronizado) experiência do canvas da Fase 11 (destaque de arestas outgoing/incoming com animação, organização Em estrela num único PUT persistida após reload e VIEWER sem controles de edição) e redesenho do workspace (temas claro/escuro persistidos, foco na vizinhança sem gravar layout e níveis de detalhe).',
   )
 } finally {
   await browser?.close()

@@ -5,6 +5,7 @@ import {
   buildZonePositions,
   createDiagramEdges,
   createDiagramNodes,
+  DIAGRAM_NODE_WIDTH,
   diagramMatches,
   gridPosition,
   tableMatchKey,
@@ -76,6 +77,27 @@ describe('diagram layout', () => {
     ])
     expect(nodes.find((node) => node.id === 'pedido')?.data.active).toBe(true)
     expect(nodes.find((node) => node.id === 'pedido')?.data.activeColumn).toBe('cliente_id')
+  })
+
+  test('aplica tamanho salvo por tabela e usa o padrão quando ausente', () => {
+    const database = sampleDatabase()
+    const nodes = createDiagramNodes({
+      database,
+      positions: { cliente: { x: 0, y: 0, width: 420, height: 520 }, pedido: { x: 300, y: 0 } },
+      selection: { type: 'database' },
+      matches: new Set(),
+      query: '',
+      draggable: true,
+      onSelect: () => undefined,
+    })
+
+    const cliente = nodes.find((node) => node.id === 'cliente')
+    const pedido = nodes.find((node) => node.id === 'pedido')
+    expect(cliente?.width).toBe(420)
+    expect(cliente?.height).toBe(520)
+    expect(cliente?.style).toEqual({ width: 420, height: 520 })
+    expect(pedido?.width).toBe(DIAGRAM_NODE_WIDTH)
+    expect(pedido?.height).toBeGreaterThan(0)
   })
 
   test('cria uma aresta crow foot por relacionamento existente', () => {

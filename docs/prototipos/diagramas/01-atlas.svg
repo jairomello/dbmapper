@@ -1,0 +1,134 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1440" height="900" viewBox="0 0 1440 900" role="img"><title>Atlas · visão por áreas</title><defs><pattern id="dots" width="18" height="18" patternUnits="userSpaceOnUse"><circle cx="1" cy="1" r="0.9" fill="#c5cebd"/></pattern></defs>
+<rect x="0" y="0" width="1440" height="900" rx="0" fill="#f6f7ef" stroke="none" stroke-width="1"/>
+<rect x="0" y="0" width="240" height="900" rx="0" fill="#183d32" stroke="none" stroke-width="1"/>
+<path d="M24 32l10 -5 10 5-10 5z M24 38l10 5 10-5 M24 44l10 5 10-5" fill="none" stroke="#faf9e9" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="none"/>
+<text x="55" y="44" font-family="Inter, Arial, sans-serif" font-size="19" font-weight="700" fill="#faf9e9" text-anchor="start" letter-spacing="0">DBMapper</text>
+<path d="M22 76L217 76" fill="none" stroke="#456255" stroke-width="1" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="none"/>
+<text x="24" y="111" font-family="Inter, Arial, sans-serif" font-size="10" font-weight="700" fill="#b7ccb9" text-anchor="start" letter-spacing="1.6">PROJETO ATUAL</text>
+<rect x="16" y="125" width="208" height="53" rx="10" fill="#254b3e" stroke="none" stroke-width="1"/>
+<rect x="27" y="136" width="32" height="32" rx="8" fill="#d9eab7" stroke="none" stroke-width="1"/>
+<text x="43" y="158" font-family="Inter, Arial, sans-serif" font-size="17" font-weight="700" fill="#183d32" text-anchor="middle" letter-spacing="0">A</text>
+<text x="72" y="158" font-family="Inter, Arial, sans-serif" font-size="16" font-weight="600" fill="white" text-anchor="start" letter-spacing="0">Axiis</text>
+<g transform="translate(188 142) scale(0.75)">
+<path d="M8 10l4 4 4-4" fill="none" stroke="white" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="none"/>
+</g>
+<g transform="translate(26 200) scale(0.75)">
+<path d="M3 3h7v7H3z M14 3h7v7h-7z M3 14h7v7H3z M14 14h7v7h-7z" fill="none" stroke="#d4e2d7" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="none"/>
+</g>
+<text x="58" y="215" font-family="Inter, Arial, sans-serif" font-size="15" font-weight="600" fill="#d4e2d7" text-anchor="start" letter-spacing="0">Visão geral</text>
+<rect x="12" y="238" width="216" height="38" rx="8" fill="#d7eac0" stroke="none" stroke-width="1"/>
+<g transform="translate(26 246) scale(0.75)">
+<path d="M3 10h5v5H3z M16 3h5v5h-5z M16 16h5v5h-5z M8 12h4V6h4 M12 12v6h4" fill="none" stroke="#183d32" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="none"/>
+</g>
+<text x="58" y="261" font-family="Inter, Arial, sans-serif" font-size="15" font-weight="600" fill="#183d32" text-anchor="start" letter-spacing="0">Diagrama</text>
+<g transform="translate(26 292) scale(0.75)">
+<path d="M3 4q5-2 9 2 4-4 9-2v15q-5-2-9 1-4-3-9-1z M12 6v14" fill="none" stroke="#d4e2d7" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="none"/>
+</g>
+<text x="58" y="307" font-family="Inter, Arial, sans-serif" font-size="15" font-weight="600" fill="#d4e2d7" text-anchor="start" letter-spacing="0">Dicionário</text>
+<path d="M22 352L217 352" fill="none" stroke="#456255" stroke-width="1" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="none"/>
+<text x="24" y="388" font-family="Inter, Arial, sans-serif" font-size="10" font-weight="700" fill="#b7ccb9" text-anchor="start" letter-spacing="1.4">ÁREAS DO MODELO</text>
+<circle cx="32" cy="425" r="4" fill="#cd9f69" stroke="none"/>
+<text x="51" y="430" font-family="Inter, Arial, sans-serif" font-size="14" font-weight="400" fill="#e5ebdf" text-anchor="start" letter-spacing="0">Contratos</text>
+<circle cx="32" cy="463" r="4" fill="#ad9bc6" stroke="none"/>
+<text x="51" y="468" font-family="Inter, Arial, sans-serif" font-size="14" font-weight="400" fill="#e5ebdf" text-anchor="start" letter-spacing="0">Pessoas</text>
+<circle cx="32" cy="501" r="4" fill="#7aa995" stroke="none"/>
+<text x="51" y="506" font-family="Inter, Arial, sans-serif" font-size="14" font-weight="400" fill="#e5ebdf" text-anchor="start" letter-spacing="0">Operações</text>
+<circle cx="32" cy="539" r="4" fill="#83a8c4" stroke="none"/>
+<text x="51" y="544" font-family="Inter, Arial, sans-serif" font-size="14" font-weight="400" fill="#e5ebdf" text-anchor="start" letter-spacing="0">Financeiro</text>
+<text x="24" y="851" font-family="Inter, Arial, sans-serif" font-size="14" font-weight="400" fill="#d4e2d7" text-anchor="start" letter-spacing="0">108 tabelas no projeto</text>
+<text x="276" y="42" font-family="Inter, Arial, sans-serif" font-size="14" font-weight="400" fill="#596d61" text-anchor="start" letter-spacing="0">Projetos    /    Axiis    /    Diagrama</text>
+<rect x="1275" y="18" width="133" height="34" rx="8" fill="#fff" stroke="#d6ddd1" stroke-width="1"/>
+<text x="1341.5" y="40" font-family="Inter, Arial, sans-serif" font-size="13" font-weight="600" fill="#183d32" text-anchor="middle" letter-spacing="0">Exportar   ↓</text>
+<path d="M240 67L1440 67" fill="none" stroke="#d6ddd1" stroke-width="1" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="none"/>
+<text x="279" y="148" font-family="Georgia, serif" font-size="48" font-weight="400" fill="#183d32" text-anchor="start" letter-spacing="0">Atlas do modelo</text>
+<text x="281" y="182" font-family="Inter, Arial, sans-serif" font-size="15" font-weight="400" fill="#596d61" text-anchor="start" letter-spacing="0">108 tabelas    ·    1.176 campos    ·    203 chaves estrangeiras</text>
+<rect x="1203" y="125" width="204" height="36" rx="18" fill="#fff" stroke="#d6ddd1" stroke-width="1"/>
+<g transform="translate(1218 134) scale(0.75)">
+<path d="M2 8l10-5 10 5-10 5z M3 13l9 5 9-5 M4 17l8 4 8-4" fill="none" stroke="#32654a" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="none"/>
+</g>
+<text x="1248" y="148" font-family="Inter, Arial, sans-serif" font-size="14" font-weight="400" fill="#233d33" text-anchor="start" letter-spacing="0">Agrupar por área  ⌄</text>
+<rect x="268" y="218" width="1144" height="596" rx="20" fill="#eef1e6" stroke="#d6ddd1" stroke-width="1"/>
+<rect x="269" y="219" width="1142" height="594" rx="20" fill="url(#dots)" stroke="none" stroke-width="1"/>
+<rect x="294" y="242" width="118" height="25" rx="6" fill="#fff" stroke="none" stroke-width="1"/>
+<text x="353.0" y="259" font-family="Inter, Arial, sans-serif" font-size="12" font-weight="600" fill="#32654a" text-anchor="middle" letter-spacing="0">Zona principal</text>
+<text x="1382" y="262" font-family="Inter, Arial, sans-serif" font-size="13" font-weight="400" fill="#596d61" text-anchor="end" letter-spacing="0">4 áreas em foco</text>
+<path d="M735 390H935" fill="none" stroke="#7c9483" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="none"/>
+<path d="M530 466V584" fill="none" stroke="#7c9483" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="none"/>
+<path d="M1113 466V584" fill="none" stroke="#7c9483" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="none"/>
+<path d="M735 662H935" fill="none" stroke="#7c9483" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="none"/>
+<path d="M735 415H823Q835 415 835 427V627Q835 639 847 639H935" fill="none" stroke="#7c9483" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="none"/>
+<rect x="392" y="322" width="345" height="152" rx="14" fill="#dfe5d8" stroke="none" stroke-width="1"/>
+<rect x="390" y="317" width="345" height="152" rx="14" fill="#fefef9" stroke="#cbd4c8" stroke-width="1"/>
+<rect x="405" y="332" width="38" height="38" rx="9" fill="#f2e4ce" stroke="none" stroke-width="1"/>
+<g transform="translate(413 340) scale(0.9166666666666666)">
+<path d="M2 8l10-5 10 5-10 5z M3 13l9 5 9-5 M4 17l8 4 8-4" fill="none" stroke="#805727" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="none"/>
+</g>
+<text x="455" y="360" font-family="Inter, Arial, sans-serif" font-size="23" font-weight="600" fill="#183d32" text-anchor="start" letter-spacing="0">Contratos</text>
+
+<path d="M406 382L719 382" fill="none" stroke="#d6ddd1" stroke-width="1" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="none"/>
+<g transform="translate(410 396) scale(0.625)">
+<path d="M3 4h18v16H3z M3 9h18 M9 9v11" fill="none" stroke="#596d61" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="none"/>
+</g>
+<text x="435" y="409" font-family="IBM Plex Mono, DejaVu Sans Mono, monospace" font-size="14" font-weight="400" fill="#183d32" text-anchor="start" letter-spacing="0">contrato_cliente</text>
+<g transform="translate(410 425) scale(0.625)">
+<path d="M3 4h18v16H3z M3 9h18 M9 9v11" fill="none" stroke="#596d61" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="none"/>
+</g>
+<text x="435" y="438" font-family="IBM Plex Mono, DejaVu Sans Mono, monospace" font-size="14" font-weight="400" fill="#183d32" text-anchor="start" letter-spacing="0">contrato_cli_servico</text>
+<rect x="937" y="322" width="345" height="152" rx="14" fill="#dfe5d8" stroke="none" stroke-width="1"/>
+<rect x="935" y="317" width="345" height="152" rx="14" fill="#fefef9" stroke="#cbd4c8" stroke-width="1"/>
+<rect x="950" y="332" width="38" height="38" rx="9" fill="#eee4f4" stroke="none" stroke-width="1"/>
+<g transform="translate(958 340) scale(0.9166666666666666)">
+<path d="M2 8l10-5 10 5-10 5z M3 13l9 5 9-5 M4 17l8 4 8-4" fill="none" stroke="#715588" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="none"/>
+</g>
+<text x="1000" y="360" font-family="Inter, Arial, sans-serif" font-size="23" font-weight="600" fill="#183d32" text-anchor="start" letter-spacing="0">Pessoas</text>
+
+<path d="M951 382L1264 382" fill="none" stroke="#d6ddd1" stroke-width="1" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="none"/>
+<g transform="translate(955 396) scale(0.625)">
+<path d="M3 4h18v16H3z M3 9h18 M9 9v11" fill="none" stroke="#596d61" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="none"/>
+</g>
+<text x="980" y="409" font-family="IBM Plex Mono, DejaVu Sans Mono, monospace" font-size="14" font-weight="400" fill="#183d32" text-anchor="start" letter-spacing="0">cliente</text>
+<g transform="translate(955 425) scale(0.625)">
+<path d="M3 4h18v16H3z M3 9h18 M9 9v11" fill="none" stroke="#596d61" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="none"/>
+</g>
+<text x="980" y="438" font-family="IBM Plex Mono, DejaVu Sans Mono, monospace" font-size="14" font-weight="400" fill="#183d32" text-anchor="start" letter-spacing="0">personalidade_juridica</text>
+<rect x="392" y="585" width="345" height="152" rx="14" fill="#dfe5d8" stroke="none" stroke-width="1"/>
+<rect x="390" y="580" width="345" height="152" rx="14" fill="#fefef9" stroke="#cbd4c8" stroke-width="1"/>
+<rect x="405" y="595" width="38" height="38" rx="9" fill="#dbecdc" stroke="none" stroke-width="1"/>
+<g transform="translate(413 603) scale(0.9166666666666666)">
+<path d="M2 8l10-5 10 5-10 5z M3 13l9 5 9-5 M4 17l8 4 8-4" fill="none" stroke="#33715a" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="none"/>
+</g>
+<text x="455" y="623" font-family="Inter, Arial, sans-serif" font-size="23" font-weight="600" fill="#183d32" text-anchor="start" letter-spacing="0">Operações</text>
+
+<path d="M406 645L719 645" fill="none" stroke="#d6ddd1" stroke-width="1" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="none"/>
+<g transform="translate(410 659) scale(0.625)">
+<path d="M3 4h18v16H3z M3 9h18 M9 9v11" fill="none" stroke="#596d61" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="none"/>
+</g>
+<text x="435" y="672" font-family="IBM Plex Mono, DejaVu Sans Mono, monospace" font-size="14" font-weight="400" fill="#183d32" text-anchor="start" letter-spacing="0">alocacao</text>
+<g transform="translate(410 688) scale(0.625)">
+<path d="M3 4h18v16H3z M3 9h18 M9 9v11" fill="none" stroke="#596d61" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="none"/>
+</g>
+<text x="435" y="701" font-family="IBM Plex Mono, DejaVu Sans Mono, monospace" font-size="14" font-weight="400" fill="#183d32" text-anchor="start" letter-spacing="0">alocacao_tag</text>
+<rect x="937" y="585" width="345" height="152" rx="14" fill="#dfe5d8" stroke="none" stroke-width="1"/>
+<rect x="935" y="580" width="345" height="152" rx="14" fill="#fefef9" stroke="#cbd4c8" stroke-width="1"/>
+<rect x="950" y="595" width="38" height="38" rx="9" fill="#dfebf0" stroke="none" stroke-width="1"/>
+<g transform="translate(958 603) scale(0.9166666666666666)">
+<path d="M2 8l10-5 10 5-10 5z M3 13l9 5 9-5 M4 17l8 4 8-4" fill="none" stroke="#426f89" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="none"/>
+</g>
+<text x="1000" y="623" font-family="Inter, Arial, sans-serif" font-size="23" font-weight="600" fill="#183d32" text-anchor="start" letter-spacing="0">Financeiro</text>
+
+<path d="M951 645L1264 645" fill="none" stroke="#d6ddd1" stroke-width="1" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="none"/>
+<g transform="translate(955 659) scale(0.625)">
+<path d="M3 4h18v16H3z M3 9h18 M9 9v11" fill="none" stroke="#596d61" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="none"/>
+</g>
+<text x="980" y="672" font-family="IBM Plex Mono, DejaVu Sans Mono, monospace" font-size="14" font-weight="400" fill="#183d32" text-anchor="start" letter-spacing="0">banco</text>
+<g transform="translate(955 688) scale(0.625)">
+<path d="M3 4h18v16H3z M3 9h18 M9 9v11" fill="none" stroke="#596d61" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="none"/>
+</g>
+<text x="980" y="701" font-family="IBM Plex Mono, DejaVu Sans Mono, monospace" font-size="14" font-weight="400" fill="#183d32" text-anchor="start" letter-spacing="0">cc_contabil</text>
+<rect x="290" y="755" width="165" height="38" rx="9" fill="#fff" stroke="#d6ddd1" stroke-width="1"/>
+<text x="306" y="780" font-family="Inter, Arial, sans-serif" font-size="15" font-weight="400" fill="#233d33" text-anchor="start" letter-spacing="0">−      75%      +</text>
+<g transform="translate(425 766) scale(0.6666666666666666)">
+<path d="M4 9V4h5 M15 4h5v5 M20 15v5h-5 M9 20H4v-5" fill="none" stroke="#32654a" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="none"/>
+</g>
+<text x="280" y="855" font-family="Inter, Arial, sans-serif" font-size="14" font-weight="700" fill="#183d32" text-anchor="start" letter-spacing="0">Exibindo áreas</text>
+<text x="406" y="855" font-family="Inter, Arial, sans-serif" font-size="14" font-weight="400" fill="#596d61" text-anchor="start" letter-spacing="0">Selecione uma área para explorar suas tabelas.</text></svg>

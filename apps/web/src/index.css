@@ -1,24 +1,196 @@
 @import "tailwindcss";
 
 @theme {
-  --color-accent: #6d5dfc;
-  --color-ink: #0f172a;
-  --color-bg: #f1f5f9;
-  --color-surface: #ffffff;
+  --color-accent: var(--accent);
+  --color-accent-ink: var(--accent-ink);
+  --color-accent-soft: var(--accent-soft);
+  --color-ink: var(--text);
+  --color-bg: var(--background);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-line: var(--line);
+  --color-muted: var(--muted);
+  --color-danger: var(--danger);
+  --color-danger-soft: var(--danger-soft);
+  --color-success: var(--success);
+  --color-success-soft: var(--success-soft);
+  --color-warning: var(--warning);
+  --color-warning-soft: var(--warning-soft);
+  --color-canvas: var(--canvas);
+  --color-card: var(--card);
+  --color-card-header: var(--card-header);
+  --color-header: var(--header-bg);
+  --color-header-ink: var(--header-ink);
   --radius-sm: 6px;
   --radius-md: 10px;
   --radius-lg: 16px;
+  --font-serif: "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, ui-serif, serif;
 }
 
-:root {
-  --diagram-edge-color: #94a3b8;
-  --diagram-edge-out: #b45309;
-  --diagram-edge-in: #1d4ed8;
+:root,
+[data-theme="light"] {
+  color-scheme: light;
+
+  --background: #f4f0e8;
+  --surface: #fffdfa;
+  --surface-2: #f2eee6;
+  --line: #c9beb2;
+  --line-strong: #8f857c;
+  --text: #302e33;
+  --muted: #716771;
+  --accent: #57354d;
+  --accent-ink: #fffdfa;
+  --accent-soft: #e4d9de;
+  --danger: #8b3a3a;
+  --danger-soft: #f7eaea;
+  --success: #2f6f5b;
+  --success-soft: #e8f1ec;
+  --warning: #8a5a1f;
+  --warning-soft: #f9f0e2;
+  --canvas: #f7f3ec;
+  --canvas-dot: #d9d0c3;
+  --card: #fffdfa;
+  --card-header: #f2eee6;
+  --header-bg: #57354d;
+  --header-ink: #fffdfa;
+  --focus: #57354d;
+
+  --color-slate-50: #f7f3ec;
+  --color-slate-100: #f2eee6;
+  --color-slate-200: #e5dfd5;
+  --color-slate-300: #8f857c;
+  --color-slate-400: #928390;
+  --color-slate-500: #716771;
+  --color-slate-600: #5d5460;
+  --color-slate-700: #4a444e;
+  --color-slate-800: #392737;
+  --color-slate-900: #302e33;
+
+  --color-indigo-50: #f1e8ed;
+  --color-indigo-100: #e4d9de;
+  --color-indigo-300: #c9aec0;
+  --color-indigo-500: #7d5a72;
+  --color-indigo-600: #57354d;
+  --color-indigo-700: #4a2c41;
+  --color-indigo-800: #3a2233;
+
+  --color-emerald-50: #e8f1ec;
+  --color-emerald-100: #d5e7de;
+  --color-emerald-300: #a9cbbb;
+  --color-emerald-500: #3f8f74;
+  --color-emerald-700: #2f6f5b;
+  --color-emerald-800: #245749;
+
+  --color-amber-50: #f9f0e2;
+  --color-amber-100: #f3e3c8;
+  --color-amber-300: #e5c99a;
+  --color-amber-500: #b98a44;
+  --color-amber-700: #8a5a1f;
+  --color-amber-800: #6f4817;
+
+  --color-rose-50: #f7eaea;
+  --color-rose-100: #f0dcdc;
+  --color-rose-300: #dfb3b3;
+  --color-rose-500: #b05c5c;
+  --color-rose-700: #8b3a3a;
+
+  --color-red-50: #f7eaea;
+  --color-red-100: #f0dcdc;
+  --color-red-300: #dfb3b3;
+  --color-red-500: #b05c5c;
+  --color-red-600: #9b4444;
+  --color-red-700: #8b3a3a;
+
+  --diagram-edge-color: #a394a0;
+  --diagram-edge-out: #9a5b2a;
+  --diagram-edge-in: #3f4f86;
   --diagram-edge-width: 2px;
   --diagram-edge-strong-width: 3px;
   --diagram-edge-dash-out: 6 4;
   --diagram-edge-dash-in: 12 6;
   --diagram-node-muted-opacity: 0.35;
+}
+
+[data-theme="dark"] {
+  color-scheme: dark;
+
+  --background: #0f1519;
+  --surface: #1a2127;
+  --surface-2: #20282f;
+  --line: #46545f;
+  --line-strong: #5f7280;
+  --text: #e4edf0;
+  --muted: #afbdc5;
+  --accent: #2b7f63;
+  --accent-ink: #ffffff;
+  --accent-soft: #1f3b33;
+  --danger: #efb3b3;
+  --danger-soft: #3a2426;
+  --success: #94ebca;
+  --success-soft: #1e3a32;
+  --warning: #efc588;
+  --warning-soft: #33291c;
+  --canvas: #131a1f;
+  --canvas-dot: #2a343c;
+  --card: #1d262d;
+  --card-header: #232e36;
+  --header-bg: #141a1f;
+  --header-ink: #eef4f6;
+  --focus: #94ebca;
+
+  --color-slate-50: #20282f;
+  --color-slate-100: #263038;
+  --color-slate-200: #2c3740;
+  --color-slate-300: #5f7280;
+  --color-slate-400: #94a3ae;
+  --color-slate-500: #afbdc5;
+  --color-slate-600: #c3ced5;
+  --color-slate-700: #d6dee3;
+  --color-slate-800: #141a1f;
+  --color-slate-900: #0f1519;
+
+  --color-indigo-50: #22323b;
+  --color-indigo-100: #2b3f48;
+  --color-indigo-300: #6f5f8c;
+  --color-indigo-500: #a995cc;
+  --color-indigo-600: #8f7bb8;
+  --color-indigo-700: #cbb8e8;
+  --color-indigo-800: #e0d3f5;
+
+  --color-emerald-50: #1d332c;
+  --color-emerald-100: #224238;
+  --color-emerald-300: #3f7d68;
+  --color-emerald-500: #6fceac;
+  --color-emerald-700: #94ebca;
+  --color-emerald-800: #b8f5dd;
+
+  --color-amber-50: #33291c;
+  --color-amber-100: #403223;
+  --color-amber-300: #8a6b3d;
+  --color-amber-500: #d7a45a;
+  --color-amber-700: #efc588;
+  --color-amber-800: #f6ddb4;
+
+  --color-rose-50: #3a2426;
+  --color-rose-100: #472c2f;
+  --color-rose-300: #8a5a5f;
+  --color-rose-500: #d98b8b;
+  --color-rose-700: #efb3b3;
+
+  --color-red-50: #3a2426;
+  --color-red-100: #472c2f;
+  --color-red-300: #8a5a5f;
+  --color-red-500: #d98b8b;
+  --color-red-600: #e59a9a;
+  --color-red-700: #efb3b3;
+
+  --diagram-edge-color: #7d8f9a;
+  --diagram-edge-out: #efc588;
+  --diagram-edge-in: #a995cc;
+}
+
+.bg-white {
+  background-color: var(--color-surface);
 }
 
 .diagram-edge--outgoing {
@@ -45,6 +217,33 @@
   opacity: var(--diagram-node-muted-opacity);
 }
 
+.react-flow__background-pattern {
+  fill: var(--canvas-dot);
+}
+
+.react-flow__minimap {
+  background-color: var(--surface);
+}
+
+.react-flow__controls button {
+  background-color: var(--surface);
+  border-bottom-color: var(--line);
+  color: var(--text);
+}
+
+.react-flow__controls button:hover {
+  background-color: var(--surface-2);
+}
+
+.react-flow__controls button svg {
+  fill: currentColor;
+}
+
+.react-flow__attribution {
+  background: transparent;
+  color: var(--muted);
+}
+
 @keyframes diagram-edge-flow-out {
   from {
     stroke-dashoffset: 10;
@@ -69,10 +268,15 @@
   }
 }
 
+:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
 body {
   margin: 0;
-  background: var(--color-bg);
-  color: var(--color-ink);
+  background: var(--background);
+  color: var(--text);
   font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   -webkit-font-smoothing: antialiased;
 }

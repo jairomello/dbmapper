@@ -76,6 +76,8 @@ const diagramPositionSchema = z
   .object({
     x: z.number().finite(),
     y: z.number().finite(),
+    width: z.number().finite().min(180).max(1200).optional(),
+    height: z.number().finite().min(100).max(4000).optional(),
   })
   .strict()
 

@@ -175,6 +175,8 @@ export interface EventListFilters {
 export interface DiagramPosition {
   x: number
   y: number
+  width?: number
+  height?: number
 }
 
 export interface DiagramZone {

@@ -92,6 +92,21 @@ function stubProjectWithDiagram(role: UserRole = 'MEMBER', layout: DiagramLayout
 }
 
 describe('WorkspacePage', () => {
+  test('alterna o tema e persiste a preferência local', async () => {
+    stubProject()
+    renderApp(['/project/projeto-1'])
+
+    await screen.findByTestId('table-row-cliente')
+    expect(document.documentElement.dataset.theme).toBe('light')
+
+    fireEvent.click(screen.getByTestId('theme-toggle'))
+    await waitFor(() => expect(document.documentElement.dataset.theme).toBe('dark'))
+    expect(window.localStorage.getItem('dbmapper-theme')).toBe('dark')
+
+    fireEvent.click(screen.getByTestId('theme-toggle'))
+    await waitFor(() => expect(document.documentElement.dataset.theme).toBe('light'))
+  })
+
   test('carrega o projeto da rota e renderiza suas tabelas', async () => {
     stubProject()
     renderApp(['/project/projeto-1'])
