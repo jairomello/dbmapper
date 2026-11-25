@@ -72,6 +72,12 @@ export const createProjectSchema = z
   })
   .strict()
 
+export const renameProjectSchema = z
+  .object({
+    name: z.string().trim().min(1).max(200),
+  })
+  .strict()
+
 const diagramPositionSchema = z
   .object({
     x: z.number().finite(),
@@ -130,8 +136,7 @@ export function createDiagramRequestSchema(knownMembers: Iterable<string>) {
     .superRefine((value, ctx) => {
       if (!value.zones) return
 
-      const zoneNames = new Map<string, number>()
-      const memberOwners = new Map<string, string>()
+      const zoneNames = new Set<string>()
 
       value.zones.forEach((zone, zoneIndex) => {
         if (zoneNames.has(zone.name)) {
@@ -141,7 +146,7 @@ export function createDiagramRequestSchema(knownMembers: Iterable<string>) {
             message: `Nome de zona duplicado: ${zone.name}.`,
           })
         } else {
-          zoneNames.set(zone.name, zoneIndex)
+          zoneNames.add(zone.name)
         }
 
         zone.members.forEach((member, memberIndex) => {
@@ -151,20 +156,7 @@ export function createDiagramRequestSchema(knownMembers: Iterable<string>) {
               path: ['zones', zoneIndex, 'members', memberIndex],
               message: `Tabela desconhecida na zona ${zone.name}: ${member}.`,
             })
-            return
           }
-
-          const owner = memberOwners.get(member)
-          if (owner !== undefined && owner !== zone.name) {
-            ctx.addIssue({
-              code: z.ZodIssueCode.custom,
-              path: ['zones', zoneIndex, 'members', memberIndex],
-              message: `Tabela ${member} já pertence à zona ${owner}.`,
-            })
-            return
-          }
-
-          memberOwners.set(member, zone.name)
         })
       })
     })

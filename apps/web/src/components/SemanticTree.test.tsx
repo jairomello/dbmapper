@@ -73,6 +73,49 @@ describe('SemanticTree', () => {
     expect(selections).toEqual([{ type: 'column', table: 'cliente', column: 'id' }])
     expect(clienteId.getAttribute('data-active')).toBe('true')
   })
+
+  test('ordena as tabelas alfabeticamente, independente da ordem do modelo', () => {
+    const database = sampleDatabase()
+    for (const name of ['zeta', 'alfa']) {
+      database.tables.push({
+        name,
+        description: '',
+        business_terms: [],
+        reviewed: false,
+        status: 'UNCHANGED',
+        relationships: { parents: [], children: [] },
+        columns: [],
+      })
+    }
+
+    render(<SemanticTree database={database} selection={{ type: 'database' }} onSelect={() => undefined} />)
+
+    const order = screen
+      .getAllByTestId(/^table-row-/)
+      .map((row) => row.getAttribute('data-testid')?.replace('table-row-', ''))
+    expect(order).toEqual(['alfa', 'cliente', 'pedido', 'zeta'])
+  })
+
+  test('filtra por aprovadas, pendentes ou todas', () => {
+    render(<SemanticTree database={sampleDatabase()} selection={{ type: 'database' }} onSelect={() => undefined} />)
+
+    expect(screen.getByTestId('table-row-cliente')).toBeTruthy()
+    expect(screen.getByTestId('table-row-pedido')).toBeTruthy()
+    expect(screen.getByTestId('tree-filter-all').getAttribute('aria-pressed')).toBe('true')
+
+    fireEvent.click(screen.getByTestId('tree-filter-pending'))
+    expect(screen.queryByTestId('table-row-cliente')).toBeNull()
+    expect(screen.getByTestId('table-row-pedido')).toBeTruthy()
+    expect(screen.getByTestId('tree-table-count').textContent).toBe('1')
+
+    fireEvent.click(screen.getByTestId('tree-filter-reviewed'))
+    expect(screen.getByTestId('table-row-cliente')).toBeTruthy()
+    expect(screen.queryByTestId('table-row-pedido')).toBeNull()
+
+    fireEvent.click(screen.getByTestId('tree-filter-all'))
+    expect(screen.getByTestId('table-row-cliente')).toBeTruthy()
+    expect(screen.getByTestId('table-row-pedido')).toBeTruthy()
+  })
 })
 
 function databaseWithConfig() {
@@ -118,43 +161,35 @@ describe('SemanticTree zones', () => {
     { name: 'Geografia', tabOrder: 1, members: [] },
   ]
 
-  test('marca tabela fora do diagrama e oferece adicionar à aba atual', () => {
-    const added: string[] = []
+  test('marca de forma discreta a tabela fora de todas as zonas', () => {
     render(
       <SemanticTree
         database={sampleDatabase()}
         selection={{ type: 'database' }}
         onSelect={() => undefined}
         zones={zones}
-        activeZone="Principal"
         canMoveTables
-        onAddToActiveZone={(table) => added.push(table)}
       />,
     )
 
-    expect(screen.getByTestId('table-outside-pedido').textContent).toContain('fora do diagrama')
+    expect(screen.getByTestId('table-outside-pedido').getAttribute('title')).toContain('Fora do diagrama')
     expect(screen.queryByTestId('table-outside-cliente')).toBeNull()
-
-    fireEvent.click(screen.getByTestId('table-add-to-zone-pedido'))
-    expect(added).toEqual(['pedido'])
   })
 
-  test('move uma tabela para outra zona pela ação da árvore', () => {
-    const moved: Array<[string, string]> = []
+  test('não renderiza seletor de zona por tabela', () => {
     render(
       <SemanticTree
         database={sampleDatabase()}
         selection={{ type: 'database' }}
         onSelect={() => undefined}
         zones={zones}
-        activeZone="Principal"
         canMoveTables
-        onMoveTable={(table, zone) => moved.push([table, zone])}
       />,
     )
 
-    fireEvent.change(screen.getByTestId('table-zone-pedido'), { target: { value: 'Geografia' } })
-    expect(moved).toEqual([['pedido', 'Geografia']])
+    expect(screen.queryByTestId('table-zone-pedido')).toBeNull()
+    expect(screen.queryByTestId('table-add-to-zone-pedido')).toBeNull()
+    expect(document.querySelector('select')).toBeNull()
   })
 
   test('dragstart da tabela carrega o nome para o canvas', () => {
@@ -164,7 +199,6 @@ describe('SemanticTree zones', () => {
         selection={{ type: 'database' }}
         onSelect={() => undefined}
         zones={zones}
-        activeZone="Principal"
         canMoveTables
       />,
     )
@@ -182,7 +216,6 @@ describe('SemanticTree zones', () => {
         selection={{ type: 'database' }}
         onSelect={() => undefined}
         zones={zones}
-        activeZone="Principal"
         canMoveTables={false}
       />,
     )

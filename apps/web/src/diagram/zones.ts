@@ -70,16 +70,6 @@ export function normalizeZoneState(document: DiagramDocument | undefined, databa
     zones = [{ name: DEFAULT_ZONE, tabOrder: 0, members: [] }, ...zones]
   }
 
-  const claimed = new Set<string>()
-  zones = zones.map((zone) => {
-    const members = zone.members.filter((member) => {
-      if (claimed.has(member)) return false
-      claimed.add(member)
-      return true
-    })
-    return { ...zone, members }
-  })
-
   const layouts: Record<string, ZoneLayoutState> = {}
   for (const zone of zones) {
     const stored = document?.layouts?.find((layout) => layout.zoneName === zone.name)
@@ -97,21 +87,40 @@ export function syncLayouts(zones: readonly DiagramZone[], layouts: Record<strin
   return next
 }
 
-export function zoneOfTable(zones: readonly DiagramZone[], table: string): string | null {
-  for (const zone of zones) {
-    if (zone.members.includes(table)) return zone.name
-  }
-  return null
+export function zonesOfTable(zones: readonly DiagramZone[], table: string): string[] {
+  return zones.filter((zone) => zone.members.includes(table)).map((zone) => zone.name)
 }
 
-export function assignMember(zones: readonly DiagramZone[], table: string, target: string): DiagramZone[] {
+export function zoneOfTable(zones: readonly DiagramZone[], table: string): string | null {
+  return zones.find((zone) => zone.members.includes(table))?.name ?? null
+}
+
+export function isZoneMember(zone: DiagramZone, table: string): boolean {
+  return zone.members.includes(table)
+}
+
+export function addMemberToZone(
+  zones: readonly DiagramZone[],
+  table: string,
+  target: string,
+): DiagramZone[] {
   return zones.map((zone) => {
-    if (zone.name === target) {
-      return { ...zone, members: [...zone.members.filter((member) => member !== table), table] }
-    }
-    if (!zone.members.includes(table)) return zone
-    return { ...zone, members: zone.members.filter((member) => member !== table) }
+    if (zone.name !== target) return zone
+    if (zone.members.includes(table)) return zone
+    return { ...zone, members: [...zone.members, table] }
   })
+}
+
+export function removeMemberFromZone(
+  zones: readonly DiagramZone[],
+  table: string,
+  target: string,
+): DiagramZone[] {
+  return zones.map((zone) =>
+    zone.name === target && zone.members.includes(table)
+      ? { ...zone, members: zone.members.filter((member) => member !== table) }
+      : zone,
+  )
 }
 
 export function removeMember(zones: readonly DiagramZone[], table: string): DiagramZone[] {
@@ -133,7 +142,9 @@ export function returnMembersToPrincipal(zones: readonly DiagramZone[], removedZ
   const removed = zones.find((zone) => zone.name === removedZone)
   const next = zones.filter((zone) => zone.name !== removedZone)
   if (!removed) return next
-  return addMembers(next, DEFAULT_ZONE, removed.members)
+  const stillAssigned = new Set(next.flatMap((zone) => zone.members))
+  const orphans = removed.members.filter((member) => !stillAssigned.has(member))
+  return addMembers(next, DEFAULT_ZONE, orphans)
 }
 
 export function renameTableInLayouts(

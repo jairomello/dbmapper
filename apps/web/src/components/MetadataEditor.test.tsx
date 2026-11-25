@@ -19,6 +19,45 @@ afterEach(() => {
 })
 
 describe('MetadataEditor', () => {
+  test('lista as zonas da tabela e alterna a associação', () => {
+    const onToggleZone = mock(() => undefined)
+    const zones = [
+      { name: 'Principal', tabOrder: 0, members: ['cliente'] },
+      { name: 'Geografia', tabOrder: 1, members: [] },
+    ]
+    const view = render(
+      <MetadataEditor
+        database={sampleDatabase()}
+        selection={{ type: 'table', table: 'cliente' }}
+        onSave={async (next) => next}
+        zones={zones}
+        onToggleZone={onToggleZone}
+      />,
+    )
+
+    const principal = within(view.container).getByTestId('zone-toggle-Principal') as HTMLInputElement
+    const geografia = within(view.container).getByTestId('zone-toggle-Geografia') as HTMLInputElement
+    expect(principal.checked).toBe(true)
+    expect(geografia.checked).toBe(false)
+
+    fireEvent.click(geografia)
+    expect(onToggleZone).toHaveBeenCalledWith('cliente', 'Geografia', true)
+  })
+
+  test('VIEWER vê as zonas sem conseguir alternar', () => {
+    const view = render(
+      <MetadataEditor
+        database={sampleDatabase()}
+        selection={{ type: 'table', table: 'cliente' }}
+        onSave={async (next) => next}
+        zones={[{ name: 'Principal', tabOrder: 0, members: ['cliente'] }]}
+      />,
+    )
+
+    const principal = within(view.container).getByTestId('zone-toggle-Principal') as HTMLInputElement
+    expect(principal.disabled).toBe(true)
+  })
+
   test('persiste a descrição editada e mostra o breadcrumb', async () => {
     const { onSave, queries } = renderEditor({ type: 'column', table: 'pedido', column: 'cliente_id' })
 

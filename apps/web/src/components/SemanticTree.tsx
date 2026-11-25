@@ -10,10 +10,7 @@ interface SemanticTreeProps {
   selection: Selection
   onSelect: (selection: Selection) => void
   zones?: DiagramZone[]
-  activeZone?: string
   canMoveTables?: boolean
-  onMoveTable?: (table: string, zone: string) => void
-  onAddToActiveZone?: (table: string) => void
 }
 
 function isActive(selection: Selection, candidate: Selection): boolean {
@@ -56,17 +53,31 @@ function tableEmphasis(
   return incident.has(table) ? 'incident' : 'muted'
 }
 
+type ReviewFilter = 'all' | 'reviewed' | 'pending'
+
+const REVIEW_FILTERS: Array<{ value: ReviewFilter; label: string }> = [
+  { value: 'all', label: 'Todas' },
+  { value: 'reviewed', label: 'Aprovadas' },
+  { value: 'pending', label: 'Pendentes' },
+]
+
 export function SemanticTree({
   database,
   selection,
   onSelect,
   zones,
-  activeZone,
   canMoveTables = false,
-  onMoveTable,
-  onAddToActiveZone,
 }: SemanticTreeProps) {
-  const tables = database.tables.filter((table) => table.status !== 'REMOVED')
+  const [reviewFilter, setReviewFilter] = useState<ReviewFilter>('all')
+  const tables = database.tables
+    .filter((table) => table.status !== 'REMOVED')
+    .filter((table) => {
+      if (reviewFilter === 'reviewed') return Boolean(table.reviewed)
+      if (reviewFilter === 'pending') return !table.reviewed
+      return true
+    })
+    .slice()
+    .sort((left, right) => left.name.localeCompare(right.name, 'pt-BR', { sensitivity: 'base', numeric: true }))
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({})
   const [query, setQuery] = useState('')
   const selectedTable = selection.type === 'database' ? null : selection.table
@@ -74,9 +85,9 @@ export function SemanticTree({
   const incident = incidentNames(database, selectionActive ? selectedTable : null)
   const needle = query.trim().toLowerCase()
 
-  function zoneOfTable(table: string): string | null {
-    if (!zones) return null
-    return zones.find((zone) => zone.members.includes(table))?.name ?? null
+  function isOutsideZones(table: string): boolean {
+    if (!zones || zones.length === 0) return false
+    return !zones.some((zone) => zone.members.includes(table))
   }
 
   const allCollapsed = tables.length > 0 && tables.every((table) => collapsed[table.name])
@@ -141,6 +152,31 @@ export function SemanticTree({
         </label>
       </div>
 
+      <fieldset
+        className="flex items-center gap-1 px-3 pt-1.5"
+        aria-label="Filtrar tabelas por revisão"
+      >
+        {REVIEW_FILTERS.map((option) => {
+          const active = reviewFilter === option.value
+          return (
+            <button
+              key={option.value}
+              type="button"
+              className={`rounded-md px-2 py-0.5 text-[10px] font-medium transition ${
+                active
+                  ? 'bg-accent-soft text-accent'
+                  : 'border border-line-strong text-muted hover:bg-surface-2 hover:text-ink'
+              }`}
+              aria-pressed={active}
+              onClick={() => setReviewFilter(option.value)}
+              data-testid={`tree-filter-${option.value}`}
+            >
+              {option.label}
+            </button>
+          )
+        })}
+      </fieldset>
+
       <div className="flex items-center justify-between px-3 pt-2.5 text-[10px] font-semibold uppercase tracking-[0.16em] text-muted">
         <span>Tabelas</span>
         <span data-testid="tree-table-count">{visibleTables.length}</span>
@@ -167,8 +203,7 @@ export function SemanticTree({
           {visibleTables.map((table) => {
             const tableCollapsed = Boolean(collapsed[table.name])
             const tableActive = isActive(selection, { type: 'table', table: table.name })
-            const tableZone = zoneOfTable(table.name)
-            const outside = Boolean(zones) && tableZone === null
+            const outside = isOutsideZones(table.name)
             const emphasis = selectionActive ? tableEmphasis(table.name, selectedTable, incident) : 'none'
             const tableMatchesQuery = Boolean(needle) && table.name.toLowerCase().includes(needle)
             const columns = needle && !tableMatchesQuery
@@ -221,50 +256,15 @@ export function SemanticTree({
                   </button>
                 </div>
 
-                {zones ? (
-                  <div className="ml-8 flex flex-wrap items-center gap-1 px-1 pb-1">
-                    {outside ? (
-                      <span
-                        className="rounded-full bg-warning-soft px-1.5 py-0.5 text-[10px] font-medium text-warning"
-                        data-testid={`table-outside-${table.name}`}
-                      >
-                        fora do diagrama
-                      </span>
-                    ) : null}
-                    {canMoveTables && zones.length > 0 ? (
-                      <select
-                        className="rounded-md border border-line-strong bg-surface px-1 py-0.5 text-[10px] text-muted"
-                        aria-label={`Mover tabela ${table.name} para zona`}
-                        data-testid={`table-zone-${table.name}`}
-                        value={tableZone ?? ''}
-                        onChange={(event) => {
-                          if (!event.target.value) return
-                          onMoveTable?.(table.name, event.target.value)
-                        }}
-                      >
-                        {outside ? <option value="">Fora do diagrama</option> : null}
-                        {zones.map((zone) => (
-                          <option key={zone.name} value={zone.name}>
-                            {zone.name}
-                          </option>
-                        ))}
-                      </select>
-                    ) : null}
-                    {outside && canMoveTables && onAddToActiveZone ? (
-                      <button
-                        type="button"
-                        className="rounded-md border border-warning/40 bg-surface px-1.5 py-0.5 text-[10px] font-medium text-warning hover:bg-warning-soft"
-                        aria-label={`Adicionar ${table.name} à aba atual`}
-                        data-testid={`table-add-to-zone-${table.name}`}
-                        onClick={() => {
-                          onAddToActiveZone(table.name)
-                          onSelect({ type: 'table', table: table.name })
-                        }}
-                      >
-                        Adicionar à aba atual{activeZone ? ` (${activeZone})` : ''}
-                      </button>
-                    ) : null}
-                  </div>
+                {outside ? (
+                  <span
+                    className="ml-9 inline-flex items-center gap-1 text-[10px] text-warning"
+                    title="Fora do diagrama — arraste a tabela para uma aba ou abra a ficha para escolher as zonas."
+                    data-testid={`table-outside-${table.name}`}
+                  >
+                    <span aria-hidden="true" className="h-1.5 w-1.5 rounded-full bg-warning/80" />
+                    <span className="sr-only">Fora do diagrama</span>
+                  </span>
                 ) : null}
 
                 {tableCollapsed ? null : (

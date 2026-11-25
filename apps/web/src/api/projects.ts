@@ -51,6 +51,9 @@ export const projectsApi = {
   create(input: CreateProjectInput): Promise<ProjectView> {
     return jsonRequest<ProjectView>('/api/projects', 'POST', input)
   },
+  rename(id: string, name: string): Promise<ProjectSummary> {
+    return jsonRequest<ProjectSummary>(projectPath(id), 'PATCH', { name })
+  },
   save(id: string, database: DatabaseModel): Promise<ProjectView> {
     return jsonRequest<ProjectView>(projectPath(id), 'PUT', { database })
   },

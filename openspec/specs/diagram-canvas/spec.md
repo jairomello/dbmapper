@@ -374,3 +374,117 @@ The diagram MUST provide a collapsible metadata panel alongside the canvas when 
 - **WHEN** a user selects a column in the diagram
 - **THEN** its metadata appears in the panel without leaving the diagram
 - **AND** its selected state is visible in the tree
+
+### Requirement: Clear the selection from the canvas
+
+Clicking an empty area of the diagram pane MUST clear the current table or
+column selection by returning to the database root selection. The cards MUST
+lose their highlight, the semantic tree MUST highlight the database row, and, in
+the workspace diagram mode, the item panel MUST close. Dragging a card MUST be
+possible from its whole header (excluding action buttons), not only from a small
+grip, and MUST remain unavailable to a `VIEWER`.
+
+#### Scenario: Empty canvas click clears the table selection
+
+- **WHEN** a table is selected and the user clicks an empty part of the canvas
+- **THEN** the table card is no longer highlighted
+- **AND** the selection returns to the project database
+- **AND** the item panel closes
+
+#### Scenario: Dragging starts from the card header
+
+- **WHEN** a `MEMBER` presses and drags the header of a card
+- **THEN** the card moves and the new position is persisted
+- **AND** clicking the table name still selects the table
+
+#### Scenario: Viewer cannot drag
+
+- **WHEN** a `VIEWER` drags a card header
+- **THEN** no position or layout write happens
+
+### Requirement: Temporary pan mode with Ctrl
+
+While the Ctrl key is held, the diagram MUST behave as the **Mover** tool: dragging
+the canvas pans the view and table cards MUST NOT be dragged, even when the drag
+starts over a card. Releasing Ctrl MUST restore the previous tool behavior
+(default **Selecionar**) without requiring a click. Losing window focus or
+switching tabs MUST release the temporary mode.
+
+#### Scenario: Ctrl enables pan while held
+
+- **WHEN** a `MEMBER` holds Ctrl and drags on the canvas
+- **THEN** the viewport pans instead of moving a table card
+
+#### Scenario: Releasing Ctrl restores card dragging
+
+- **WHEN** the user releases Ctrl
+- **THEN** dragging a card header moves the card again
+- **AND** the active toolbar tool is unchanged
+
+#### Scenario: Focus loss resets the modifier
+
+- **WHEN** the window loses focus while Ctrl is held
+- **THEN** the temporary pan mode is turned off
+
+### Requirement: Temporary pan mode feedback
+
+While the Ctrl key (left or right) is held, the toolbar MUST present **Mover** as
+pressed and **Selecionar** as not pressed, without changing the tool that is
+restored on release. The pane and cards MUST show a grab cursor in that mode and
+a grabbing cursor while the canvas is being dragged. Interactive areas (toolbar,
+controls, minimap, menus, dialogs and form fields) MUST NOT start the temporary
+pan when pressed.
+
+#### Scenario: Toolbar reflects the temporary mode
+
+- **WHEN** the user holds Ctrl on either side
+- **THEN** **Mover** is pressed in the toolbar and **Selecionar** is not
+
+#### Scenario: Releasing restores the toolbar state
+
+- **WHEN** the user releases Ctrl
+- **THEN** **Selecionar** is pressed again (unless **Mover** was chosen explicitly)
+
+#### Scenario: Cursor indicates the mode
+
+- **WHEN** Ctrl is held over the pane or a card
+- **THEN** the cursor is `grab`
+- **AND** while dragging the canvas it becomes `grabbing`
+
+#### Scenario: Interactive controls keep working
+
+- **WHEN** the user presses Ctrl on the toolbar, minimap, controls, a menu or a
+  form field
+- **THEN** the canvas does not start panning
+
+### Requirement: Wheel zoom and scrolling
+
+The mouse wheel MUST scroll the canvas vertically when no modifier is held, and
+horizontally when Shift is held, without changing the zoom. With Ctrl held, the
+wheel MUST zoom around the cursor position. Ctrl MUST take precedence over Shift.
+Wheel events over scrollable content inside a card MUST keep scrolling that
+content instead of moving the canvas.
+
+#### Scenario: Plain wheel scrolls vertically
+
+- **WHEN** the user scrolls the wheel over the canvas without Ctrl or Shift
+- **THEN** the viewport moves vertically
+- **AND** the zoom level is unchanged
+
+#### Scenario: Shift + wheel scrolls horizontally
+
+- **WHEN** the user holds Shift and scrolls the wheel over the canvas
+- **THEN** the viewport moves horizontally
+- **AND** the zoom level is unchanged
+
+#### Scenario: Ctrl + wheel zooms around the cursor
+
+- **WHEN** the user holds Ctrl and scrolls the wheel over the canvas
+- **THEN** the zoom changes at the cursor position
+- **AND** Ctrl+Shift keeps this zoom behavior
+
+#### Scenario: Scrollable card content keeps its scroll
+
+- **WHEN** the wheel is used over a scrollable column list inside a card
+- **THEN** that list scrolls
+- **AND** the canvas viewport does not move

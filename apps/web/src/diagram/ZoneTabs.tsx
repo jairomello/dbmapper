@@ -1,7 +1,7 @@
 import { type DragEvent, useState } from 'react'
 import type { DiagramZone } from '../api/types'
 import { ConfirmDialog } from './ConfirmDialog'
-import { DEFAULT_ZONE } from './zones'
+import { DEFAULT_ZONE, DIAGRAM_TABLE_MIME } from './zones'
 
 const ZONE_MIME = 'application/x-dbmapper-zone'
 
@@ -14,6 +14,7 @@ export interface ZoneTabsProps {
   onRename: (from: string, to: string) => boolean
   onDelete: (name: string) => boolean
   onReorder: (order: string[]) => boolean
+  onAddTable: (table: string, zone: string) => void
 }
 
 export function ZoneTabs({
@@ -25,6 +26,7 @@ export function ZoneTabs({
   onRename,
   onDelete,
   onReorder,
+  onAddTable,
 }: ZoneTabsProps) {
   const [creating, setCreating] = useState(false)
   const [createDraft, setCreateDraft] = useState('')
@@ -70,6 +72,15 @@ export function ZoneTabs({
 
   function dropOn(target: string, event: DragEvent) {
     event.preventDefault()
+
+    const table = event.dataTransfer.getData(DIAGRAM_TABLE_MIME)
+    if (table) {
+      setDragging(null)
+      onActivate(target)
+      onAddTable(table, target)
+      return
+    }
+
     const from = event.dataTransfer.getData(ZONE_MIME) || dragging
     setDragging(null)
     if (!from || from === target) return
@@ -105,9 +116,10 @@ export function ZoneTabs({
               }}
               onDragEnd={() => setDragging(null)}
               onDragOver={(event) => {
-                if (!dragging) return
+                const hasTable = event.dataTransfer.types.includes(DIAGRAM_TABLE_MIME)
+                if (!dragging && !hasTable) return
                 event.preventDefault()
-                event.dataTransfer.dropEffect = 'move'
+                event.dataTransfer.dropEffect = hasTable ? 'copy' : 'move'
               }}
               onDrop={(event) => dropOn(zone.name, event)}
             >

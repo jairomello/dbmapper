@@ -442,6 +442,65 @@ describe('persistência SQLite: documento de diagrama com zonas', () => {
     }
   })
 
+  test('aceita a mesma tabela em várias zonas', async () => {
+    const persistence = await createPersistence()
+
+    try {
+      const created = persistence.projects.create({ name: 'Muitas zonas' })
+      persistence.projects.replaceModel(created.id, database)
+
+      const saved = persistence.projects.putDiagramDocument({
+        projectId: created.id,
+        zones: [
+          { name: 'Principal', tabOrder: 0, members: ['cliente', 'pedido'] },
+          { name: 'Vendas', tabOrder: 1, members: ['pedido'] },
+        ],
+        layouts: [],
+      })
+
+      expect(saved!.zones).toEqual([
+        { name: 'Principal', tabOrder: 0, members: ['cliente', 'pedido'] },
+        { name: 'Vendas', tabOrder: 1, members: ['pedido'] },
+      ])
+    } finally {
+      persistence.close()
+    }
+  })
+
+  test('excluir uma zona não devolve à Principal membros que estão em outra zona', async () => {
+    const persistence = await createPersistence()
+
+    try {
+      const created = persistence.projects.create({ name: 'Compartilhado' })
+      persistence.projects.replaceModel(created.id, database)
+      persistence.projects.putDiagramDocument({
+        projectId: created.id,
+        zones: [
+          { name: 'Principal', tabOrder: 0, members: ['cliente'] },
+          { name: 'Vendas', tabOrder: 1, members: ['pedido'] },
+          { name: 'Relatórios', tabOrder: 2, members: ['pedido'] },
+        ],
+        layouts: [],
+      })
+
+      const saved = persistence.projects.putDiagramDocument({
+        projectId: created.id,
+        zones: [
+          { name: 'Principal', tabOrder: 0, members: ['cliente'] },
+          { name: 'Relatórios', tabOrder: 1, members: ['pedido'] },
+        ],
+        layouts: [],
+      })
+
+      expect(saved!.zones).toEqual([
+        { name: 'Principal', tabOrder: 0, members: ['cliente'] },
+        { name: 'Relatórios', tabOrder: 1, members: ['pedido'] },
+      ])
+    } finally {
+      persistence.close()
+    }
+  })
+
   test('falha na escrita desfaz zonas e layouts juntos', async () => {
     const persistence = await createPersistence()
 

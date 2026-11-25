@@ -10,7 +10,13 @@ import {
 } from '../persistence/ports'
 import { normalizeDatabaseModel, projectExport, projectView } from '../services/model-mapper'
 import type { AppEnv } from '../types'
-import { createDiagramRequestSchema, createProjectSchema, parseJsonBody, projectDocumentSchema } from '../validation'
+import {
+  createDiagramRequestSchema,
+  createProjectSchema,
+  parseJsonBody,
+  projectDocumentSchema,
+  renameProjectSchema,
+} from '../validation'
 
 function diagramDocumentView(document: DiagramDocumentRecord) {
   return {
@@ -75,6 +81,24 @@ export function registerProjectRoutes(app: Hono<AppEnv>, persistence: Persistenc
     const aggregate = repository.get(c.req.param('id'))
     if (!aggregate) throw new ApiError(404, 'NOT_FOUND', 'Projeto não encontrado.')
     return c.json(projectView(aggregate))
+  })
+
+  app.patch('/api/projects/:id', requireMember, async (c) => {
+    const id = c.req.param('id')
+    const input = await parseJsonBody(c, renameProjectSchema)
+    const actorUserId = c.get('user').sub
+    const updated = repository.updateName(id, input.name, {
+      actorUserId,
+      audit: {
+        actorUserId,
+        action: 'project.renamed',
+        subjectType: 'project',
+        subjectId: id,
+        payload: { name: input.name },
+      },
+    })
+    if (!updated) throw new ApiError(404, 'NOT_FOUND', 'Projeto não encontrado.')
+    return c.json(updated)
   })
 
   app.put('/api/projects/:id', requireMember, async (c) => {

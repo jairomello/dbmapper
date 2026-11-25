@@ -60,6 +60,7 @@ import { RelationshipDialog, type RelationshipDraft } from '../diagram/Relations
 import { TableNode } from '../diagram/TableNode'
 import { type DiagramSaveState, useDiagramEditing } from '../diagram/useDiagramEditing'
 import { type DiagramZones, diagramQueryKey, useDiagramZones } from '../diagram/useDiagramZones'
+import { wheelActionFor } from '../diagram/wheelPan'
 import { DIAGRAM_TABLE_MIME } from '../diagram/zones'
 import { ZoneTabs } from '../diagram/ZoneTabs'
 import type { Selection } from '../lib/selection'
@@ -67,6 +68,10 @@ import { useTheme } from '../theme/theme'
 
 const NODE_TYPES = { table: TableNode }
 const EDGE_TYPES = { crowsfoot: CrowFootEdge }
+
+const MIN_ZOOM = 0.05
+const MAX_ZOOM = 2
+const WHEEL_ZOOM_SENSITIVITY = 0.0015
 
 const TOOL_BUTTON = 'nodrag nopan rounded-md border px-2 py-1 text-[11px] font-medium transition disabled:opacity-50'
 const TOOL_IDLE = 'border-line-strong text-muted hover:bg-surface-2 hover:text-ink'
@@ -159,6 +164,8 @@ function DiagramCanvasInner({
   const [exporting, setExporting] = useState<DiagramExportFormat | null>(null)
   const [exportError, setExportError] = useState<string | null>(null)
   const [tool, setTool] = useState<CanvasTool>('select')
+  const [ctrlDown, setCtrlDown] = useState(false)
+  const [isPanning, setIsPanning] = useState(false)
   const [layoutMenuOpen, setLayoutMenuOpen] = useState(false)
   const [detail, setDetail] = useState<DiagramDetail>('detailed')
   const [manualExpanded, setManualExpanded] = useState<ReadonlySet<string>>(() => new Set())
@@ -166,18 +173,164 @@ function DiagramCanvasInner({
   const { theme } = useTheme()
   const savedFocusViewportRef = useRef<{ x: number; y: number; zoom: number } | null>(null)
   const moveMode = tool === 'move'
+  const panMode = moveMode || ctrlDown
 
   const wrapperRef = useRef<HTMLDivElement | null>(null)
+  const flowAreaRef = useRef<HTMLDivElement | null>(null)
+  const ctrlDownRef = useRef(false)
+  ctrlDownRef.current = ctrlDown
+  const panDragRef = useRef<{
+    pointerId: number
+    startX: number
+    startY: number
+    origin: { x: number; y: number; zoom: number }
+  } | null>(null)
   const viewportRef = useRef({ x: 0, y: 0, zoom: 1 })
   const flowReadyRef = useRef(false)
   const appliedSavedViewportRef = useRef(false)
   const skipViewportSaveRef = useRef(false)
   const previousZoneRef = useRef(zones.activeZone)
 
-  const { setViewport, setCenter, getNode, fitView, screenToFlowPosition, zoomIn, zoomOut } = useReactFlow<
-    DiagramNode,
-    DiagramEdge
-  >()
+  const { setViewport, getViewport, setCenter, getNode, fitView, screenToFlowPosition, zoomIn, zoomOut } =
+    useReactFlow<DiagramNode, DiagramEdge>()
+
+  useEffect(() => {
+    function isControlKey(event: KeyboardEvent) {
+      return event.key === 'Control' || event.code === 'ControlLeft' || event.code === 'ControlRight'
+    }
+    function onKeyDown(event: KeyboardEvent) {
+      if (isControlKey(event)) setCtrlDown(true)
+    }
+    function onKeyUp(event: KeyboardEvent) {
+      if (isControlKey(event)) setCtrlDown(false)
+    }
+    function release() {
+      setCtrlDown(false)
+    }
+
+    window.addEventListener('keydown', onKeyDown, true)
+    window.addEventListener('keyup', onKeyUp, true)
+    window.addEventListener('blur', release)
+    document.addEventListener('visibilitychange', release)
+    return () => {
+      window.removeEventListener('keydown', onKeyDown, true)
+      window.removeEventListener('keyup', onKeyUp, true)
+      window.removeEventListener('blur', release)
+      document.removeEventListener('visibilitychange', release)
+    }
+  }, [])
+
+  useEffect(() => {
+    const element = flowAreaRef.current
+    if (!element) return
+    const area = element
+
+    function hasScrollableAncestor(target: EventTarget | null): boolean {
+      if (!(target instanceof Element)) return false
+      let node: Element | null = target
+      while (node && node !== area) {
+        const style = getComputedStyle(node)
+        const scrollsVertically = /(auto|scroll)/.test(style.overflowY) && node.scrollHeight > node.clientHeight
+        const scrollsHorizontally =
+          /(auto|scroll)/.test(style.overflowX) && node.scrollWidth > node.clientWidth
+        if (scrollsVertically || scrollsHorizontally) return true
+        node = node.parentElement
+      }
+      return false
+    }
+
+    function onWheel(event: WheelEvent) {
+      const action = wheelActionFor(event)
+      if (action.kind === 'pan' && hasScrollableAncestor(event.target)) return
+
+      event.preventDefault()
+      event.stopPropagation()
+      const current = getViewport()
+
+      if (action.kind === 'zoom') {
+        const rect = area.getBoundingClientRect()
+        const factor = Math.exp(-action.deltaY * WHEEL_ZOOM_SENSITIVITY)
+        const zoom = Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, current.zoom * factor))
+        if (zoom === current.zoom) return
+        const pointX = event.clientX - rect.left
+        const pointY = event.clientY - rect.top
+        const ratio = zoom / current.zoom
+        void setViewport({
+          x: pointX - (pointX - current.x) * ratio,
+          y: pointY - (pointY - current.y) * ratio,
+          zoom,
+        })
+        return
+      }
+
+      void setViewport({ x: current.x + action.x, y: current.y + action.y, zoom: current.zoom })
+    }
+
+    element.addEventListener('wheel', onWheel, { capture: true, passive: false })
+    return () => element.removeEventListener('wheel', onWheel, { capture: true })
+  }, [getViewport, setViewport])
+
+  useEffect(() => {
+    const element = flowAreaRef.current
+    if (!element) return
+    const area = element
+
+    function isInteractive(target: EventTarget | null): boolean {
+      if (!(target instanceof Element)) return false
+      return Boolean(
+        target.closest(
+          'button, a, input, select, textarea, [role="menu"], [role="dialog"], .react-flow__panel, .react-flow__controls, .react-flow__minimap',
+        ),
+      )
+    }
+
+    function finish(event: PointerEvent) {
+      const drag = panDragRef.current
+      if (!drag || event.pointerId !== drag.pointerId) return
+      panDragRef.current = null
+      setIsPanning(false)
+      if (area.hasPointerCapture(event.pointerId)) area.releasePointerCapture(event.pointerId)
+    }
+
+    function onPointerDown(event: PointerEvent) {
+      const withControl = event.ctrlKey || ctrlDownRef.current
+      if (!withControl || event.button !== 0 || isInteractive(event.target)) return
+      if (!ctrlDownRef.current) setCtrlDown(true)
+      setIsPanning(true)
+      panDragRef.current = {
+        pointerId: event.pointerId,
+        startX: event.clientX,
+        startY: event.clientY,
+        origin: getViewport(),
+      }
+      area.setPointerCapture(event.pointerId)
+      event.preventDefault()
+      event.stopPropagation()
+    }
+
+    function onPointerMove(event: PointerEvent) {
+      const drag = panDragRef.current
+      if (!drag || event.pointerId !== drag.pointerId) return
+      event.preventDefault()
+      event.stopPropagation()
+      void setViewport({
+        x: drag.origin.x + (event.clientX - drag.startX),
+        y: drag.origin.y + (event.clientY - drag.startY),
+        zoom: drag.origin.zoom,
+      })
+    }
+
+    area.addEventListener('pointerdown', onPointerDown, { capture: true })
+    area.addEventListener('pointermove', onPointerMove, { capture: true })
+    area.addEventListener('pointerup', finish, { capture: true })
+    area.addEventListener('pointercancel', finish, { capture: true })
+    return () => {
+      area.removeEventListener('pointerdown', onPointerDown, { capture: true })
+      area.removeEventListener('pointermove', onPointerMove, { capture: true })
+      area.removeEventListener('pointerup', finish, { capture: true })
+      area.removeEventListener('pointercancel', finish, { capture: true })
+    }
+  }, [getViewport, setViewport])
 
   const zoneDatabase = useMemo(() => {
     const members = new Set(zones.activeMembers)
@@ -224,12 +377,19 @@ function DiagramCanvasInner({
   }, [modelSaving, zones.setModelSaving])
 
   const relationshipKeys = useMemo(() => {
+    const activeMembers = new Set(zones.zones.find((zone) => zone.name === zones.activeZone)?.members ?? [])
     const zoneByTable = new Map<string, string>()
     for (const zone of zones.zones) {
-      for (const member of zone.members) zoneByTable.set(member, zone.name)
+      for (const member of zone.members) {
+        if (activeMembers.has(member)) continue
+        if (!zoneByTable.has(member)) zoneByTable.set(member, zone.name)
+      }
     }
-    return buildRelationshipKeys(workingDatabase, (table) => zoneByTable.get(table) ?? null)
-  }, [workingDatabase, zones.zones])
+    return buildRelationshipKeys(
+      workingDatabase,
+      (table) => (activeMembers.has(table) ? zones.activeZone : (zoneByTable.get(table) ?? null)),
+    )
+  }, [workingDatabase, zones.zones, zones.activeZone])
 
   const handleNodesChange: OnNodesChange<DiagramNode> = useCallback(
     (changes) => {
@@ -375,10 +535,10 @@ function DiagramCanvasInner({
 
   useEffect(() => {
     if (!flowReadyRef.current || selection.type === 'database') return
-    const zone = zones.zoneOf(selection.table)
-    if (!zone) return
-    if (zone !== zones.activeZone) {
-      zones.setActiveZone(zone)
+    const memberships = zones.zonesOf(selection.table)
+    if (memberships.length === 0) return
+    if (!memberships.includes(zones.activeZone)) {
+      zones.setActiveZone(memberships[0])
       return
     }
     const node = getNode(selection.table)
@@ -390,7 +550,7 @@ function DiagramCanvasInner({
       zoom: viewportRef.current.zoom,
       duration: 250,
     })
-  }, [selection, zones.activeZone, zones.zoneOf, zones.setActiveZone, getNode, setCenter])
+  }, [selection, zones.activeZone, zones.zonesOf, zones.setActiveZone, getNode, setCenter])
 
   const addTableAt = useCallback(
     (position: DiagramPosition) => {
@@ -501,10 +661,10 @@ function DiagramCanvasInner({
 
   const selectFromCanvas = useCallback(
     (next: Selection) => {
-      if (moveMode) return
+      if (panMode) return
       onSelect(next)
     },
-    [moveMode, onSelect],
+    [panMode, onSelect],
   )
 
   const activeRelationships = useMemo<LayoutRelationship[]>(() => {
@@ -601,13 +761,13 @@ function DiagramCanvasInner({
         selection,
         matches,
         query,
-        draggable: effectiveCanEdit && !moveMode && !focusNames,
+        draggable: effectiveCanEdit && !panMode && !focusNames,
         keys: relationshipKeys,
         detail,
         expandedTables,
         onSelect: selectFromCanvas,
         canEdit: canEditNow,
-        relationshipMode: relationshipMode !== 'off' && !moveMode,
+        relationshipMode: relationshipMode !== 'off' && !panMode,
         onPickTable: handlePickTable,
         onAddColumn: (table) => setOpenPopover({ kind: 'new-column', table }),
         onEditTable: (table) => setOpenPopover({ kind: 'table', table }),
@@ -624,7 +784,7 @@ function DiagramCanvasInner({
       matches,
       query,
       effectiveCanEdit,
-      moveMode,
+      panMode,
       selectFromCanvas,
       relationshipMode,
       handlePickTable,
@@ -686,14 +846,14 @@ function DiagramCanvasInner({
               onSelect: () => setOpenPopover({ kind: 'table', table: menu.table }),
             },
             ...zones.zones
-              .filter((zone) => zone.name !== zones.zoneOf(menu.table))
+              .filter((zone) => !zones.isInZone(menu.table, zone.name))
               .map((zone) => ({
-                label: `Mover para ${zone.name}`,
-                testId: `canvas-menu-move-${zone.name}`,
-                onSelect: () => zones.moveTable(menu.table, zone.name),
+                label: `Adicionar a ${zone.name}`,
+                testId: `canvas-menu-add-${zone.name}`,
+                onSelect: () => zones.addTableToZone(menu.table, zone.name),
               })),
             {
-              label: 'Remover do diagrama',
+              label: 'Remover desta aba',
               testId: 'canvas-menu-remove-from-diagram',
               onSelect: () => setPendingRemove(menu.table),
             },
@@ -715,7 +875,7 @@ function DiagramCanvasInner({
 
   const selectedOutsideZone =
     selectedTable !== null &&
-    zones.zoneOf(selectedTable) === null &&
+    zones.zonesOf(selectedTable).length === 0 &&
     workingDatabase.tables.some((table) => table.name === selectedTable && table.status !== 'REMOVED')
 
   function handleDragOver(event: DragEvent<HTMLDivElement>) {
@@ -757,7 +917,9 @@ function DiagramCanvasInner({
   return (
     <div
       ref={wrapperRef}
-      className="flex h-full w-full flex-col"
+      className={`flex h-full w-full flex-col ${panMode ? 'select-none' : ''}`}
+      data-pan-mode={panMode ? 'true' : undefined}
+      data-panning={isPanning ? 'true' : undefined}
       data-testid="diagram-canvas"
       role="application"
       aria-label="Área do diagrama"
@@ -773,8 +935,11 @@ function DiagramCanvasInner({
         onRename={zones.renameZone}
         onDelete={zones.deleteZone}
         onReorder={zones.reorderZones}
+        onAddTable={(table, zone) => {
+          if (zones.addTableToZone(table, zone)) onSelect({ type: 'table', table })
+        }}
       />
-      <div className="relative min-h-0 flex-1">
+      <div ref={flowAreaRef} className="relative min-h-0 flex-1">
         <ReactFlow<DiagramNode, DiagramEdge>
           nodes={nodes}
           edges={edges}
@@ -786,15 +951,18 @@ function DiagramCanvasInner({
           onInit={handleInit}
           onConnect={handleConnect}
           onNodeContextMenu={handleNodeContextMenu}
+          onPaneClick={() => onSelect({ type: 'database' })}
           onPaneContextMenu={handlePaneContextMenu}
-          nodesDraggable={canEditNow && !moveMode}
-          nodesConnectable={canEditNow && !moveMode}
+          zoomOnScroll={false}
+          zoomActivationKeyCode={null}
+          nodesDraggable={canEditNow && !panMode}
+          nodesConnectable={canEditNow && !panMode}
           panOnDrag={moveMode || !canEditNow}
           elementsSelectable={false}
           edgesFocusable={false}
           deleteKeyCode={null}
-          minZoom={0.05}
-          maxZoom={2}
+          minZoom={MIN_ZOOM}
+          maxZoom={MAX_ZOOM}
           fitView={false}
           defaultViewport={{ x: 0, y: 0, zoom: 1 }}
           className="bg-canvas"
@@ -879,9 +1047,9 @@ function DiagramCanvasInner({
                 <button
                   type="button"
                   className={`nodrag nopan rounded-md px-2 py-1 text-[11px] font-medium transition ${
-                    tool === 'select' ? 'bg-surface text-accent shadow-sm' : 'text-muted hover:text-ink'
+                    !panMode ? 'bg-surface text-accent shadow-sm' : 'text-muted hover:text-ink'
                   }`}
-                  aria-pressed={tool === 'select'}
+                  aria-pressed={!panMode}
                   onClick={() => setTool('select')}
                   data-testid="diagram-tool-select"
                 >
@@ -890,10 +1058,11 @@ function DiagramCanvasInner({
                 <button
                   type="button"
                   className={`nodrag nopan rounded-md px-2 py-1 text-[11px] font-medium transition ${
-                    tool === 'move' ? 'bg-surface text-accent shadow-sm' : 'text-muted hover:text-ink'
+                    panMode ? 'bg-surface text-accent shadow-sm' : 'text-muted hover:text-ink'
                   }`}
-                  aria-pressed={tool === 'move'}
+                  aria-pressed={panMode}
                   onClick={() => setTool('move')}
+                  title="Mover (segure Ctrl para ativar temporariamente)"
                   data-testid="diagram-tool-move"
                 >
                   Mover
@@ -1131,11 +1300,11 @@ function DiagramCanvasInner({
 
       {pendingRemove ? (
         <ConfirmDialog
-          title="Remover do diagrama"
+          title="Remover desta aba"
           confirmLabel="Remover"
-          message={`Remover ${pendingRemove} do diagrama? A tabela continua no dicionário e na árvore semântica.`}
+          message={`Remover ${pendingRemove} desta aba? A tabela continua no dicionário, na árvore semântica e nas outras abas em que aparece.`}
           onConfirm={() => {
-            zones.removeTable(pendingRemove)
+            zones.removeTableFromActiveZone(pendingRemove)
             setPendingRemove(null)
           }}
           onCancel={() => setPendingRemove(null)}

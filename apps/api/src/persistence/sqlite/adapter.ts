@@ -664,6 +664,52 @@ export function createSqlitePersistence(
 
     get: getProject,
 
+    updateName(id: string, name: string, context: MutationContext = {}): ProjectSummary | null {
+      const now = new Date().toISOString()
+      return db.transaction((tx) => {
+        const existing = tx
+          .select({
+            id: projects.id,
+            name: projects.name,
+            description: projects.description,
+            createdAt: projects.createdAt,
+          })
+          .from(projects)
+          .where(eq(projects.id, id))
+          .get()
+        if (!existing) return null
+
+        tx.update(projects).set({ name, updatedAt: now }).where(eq(projects.id, id)).run()
+
+        if (context.audit) {
+          insertEventRow(
+            tx,
+            {
+              ...context.audit,
+              projectId: id,
+              subjectId: id,
+              payload: {
+                ...context.audit.payload,
+                projectId: id,
+                from: existing.name,
+                to: name,
+              },
+              createdAt: now,
+            },
+            now,
+          )
+        }
+
+        return {
+          id,
+          name,
+          description: existing.description,
+          createdAt: existing.createdAt,
+          updatedAt: now,
+        }
+      })
+    },
+
     replaceModel(id: string, database: DatabaseModel, context: MutationContext = {}): ProjectAggregate | null {
       const now = new Date().toISOString()
       const changed = db.transaction((tx) => {
@@ -1053,18 +1099,17 @@ export function createSqlitePersistence(
 
         if (input.zones !== undefined) {
           const issues: DiagramDocumentIssue[] = []
-          const zoneNameIndex = new Map<string, number>()
-          const memberOwner = new Map<string, string>()
+          const zoneNamesSet = new Set<string>()
 
           input.zones.forEach((zone, zoneIndex) => {
-            if (zoneNameIndex.has(zone.name)) {
+            if (zoneNamesSet.has(zone.name)) {
               issues.push({
                 path: `zones.${zoneIndex}.name`,
                 message: `Nome de zona duplicado: ${zone.name}.`,
                 code: 'duplicate_zone',
               })
             } else {
-              zoneNameIndex.set(zone.name, zoneIndex)
+              zoneNamesSet.add(zone.name)
             }
 
             zone.members.forEach((member, memberIndex) => {
@@ -1074,20 +1119,7 @@ export function createSqlitePersistence(
                   message: `Tabela desconhecida na zona ${zone.name}: ${member}.`,
                   code: 'unknown_member',
                 })
-                return
               }
-
-              const owner = memberOwner.get(member)
-              if (owner !== undefined && owner !== zone.name) {
-                issues.push({
-                  path: `zones.${zoneIndex}.members.${memberIndex}`,
-                  message: `Tabela ${member} já pertence à zona ${owner}.`,
-                  code: 'duplicate_member',
-                })
-                return
-              }
-
-              memberOwner.set(member, zone.name)
             })
           })
 

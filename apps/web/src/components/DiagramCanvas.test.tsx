@@ -934,15 +934,15 @@ describe('DiagramCanvas zones', () => {
 
     fireEvent.click(screen.getByTestId('diagram-zone-tab-Principal'))
     fireEvent.contextMenu(nodeWrapper('cliente'), { clientX: 120, clientY: 80, button: 2 })
-    fireEvent.click(await screen.findByTestId('canvas-menu-move-Geografia'))
+    fireEvent.click(await screen.findByTestId('canvas-menu-add-Geografia'))
 
     await waitFor(() => expect(stub.layoutPuts.length).toBeGreaterThan(0))
     const moved = stub.layoutPuts[stub.layoutPuts.length - 1]
-    expect(zoneFor(moved, 'cliente')?.name).toBe('Geografia')
-    expect(zoneFor(moved, 'cliente')?.members).toEqual(['cliente'])
+    expect(moved.zones?.find((zone) => zone.name === 'Principal')?.members).toContain('cliente')
+    expect(moved.zones?.find((zone) => zone.name === 'Geografia')?.members).toEqual(['cliente'])
     expect(stub.modelPuts).toHaveLength(0)
 
-    await waitFor(() => expect(screen.queryByTestId('diagram-node-cliente')).toBeNull())
+    expect(screen.getByTestId('diagram-node-cliente')).toBeTruthy()
     fireEvent.click(screen.getByTestId('diagram-zone-tab-Geografia'))
     expect(await screen.findByTestId('diagram-node-cliente')).toBeTruthy()
 
@@ -1045,13 +1045,33 @@ describe('DiagramCanvas zones', () => {
 
     await waitFor(() => expect(stub.layoutPuts.length).toBeGreaterThan(0))
     const last = stub.layoutPuts[stub.layoutPuts.length - 1]
-    expect(zoneFor(last, 'cliente')?.name).toBe('Geografia')
+    expect(last.zones?.find((zone) => zone.name === 'Principal')?.members).toContain('cliente')
+    expect(last.zones?.find((zone) => zone.name === 'Geografia')?.members).toContain('cliente')
     expect(last.layouts.find((layout) => layout.zoneName === 'Geografia')?.positions?.cliente).toEqual({
       x: 300,
       y: 220,
     })
     expect(stub.modelPuts).toHaveLength(0)
     expect(await screen.findByTestId('diagram-node-cliente')).toBeTruthy()
+  })
+
+  test('soltar tabela em uma aba adiciona àquela zona sem sair da atual', async () => {
+    stubRect()
+    const stub = stubEditing(twoZoneLayout())
+    renderCanvas()
+
+    await screen.findByTestId('diagram-node-cliente')
+    const tab = await screen.findByTestId('diagram-zone-tab-Geografia')
+    fireEvent.drop(tab, {
+      dataTransfer: dataTransfer({ [DIAGRAM_TABLE_MIME]: 'cliente' }),
+    })
+
+    await waitFor(() => expect(stub.layoutPuts.length).toBeGreaterThan(0))
+    const last = stub.layoutPuts[stub.layoutPuts.length - 1]
+    expect(last.zones?.find((zone) => zone.name === 'Principal')?.members).toContain('cliente')
+    expect(last.zones?.find((zone) => zone.name === 'Geografia')?.members).toContain('cliente')
+    expect(screen.getByTestId('diagram-zone-tab-Geografia').getAttribute('aria-selected')).toBe('true')
+    expect(stub.modelPuts).toHaveLength(0)
   })
 
   test('remover do diagrama tira da zona sem alterar o modelo', async () => {
@@ -1061,7 +1081,7 @@ describe('DiagramCanvas zones', () => {
     await screen.findByTestId('diagram-node-cliente')
     fireEvent.contextMenu(nodeWrapper('cliente'), { clientX: 120, clientY: 80, button: 2 })
     fireEvent.click(await screen.findByTestId('canvas-menu-remove-from-diagram'))
-    const dialog = await screen.findByRole('dialog', { name: 'Remover do diagrama' })
+    const dialog = await screen.findByRole('dialog', { name: 'Remover desta aba' })
     expect(within(dialog).getByText(/continua no dicionário/)).toBeTruthy()
     fireEvent.click(within(dialog).getByRole('button', { name: 'Remover' }))
 
@@ -1086,6 +1106,77 @@ describe('DiagramCanvas zones', () => {
       expect(screen.getByTestId('diagram-zone-tab-Geografia').getAttribute('aria-selected')).toBe('true'),
     )
     expect(await screen.findByTestId('diagram-node-pedido')).toBeTruthy()
+  })
+
+  test('segurar Ctrl ativa temporariamente o modo mover e soltar volta a arrastar cards', async () => {
+    stubRect()
+    stubLayout(emptyLayout())
+    renderCanvas()
+
+    const node = await screen.findByTestId('diagram-node-cliente')
+    const wrapper = node.closest('.react-flow__node')
+    if (!(wrapper instanceof HTMLElement)) throw new Error('Wrapper do card não encontrado.')
+    expect(wrapper.className).toContain('draggable')
+
+    fireEvent.keyDown(window, { key: 'Control', code: 'ControlLeft' })
+    await waitFor(() => expect(wrapper.className).not.toContain('draggable'))
+    expect(screen.getByTestId('diagram-canvas').getAttribute('data-pan-mode')).toBe('true')
+    expect(screen.getByTestId('diagram-tool-move').getAttribute('aria-pressed')).toBe('true')
+    expect(screen.getByTestId('diagram-tool-select').getAttribute('aria-pressed')).toBe('false')
+
+    fireEvent.keyUp(window, { key: 'Control', code: 'ControlLeft' })
+    await waitFor(() => expect(wrapper.className).toContain('draggable'))
+    expect(screen.getByTestId('diagram-canvas').getAttribute('data-pan-mode')).toBeNull()
+    expect(screen.getByTestId('diagram-tool-select').getAttribute('aria-pressed')).toBe('true')
+
+    fireEvent.keyDown(window, { key: 'Control', code: 'ControlRight' })
+    await waitFor(() => expect(wrapper.className).not.toContain('draggable'))
+    fireEvent.keyUp(window, { key: 'Control', code: 'ControlRight' })
+    await waitFor(() => expect(wrapper.className).toContain('draggable'))
+  })
+
+  test('roda sem modificador rola o viewport sem alterar o zoom', async () => {
+    stubRect()
+    stubLayout(emptyLayout())
+    renderCanvas()
+
+    await screen.findByTestId('diagram-node-cliente')
+    const pane = document.querySelector('.react-flow__pane')
+    if (!(pane instanceof HTMLElement)) throw new Error('Pane do diagrama não encontrada.')
+    const viewportStyle = () =>
+      document.querySelector('.react-flow__viewport')?.getAttribute('style') ?? ''
+    const before = viewportStyle()
+
+    const wheelEvent = new WheelEvent('wheel', {
+      deltaY: 120,
+      clientX: 400,
+      clientY: 300,
+      bubbles: true,
+      cancelable: true,
+    })
+    fireEvent(pane, wheelEvent)
+    expect(wheelEvent.defaultPrevented).toBe(true)
+
+    await waitFor(() => expect(viewportStyle()).not.toBe(before))
+    expect(viewportStyle()).toContain('scale(1)')
+  })
+
+  test('clicar no canvas vazio limpa a seleção da tabela', async () => {
+    stubRect()
+    stubLayout(emptyLayout())
+    renderWithClient(
+      <CanvasSelectionHarness
+        database={sampleDatabase()}
+        initialSelection={{ type: 'table', table: 'pedido' }}
+      />,
+    )
+
+    const node = await screen.findByTestId('diagram-node-pedido')
+    expect(node.dataset.active).toBe('true')
+
+    fireEvent.click(pane())
+
+    await waitFor(() => expect(screen.getByTestId('diagram-node-pedido').dataset.active).toBe('false'))
   })
 
   test('tabela sem zona não troca de aba e oferece adicionar à aba atual', async () => {

@@ -1,5 +1,6 @@
 import type { DatabaseModel } from '@dbmapper/domain'
 import { type KeyboardEvent, useState } from 'react'
+import type { DiagramZone } from '../api/types'
 import {
   applyDraft,
   resolveSelection,
@@ -13,11 +14,20 @@ interface MetadataEditorProps {
   selection: Selection
   onSave: (database: DatabaseModel) => Promise<unknown>
   isSaving?: boolean
+  zones?: DiagramZone[]
+  onToggleZone?: (table: string, zone: string, member: boolean) => void
 }
 
 const INDENT = { database: 'Banco', table: 'Tabela', column: 'Campo' } as const
 
-export function MetadataEditor({ database, selection, onSave, isSaving = false }: MetadataEditorProps) {
+export function MetadataEditor({
+  database,
+  selection,
+  onSave,
+  isSaving = false,
+  zones,
+  onToggleZone,
+}: MetadataEditorProps) {
   const resolved = resolveSelection(database, selection)
 
   if (!resolved) {
@@ -41,6 +51,8 @@ export function MetadataEditor({ database, selection, onSave, isSaving = false }
       reviewed={Boolean(resolved.item.reviewed)}
       onSave={onSave}
       isSaving={isSaving}
+      zones={zones}
+      onToggleZone={onToggleZone}
     />
   )
 }
@@ -56,6 +68,8 @@ interface EditorFormProps {
   reviewed: boolean
   onSave: (database: DatabaseModel) => Promise<unknown>
   isSaving: boolean
+  zones?: DiagramZone[]
+  onToggleZone?: (table: string, zone: string, member: boolean) => void
 }
 
 function EditorForm({
@@ -69,6 +83,8 @@ function EditorForm({
   reviewed,
   onSave,
   isSaving,
+  zones,
+  onToggleZone,
 }: EditorFormProps) {
   const [description, setDescription] = useState(initialDescription)
   const [terms, setTerms] = useState(initialTerms)
@@ -227,6 +243,36 @@ function EditorForm({
             </button>
           </div>
         </div>
+
+        {kind === 'table' && zones && zones.length > 0 ? (
+          <div>
+            <h3 className="text-sm font-medium text-ink">Zonas do diagrama</h3>
+            <p className="mt-1 text-[10px] text-muted">
+              A mesma tabela pode aparecer em várias abas; cada aba mantém seu próprio layout.
+            </p>
+            <div className="mt-2 grid gap-1.5">
+              {zones.map((zone) => {
+                const checked = zone.members.includes(name)
+                return (
+                  <label
+                    key={zone.name}
+                    className="flex items-center gap-2 rounded-md border border-line px-2.5 py-1.5 text-sm text-ink"
+                  >
+                    <input
+                      type="checkbox"
+                      className="h-3.5 w-3.5 accent-[var(--accent)]"
+                      checked={checked}
+                      disabled={!onToggleZone}
+                      onChange={(event) => onToggleZone?.(name, zone.name, event.target.checked)}
+                      data-testid={`zone-toggle-${zone.name}`}
+                    />
+                    <span className="truncate">{zone.name}</span>
+                  </label>
+                )
+              })}
+            </div>
+          </div>
+        ) : null}
 
         {feedback ? (
           <p className="rounded-lg bg-success-soft px-3 py-2 text-sm text-success" role="status">

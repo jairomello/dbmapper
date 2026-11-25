@@ -499,8 +499,12 @@ try {
     }
   }, projectId)
   const geografia = afterDragLayout.zones.find((zone) => zone.name === 'Geografia')
+  const principalAfterDrag = afterDragLayout.zones.find((zone) => zone.name === 'Principal')
   if (!geografia?.members.includes('products')) {
     throw new Error('A tabela products não foi arrastada para a zona Geografia.')
+  }
+  if (!principalAfterDrag?.members.includes('products')) {
+    throw new Error('A tabela products saiu da zona Principal ao ser adicionada a Geografia.')
   }
   if (!afterDragLayout.layouts.find((layout) => layout.zoneName === 'Geografia')?.positions.products) {
     throw new Error('A posição da tabela products não foi persistida na zona Geografia.')
@@ -509,20 +513,23 @@ try {
   const removeSave = waitForDiagramSave(page)
   await page.getByTestId('diagram-node-products').click({ button: 'right' })
   await page.getByTestId('canvas-menu-remove-from-diagram').click()
-  const removeDialog = page.getByRole('dialog', { name: 'Remover do diagrama' })
+  const removeDialog = page.getByRole('dialog', { name: 'Remover desta aba' })
   await removeDialog.waitFor()
   await removeDialog.getByRole('button', { name: 'Remover' }).click()
   await removeSave
   await page.getByTestId('diagram-node-products').waitFor({ state: 'detached' })
   await page.getByTestId('table-row-products').waitFor()
-  await page.getByTestId('table-outside-products').waitFor()
+  await page.getByTestId('table-outside-products').waitFor({ state: 'detached' })
 
   const afterRemoveLayout = await page.evaluate(async (id) => {
     const response = await fetch(`/api/projects/${id}/diagram`)
     return (await response.json()) as { zones: Array<{ name: string; members: string[] }> }
   }, projectId)
-  if (afterRemoveLayout.zones.some((zone) => zone.members.includes('products'))) {
-    throw new Error('A tabela products continuou em alguma zona após ser removida do diagrama.')
+  if (afterRemoveLayout.zones.some((zone) => zone.name === 'Geografia' && zone.members.includes('products'))) {
+    throw new Error('A tabela products continuou na zona Geografia após ser removida da aba.')
+  }
+  if (!afterRemoveLayout.zones.some((zone) => zone.name === 'Principal' && zone.members.includes('products'))) {
+    throw new Error('A tabela products saiu da zona Principal ao ser removida de Geografia.')
   }
   persistedTable(await readPersistedProject(page, projectId), 'products')
 

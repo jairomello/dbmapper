@@ -157,7 +157,7 @@ describe('WorkspacePage', () => {
     await waitFor(() => expect(within(reviewedColumn).getByText('aprovado')).toBeTruthy())
   })
 
-  test('o header oferece o link Somente leitura para o viewer do projeto', async () => {
+  test('o header oferece o link Visualização para o viewer do projeto', async () => {
     const project = sampleProject()
 
     restoreCallbacks.push(
@@ -174,6 +174,38 @@ describe('WorkspacePage', () => {
 
     expect(await screen.findByTestId('table-row-cliente')).toBeTruthy()
     expect(screen.queryByRole('button', { name: 'Salvar' })).toBeNull()
+  })
+
+  test('renomeia o projeto aberto pelo nome no header', async () => {
+    const project = sampleProject()
+
+    restoreCallbacks.push(
+      installFetch((url, init) => {
+        if (url === '/api/auth/me') return jsonResponse(sampleUser)
+        if (url === `/api/projects/${project.id}` && init?.method === 'PATCH') {
+          return jsonResponse({
+            id: project.id,
+            name: 'Banco Central',
+            description: project.description,
+            createdAt: project.createdAt,
+            updatedAt: project.updatedAt,
+          })
+        }
+        if (url === `/api/projects/${project.id}`) return jsonResponse(project)
+        return errorResponse('NOT_FOUND', 'Recurso não encontrado.', 404)
+      }),
+    )
+
+    renderApp(['/project/projeto-1'])
+    fireEvent.click(await screen.findByTestId('workspace-project-name'))
+
+    const dialog = await screen.findByRole('dialog', { name: 'Renomear projeto' })
+    fireEvent.change(within(dialog).getByLabelText('Nome do projeto'), { target: { value: 'Banco Central' } })
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Salvar nome' }))
+
+    await waitFor(() =>
+      expect(screen.getByTestId('workspace-breadcrumb-project').textContent).toBe('Banco Central'),
+    )
   })
 
   test('o header abre o diálogo Gerar SQL', async () => {
@@ -521,7 +553,8 @@ describe('WorkspacePage diagram zones', () => {
     await screen.findByTestId('diagram-zone-tab-Principal')
     await waitFor(() => expect(screen.getByTestId('table-outside-pedido')).toBeTruthy())
 
-    fireEvent.click(screen.getByTestId('table-add-to-zone-pedido'))
+    fireEvent.click(screen.getByTestId('table-row-pedido'))
+    fireEvent.click(await screen.findByTestId('diagram-add-to-zone'))
     expect(await screen.findByTestId('diagram-node-pedido')).toBeTruthy()
   })
 })

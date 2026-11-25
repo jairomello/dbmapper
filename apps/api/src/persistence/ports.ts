@@ -278,6 +278,7 @@ export interface ProjectRepository {
   create(input: CreateProjectInput, options?: CreateProjectOptions): ProjectRecord
   list(): ProjectSummary[]
   get(id: string): ProjectAggregate | null
+  updateName(id: string, name: string, context?: MutationContext): ProjectSummary | null
   replaceModel(id: string, database: DatabaseModel, context?: MutationContext): ProjectAggregate | null
   applyModel(
     id: string,

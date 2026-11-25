@@ -4,6 +4,7 @@ import { Link, useNavigate, useParams } from 'react-router-dom'
 import { usePendingSuggestions } from '../agent/queries'
 import { authApi } from '../api/auth'
 import { projectsApi } from '../api/projects'
+import type { ProjectView } from '../api/types'
 import type { DatabaseModel } from '@dbmapper/domain'
 import { SESSION_QUERY_KEY, useSession } from '../auth/session'
 import { DdlDialog } from '../components/DdlDialog'
@@ -11,6 +12,7 @@ import { DiagramCanvas } from '../components/DiagramCanvas'
 import { JsonTransfer } from '../components/JsonTransfer'
 import { MetadataEditor } from '../components/MetadataEditor'
 import { NewProjectDialog } from '../components/NewProjectDialog'
+import { RenameProjectDialog } from '../components/RenameProjectDialog'
 import { SemanticTree } from '../components/SemanticTree'
 import { StatusBar } from '../components/StatusBar'
 import { SuggestionPanel } from '../components/SuggestionPanel'
@@ -45,6 +47,7 @@ export function WorkspacePage() {
   const [isWizardOpen, setIsWizardOpen] = useState(false)
   const [isDdlOpen, setIsDdlOpen] = useState(false)
   const [isAgentOpen, setIsAgentOpen] = useState(false)
+  const [isRenaming, setIsRenaming] = useState(false)
   const [activeJobId, setActiveJobId] = useState<string | null>(null)
   const [diagramSaveState, setDiagramSaveState] = useState<DiagramSaveState>(INITIAL_SAVE_STATE)
   const menuRef = useRef<HTMLDetailsElement>(null)
@@ -111,6 +114,11 @@ export function WorkspacePage() {
       navigate('/login', { replace: true })
     },
   })
+
+  function selectItem(next: Selection) {
+    setSelection(next)
+    if (next.type === 'database') setIsEditorPanelOpen(false)
+  }
 
   function adoptProject(createdId: string) {
     queryClient.invalidateQueries({ queryKey: PROJECTS_QUERY_KEY })
@@ -189,6 +197,20 @@ export function WorkspacePage() {
               aria-label="Ações do projeto"
               className="absolute right-0 z-50 mt-2 w-64 space-y-1 rounded-lg border border-line bg-surface p-2 text-ink shadow-xl"
             >
+              {canEditDiagram && project.data ? (
+                <button
+                  type="button"
+                  role="menuitem"
+                  className="w-full rounded-md px-3 py-2 text-left text-xs font-medium hover:bg-surface-2"
+                  onClick={() => {
+                    closeMenu()
+                    setIsRenaming(true)
+                  }}
+                  data-testid="workspace-rename-button"
+                >
+                  Renomear projeto
+                </button>
+              ) : null}
               <button
                 type="button"
                 role="menuitem"
@@ -231,7 +253,7 @@ export function WorkspacePage() {
                   onClick={closeMenu}
                   data-testid="workspace-viewer-link"
                 >
-                  Somente leitura
+                  Visualização
                 </Link>
               ) : null}
             </div>
@@ -257,15 +279,9 @@ export function WorkspacePage() {
             <SemanticTree
               database={project.data.database}
               selection={selection}
-              onSelect={setSelection}
+              onSelect={selectItem}
               zones={diagramZones.zones}
-              activeZone={diagramZones.activeZone}
               canMoveTables={canEditDiagram && view === 'diagrama' && !isWizardOpen}
-              onMoveTable={(table, zone) => diagramZones.moveTable(table, zone)}
-              onAddToActiveZone={(table) => {
-                setSelection({ type: 'table', table })
-                diagramZones.addTableToActiveZone(table)
-              }}
             />
           ) : (
             <div className="p-4 text-sm text-muted">Carregando projeto…</div>
@@ -305,7 +321,21 @@ export function WorkspacePage() {
                 </fieldset>
 
                 <div className="hidden min-w-0 flex-col md:flex">
-                  <h1 className="truncate font-serif text-lg leading-tight text-ink">{project.data.name}</h1>
+                  <h1 className="truncate font-serif text-lg leading-tight text-ink">
+                    {canEditDiagram ? (
+                      <button
+                        type="button"
+                        className="max-w-full truncate rounded-sm text-left hover:text-accent"
+                        onClick={() => setIsRenaming(true)}
+                        title="Renomear projeto"
+                        data-testid="workspace-project-name"
+                      >
+                        {project.data.name}
+                      </button>
+                    ) : (
+                      project.data.name
+                    )}
+                  </h1>
                   <p className="truncate text-[11px] text-muted">
                     {view === 'diagrama' ? `Zona ${diagramZones.activeZone}` : 'Dicionário'} /{' '}
                     {selection.type === 'database'
@@ -367,7 +397,7 @@ export function WorkspacePage() {
                       projectId={projectId}
                       database={project.data.database}
                       selection={selection}
-                      onSelect={setSelection}
+                      onSelect={selectItem}
                       canEdit={canEditDiagram}
                       locked={isWizardOpen}
                       onSaveStateChange={setDiagramSaveState}
@@ -401,6 +431,15 @@ export function WorkspacePage() {
                         selection={selection}
                         onSave={saveProject.mutateAsync}
                         isSaving={saveProject.isPending}
+                        zones={diagramZones.zones}
+                        onToggleZone={
+                          canEditDiagram
+                            ? (table, zone, member) => {
+                                if (member) diagramZones.addTableToZone(table, zone)
+                                else diagramZones.removeTableFromZone(table, zone)
+                              }
+                            : undefined
+                        }
                       />
                     </div>
                   </aside>
@@ -451,6 +490,20 @@ export function WorkspacePage() {
           activeJobId={activeJobId}
           onJobStarted={setActiveJobId}
           onClose={() => setIsAgentOpen(false)}
+        />
+      ) : null}
+
+      {isRenaming && project.data ? (
+        <RenameProjectDialog
+          project={project.data}
+          onClose={() => setIsRenaming(false)}
+          onRenamed={(renamed) => {
+            setIsRenaming(false)
+            queryClient.setQueryData(projectQueryKey(renamed.id), (current: ProjectView | undefined) =>
+              current ? { ...current, name: renamed.name, updatedAt: renamed.updatedAt } : current,
+            )
+            queryClient.invalidateQueries({ queryKey: PROJECTS_QUERY_KEY })
+          }}
         />
       ) : null}
     </div>

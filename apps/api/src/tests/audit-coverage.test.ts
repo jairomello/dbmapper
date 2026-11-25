@@ -148,6 +148,14 @@ describe('auditoria: cobertura das rotas mutantes', () => {
       },
     },
     {
+      name: 'PATCH /api/projects/:id',
+      action: 'project.renamed',
+      run: async () => {
+        const renamed = await apiRequest(context, `/api/projects/${projectId}`, 'PATCH', { name: 'Renomeado' })
+        expect(renamed.response.status).toBe(200)
+      },
+    },
+    {
       name: 'PUT /api/projects/:id/diagram',
       action: 'diagram.layout_saved',
       run: async () => {

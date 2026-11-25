@@ -93,7 +93,7 @@ describe('GalleryPage', () => {
     expect(screen.queryByRole('heading', { name: 'Seus projetos' })).toBeNull()
   })
 
-  test('o link Somente leitura abre o viewer do projeto', async () => {
+  test('o link Abrir visualização abre o viewer do projeto', async () => {
     const project = sampleProject()
 
     restoreCallbacks.push(
@@ -111,6 +111,40 @@ describe('GalleryPage', () => {
     expect(await screen.findByTestId('table-row-cliente')).toBeTruthy()
     expect(screen.getByText('Somente leitura')).toBeTruthy()
     expect(screen.queryByRole('button', { name: 'Salvar' })).toBeNull()
+  })
+
+  test('renomeia um projeto pelo card sem sair da galeria', async () => {
+    const project = sampleProject()
+    const renamed = { ...summaryOf(project), name: 'Banco Central' }
+    let patchedName = ''
+    let listed = [summaryOf(project)]
+
+    restoreCallbacks.push(
+      installFetch(async (url, init) => {
+        if (url === '/api/auth/me') return jsonResponse(sampleUser)
+        if (url === `/api/projects/${project.id}` && init?.method === 'PATCH') {
+          const body = await readJsonBody<{ name: string }>(init)
+          patchedName = body.name
+          listed = [renamed]
+          return jsonResponse(renamed)
+        }
+        if (url === '/api/projects') return jsonResponse(listed)
+        return errorResponse('NOT_FOUND', 'Recurso não encontrado.', 404)
+      }),
+    )
+
+    renderApp(['/'])
+
+    fireEvent.click(await screen.findByTestId(`rename-project-${project.id}`))
+    const dialog = await screen.findByRole('dialog', { name: 'Renomear projeto' })
+    fireEvent.change(within(dialog).getByLabelText('Nome do projeto'), { target: { value: 'Banco Central' } })
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Salvar nome' }))
+
+    await waitFor(() =>
+      expect(screen.getByTestId(`project-card-${project.id}`).textContent).toContain('Banco Central'),
+    )
+    expect(patchedName).toBe('Banco Central')
+    expect(screen.getByRole('heading', { name: 'Seus projetos' })).toBeTruthy()
   })
 
   test('sem sessão a galeria redireciona para o login', async () => {

@@ -151,13 +151,14 @@ export function TableNode({ id, data }: NodeProps<DiagramNode>) {
       ) : null}
 
       <div
-        className={`flex shrink-0 items-center justify-between gap-2 border-b border-line px-3 py-2 ${
+        className={`diagram-drag-handle flex shrink-0 cursor-grab items-center justify-between gap-2 border-b border-line px-3 py-2 active:cursor-grabbing ${
           active ? 'bg-accent-soft' : 'bg-card-header'
         }`}
+        title={`Arraste para mover a tabela ${table.name}`}
       >
         <span
-          className="diagram-drag-handle flex h-6 w-5 shrink-0 cursor-grab items-center justify-center text-xs text-slate-400"
-          title={`Mover tabela ${table.name}`}
+          className="flex h-6 w-5 shrink-0 items-center justify-center text-xs text-slate-400"
+          aria-hidden="true"
         >
           ⠿
         </span>

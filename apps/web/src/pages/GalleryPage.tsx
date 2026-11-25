@@ -5,6 +5,7 @@ import { authApi } from '../api/auth'
 import type { ProjectSummary } from '../api/types'
 import { SESSION_QUERY_KEY, useSession } from '../auth/session'
 import { NewProjectDialog } from '../components/NewProjectDialog'
+import { RenameProjectDialog } from '../components/RenameProjectDialog'
 import { PROJECTS_QUERY_KEY, useProjects } from '../projects/queries'
 
 function formatUpdatedAt(value: string): string {
@@ -13,7 +14,15 @@ function formatUpdatedAt(value: string): string {
   return new Intl.DateTimeFormat('pt-BR', { dateStyle: 'medium', timeStyle: 'short' }).format(date)
 }
 
-function ProjectCard({ project }: { project: ProjectSummary }) {
+function ProjectCard({
+  project,
+  canRename,
+  onRename,
+}: {
+  project: ProjectSummary
+  canRename: boolean
+  onRename: (project: ProjectSummary) => void
+}) {
   return (
     <article
       className="flex h-full flex-col rounded-lg border border-slate-200 bg-white p-5 shadow-sm transition hover:-translate-y-0.5 hover:border-accent hover:shadow-md"
@@ -30,14 +39,36 @@ function ProjectCard({ project }: { project: ProjectSummary }) {
           Atualizado em {formatUpdatedAt(project.updatedAt)}
         </time>
       </Link>
-      <Link
-        to={`/viewer/${encodeURIComponent(project.id)}`}
-        className="mt-3 inline-flex w-fit items-center rounded-sm border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-100"
-        aria-label={`Abrir projeto ${project.name} somente leitura`}
-        data-testid={`viewer-link-${project.id}`}
-      >
-        Somente leitura
-      </Link>
+      <div className="mt-3 flex items-center gap-2">
+        <Link
+          to={`/viewer/${encodeURIComponent(project.id)}`}
+          className="inline-flex w-fit items-center rounded-sm border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-100"
+          aria-label={`Abrir visualização do projeto ${project.name}`}
+          data-testid={`viewer-link-${project.id}`}
+        >
+          Abrir visualização
+        </Link>
+        {canRename ? (
+          <button
+            type="button"
+            className="inline-flex h-8 w-8 items-center justify-center rounded-sm border border-slate-300 text-slate-500 hover:bg-slate-100 hover:text-ink"
+            aria-label={`Renomear projeto ${project.name}`}
+            title="Renomear projeto"
+            data-testid={`rename-project-${project.id}`}
+            onClick={() => onRename(project)}
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true" focusable="false">
+              <path
+                d="M4 20h4L19.5 8.5a2.1 2.1 0 0 0-3-3L5 17v3Z"
+                stroke="currentColor"
+                strokeWidth="1.8"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
+          </button>
+        ) : null}
+      </div>
     </article>
   )
 }
@@ -48,6 +79,8 @@ export function GalleryPage() {
   const session = useSession()
   const projects = useProjects()
   const [isCreating, setIsCreating] = useState(false)
+  const [renamingProject, setRenamingProject] = useState<ProjectSummary | null>(null)
+  const canRename = session.data?.role === 'MEMBER' || session.data?.role === 'ADMIN'
 
   const logout = useMutation({
     mutationFn: () => authApi.logout(),
@@ -127,7 +160,12 @@ export function GalleryPage() {
         {hasProjects ? (
           <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3" aria-label="Projetos">
             {projects.data?.map((project) => (
-              <ProjectCard key={project.id} project={project} />
+              <ProjectCard
+                key={project.id}
+                project={project}
+                canRename={canRename}
+                onRename={setRenamingProject}
+              />
             ))}
           </section>
         ) : null}
@@ -140,6 +178,20 @@ export function GalleryPage() {
             setIsCreating(false)
             queryClient.invalidateQueries({ queryKey: PROJECTS_QUERY_KEY })
             navigate(`/project/${encodeURIComponent(project.id)}`)
+          }}
+        />
+      ) : null}
+
+      {renamingProject ? (
+        <RenameProjectDialog
+          project={renamingProject}
+          onClose={() => setRenamingProject(null)}
+          onRenamed={(renamed) => {
+            setRenamingProject(null)
+            queryClient.setQueryData<ProjectSummary[]>(PROJECTS_QUERY_KEY, (current) =>
+              current?.map((project) => (project.id === renamed.id ? { ...project, ...renamed } : project)),
+            )
+            queryClient.invalidateQueries({ queryKey: PROJECTS_QUERY_KEY })
           }}
         />
       ) : null}

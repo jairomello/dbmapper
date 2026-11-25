@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, test } from 'bun:test'
 import {
   apiRequest,
   createTestContext,
+  createUser,
   getJson,
   sampleDatabase,
   seedProject,
@@ -128,6 +129,64 @@ describe('project-api: CRUD de projetos', () => {
 
     const reloaded = await getJson<ProjectViewBody>(context, `/api/projects/${id}`)
     expect(reloaded.body.database.description).toBe('Modelo atualizado')
+  })
+
+  test('renomeia um projeto e registra project.renamed', async () => {
+    const created = await apiRequest<ProjectViewBody>(context, '/api/projects', 'POST', { name: 'Novo Banco' })
+
+    const renamed = await apiRequest<ProjectSummary>(context, `/api/projects/${created.body.id}`, 'PATCH', {
+      name: '  Banco Central  ',
+    })
+
+    expect(renamed.response.status).toBe(200)
+    expect(renamed.body.name).toBe('Banco Central')
+
+    const reloaded = await getJson<ProjectViewBody>(context, `/api/projects/${created.body.id}`)
+    expect(reloaded.body.name).toBe('Banco Central')
+
+    const events = context.persistence.agent.events.listAll().filter((event) => event.action === 'project.renamed')
+    expect(events).toHaveLength(1)
+    expect(events[0]).toMatchObject({
+      projectId: created.body.id,
+      actorUserId: context.defaultUser.id,
+      payload: { from: 'Novo Banco', to: 'Banco Central' },
+    })
+  })
+
+  test('rename inválido ou projeto inexistente não altera nada', async () => {
+    const created = await apiRequest<ProjectViewBody>(context, '/api/projects', 'POST', { name: 'Original' })
+
+    const empty = await apiRequest<ErrorBody>(context, `/api/projects/${created.body.id}`, 'PATCH', { name: '   ' })
+    expect(empty.response.status).toBe(400)
+    expect(empty.body.error.code).toBe('VALIDATION_ERROR')
+
+    const missing = await apiRequest<ErrorBody>(context, '/api/projects/missing', 'PATCH', { name: 'Nome' })
+    expect(missing.response.status).toBe(404)
+    expect(missing.body.error.code).toBe('NOT_FOUND')
+
+    expect(context.persistence.projects.get(created.body.id)!.project.name).toBe('Original')
+    expect(context.persistence.agent.events.listAll().some((event) => event.action === 'project.renamed')).toBe(false)
+  })
+
+  test('VIEWER não pode renomear', async () => {
+    const created = await apiRequest<ProjectViewBody>(context, '/api/projects', 'POST', { name: 'Somente leitura' })
+    const viewer = await createUser(context, {
+      email: 'viewer-rename@example.com',
+      password: 'viewer-password',
+      role: 'VIEWER',
+    })
+
+    const response = await apiRequest<ErrorBody>(
+      context,
+      `/api/projects/${created.body.id}`,
+      'PATCH',
+      { name: 'Tentativa' },
+      { cookie: viewer.cookie },
+    )
+
+    expect(response.response.status).toBe(403)
+    expect(response.body.error.code).toBe('FORBIDDEN')
+    expect(context.persistence.projects.get(created.body.id)!.project.name).toBe('Somente leitura')
   })
 
   test('projeto inexistente retorna 404 com envelope e nada muda', async () => {

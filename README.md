@@ -199,7 +199,10 @@ O admin inicial vem de `DBMAPPER_ADMIN_EMAIL` (padrão `admin@dbmapper.local`) e
 Depois do login a rota `/` mostra a **galeria de projetos**: um card por projeto com
 nome, descrição e data de atualização. Clicar no card abre o workspace em
 `/project/{id}` (recarregar a página mantém o projeto); sem projetos, a galeria exibe
-um estado vazio com o CTA **Novo projeto**.
+um estado vazio com o CTA **Novo projeto**. O lápis no card renomeia o projeto
+(`PATCH /api/projects/{id}`) sem sair da galeria, e **Abrir visualização** leva ao
+viewer somente leitura. O workspace também renomeia: clique no nome do cabeçalho ou
+use **Ações do projeto → Renomear projeto**.
 
 O **Novo projeto** (na galeria e no workspace) importa um arquivo `.sql`, aceita SQL
 colado no editor ou abre um arquivo `.json` exportado pelo DBMapper. Os dois imports
@@ -242,13 +245,15 @@ aplicados por `[data-theme]`.
   (`data-testid="theme-toggle"`). A escolha é salva em `localStorage`
   (`dbmapper-theme`); sem preferência, segue o `prefers-color-scheme` e cai no
   claro. Se o storage estiver bloqueado, a troca vale para a sessão.
-- **Cabeçalho**: projeto em breadcrumb, ações primárias visíveis
-  (**Sugestões IA**, **Atualizar modelo**) e **Ações do projeto** com
-  **Novo projeto**, **Gerar SQL**, **Exportar/Importar JSON** e **Somente
-  leitura**.
-- **Explorador**: busca própria na árvore (filtra tabelas/campos sem alterar o
-  canvas), contagem de tabelas, zona da tabela e marcação de "fora do
-  diagrama".
+- **Cabeçalho**: projeto em breadcrumb (o nome abre **Renomear projeto**), ações
+  primárias visíveis (**Sugestões IA**, **Atualizar modelo**) e **Ações do
+  projeto** com **Renomear projeto**, **Novo projeto**, **Gerar SQL**,
+  **Exportar/Importar JSON** e **Visualização**.
+- **Explorador**: tabelas em ordem alfabética, busca própria na árvore (filtra
+  tabelas/campos sem alterar o canvas), filtro **Todas / Aprovadas / Pendentes**
+  por estado de revisão, contagem de tabelas e um marcador discreto para tabelas
+  **fora do diagrama**. Não há seletor de zona por tabela: arraste a tabela para
+  uma aba ou use as caixas em **Zonas do diagrama** na ficha.
 - **Ficha do item**: no modo Diagrama, o editor de metadados abre como painel
   lateral **Caderno** (`Abrir ficha`/`Ocultar ficha`), com breadcrumb, tipo e
   estado de revisão. Abaixo de `xl` o painel sobrepõe o canvas e fecha com
@@ -331,26 +336,36 @@ persistido. `bun run test:e2e` continua fora do `bun run check`.
 ## Zonas, chaves entre modelos e export (Fase 9)
 
 A barra acima do canvas ganhou **abas/zonas**: `Principal` (padrão, sempre
-presente) e as zonas criadas pelo `+`. Cada zona tem o próprio layout — posições,
-viewport e zoom — e arrastar uma tabela em uma zona não altera o arranjo das
-demais. Zonas podem ser renomeadas, reordenadas por arrasto e excluídas com
-confirmação; excluir uma zona devolve suas tabelas para `Principal`, e
-`Principal` não pode ser excluída.
+presente) e as zonas criadas pelo `+`. Cada zona é uma **visão** do diagrama com
+layout próprio — posições, viewport e zoom — e arrastar uma tabela em uma zona não
+altera o arranjo das demais. Zonas podem ser renomeadas, reordenadas por arrasto e
+excluídas com confirmação; excluir uma zona devolve à `Principal` apenas as tabelas
+que não estão em nenhuma outra, e `Principal` não pode ser excluída.
 
-- **Atribuição**: mover uma tabela entre zonas pelo menu de contexto do card ou
-  pelo seletor da árvore; arrastar uma tabela da árvore semântica para o canvas
-  adiciona-a à aba ativa na posição do cursor (`MEMBER`/`ADMIN`). Tabelas novas e
+- **Associação muitos-para-muitos**: a mesma tabela pode aparecer em várias abas
+  ao mesmo tempo. Adicionar a uma zona não a remove das outras.
+- **Seleção e arraste**: clicar no canvas vazio limpa a seleção (volta ao banco e
+  fecha a ficha); o card é movido arrastando o cabeçalho, com cursor
+  `grab`/`grabbing`.
+- **Atribuição por arrasto**: arrastar uma tabela da árvore semântica para o
+  canvas adiciona-a à aba ativa na posição do cursor; soltá-la sobre uma aba
+  adiciona àquela zona e ativa a aba (`MEMBER`/`ADMIN`). Tabelas novas e
   importadas nascem em `Principal`.
-- **Remover do diagrama ≠ excluir**: a ação do menu do card tira a tabela da zona
-  sem tocar no modelo; ela continua no dicionário e na árvore, marcada como
-  **fora do diagrama**, com a ação **Adicionar à aba atual**. A exclusão real
-  continua em **Excluir tabela** (Fase 8), com confirmação própria.
-- **Localizar pela árvore**: selecionar uma tabela/coluna troca para a aba da
-  zona dela (quando necessário), centraliza e destaca o card.
-- **Chaves entre modelos**: derivadas na renderização — relacionamentos com as
-  duas pontas em zonas diferentes aparecem na faixa **Chaves entre modelos** dos
-  dois cards; os internos ficam em **Chaves estrangeiras**. Nenhum dado novo é
-  gravado no servidor.
+- **Ficha do item**: com uma tabela selecionada no modo Diagrama, a seção
+  **Zonas do diagrama** lista todas as abas com checkbox; `VIEWER` vê a associação
+  sem poder alterá-la.
+- **Remover desta aba ≠ excluir**: o menu do card tira a tabela apenas da aba
+  ativa, mantendo-a no modelo, na árvore e nas outras abas. Tabelas fora de todas
+  as zonas ficam marcadas de forma discreta na árvore e o canvas oferece
+  **Adicionar à aba atual**. A exclusão real continua em **Excluir tabela**
+  (Fase 8), com confirmação própria.
+- **Localizar pela árvore**: selecionar uma tabela/coluna centraliza o card na
+  aba ativa; se ela não estiver na aba ativa, troca para a primeira aba que a
+  contém.
+- **Chaves entre modelos**: derivadas na renderização — relacionamentos cuja
+  outra ponta está fora da aba ativa aparecem na faixa **Chaves entre modelos**;
+  os internos ficam em **Chaves estrangeiras**. Nenhum dado novo é gravado no
+  servidor.
 - **Export**: **Exportar PNG** e **Exportar SVG** geram arquivos do diagrama no
   cliente com [`html-to-image`](https://github.com/bubkoo/html-to-image), sem
   requisição de save nem alteração de modelo/layout.
@@ -416,6 +431,11 @@ Tudo continua no frontend: posições, viewport e zoom são gravados pelo mesmo
   tela**, **Exportar PNG/SVG** e, para `MEMBER`/`ADMIN`, **Adicionar tabela**,
   **Relacionamento 1:n**, **Organizar** e **Desfazer/Refazer**. `VIEWER` vê
   apenas zoom, ajustar e exportar.
+- **Atalhos de navegação**: segurar **Ctrl** ativa o pan temporariamente (a
+  toolbar marca **Mover** e o cursor vira `grab`; soltar volta ao modo atual).
+  Na roda: **sem modificador** rola verticalmente, **Shift + roda** rola
+  horizontalmente e **Ctrl + roda** dá zoom no ponto do cursor. Listas roláveis
+  dentro dos cards continuam rolando com a roda.
 - **Destaque ao selecionar**: clicar num card (ou numa tabela/coluna da árvore)
   realça o card selecionado, mantém visíveis os cards incidentes e esmaece o
   restante no canvas e na árvore. As arestas incidentes ganham direção explícita:

@@ -5,19 +5,20 @@ import { diagramApi } from '../api/diagram'
 import type { DiagramDocument, DiagramLayoutInput, DiagramPosition, DiagramZone } from '../api/types'
 import { visibleTables } from './layout'
 import {
+  addMemberToZone,
   addMembers,
-  assignMember,
   buildDocumentInput,
   DEFAULT_ZONE,
   EMPTY_ZONE_LAYOUT,
   normalizeZoneState,
   removeMember,
+  removeMemberFromZone,
   renameTableInLayouts,
   returnMembersToPrincipal,
   syncLayouts,
   type ZoneLayoutState,
   type ZoneState,
-  zoneOfTable,
+  zonesOfTable,
 } from './zones'
 
 const SAVE_DEBOUNCE_MS = 500
@@ -39,14 +40,16 @@ export interface DiagramZones {
   isLoading: boolean
   isError: boolean
   saveState: DiagramZonesSaveState
-  zoneOf: (table: string) => string | null
+  zonesOf: (table: string) => string[]
+  isInZone: (table: string, zone: string) => boolean
   setActiveZone: (name: string) => void
   createZone: (name: string) => boolean
   renameZone: (from: string, to: string) => boolean
   deleteZone: (name: string) => boolean
   reorderZones: (order: readonly string[]) => boolean
-  moveTable: (table: string, target: string, position?: DiagramPosition) => boolean
-  removeTable: (table: string) => boolean
+  addTableToZone: (table: string, target: string, position?: DiagramPosition) => boolean
+  removeTableFromZone: (table: string, zone: string) => boolean
+  removeTableFromActiveZone: (table: string) => boolean
   addTableToActiveZone: (table: string, position?: DiagramPosition) => boolean
   addTableToPrincipal: (table: string, position?: DiagramPosition) => boolean
   renameTable: (from: string, to: string) => void
@@ -345,29 +348,26 @@ export function useDiagramZones({
     [canEdit, locked, commit, schedule],
   )
 
-  const moveTable = useCallback(
+  const addTableToZone = useCallback(
     (table: string, target: string, position?: DiagramPosition) => {
       if (!canEdit || locked) return false
       const current = stateRef.current
-      if (!current.zones.some((zone) => zone.name === target)) return false
-      const source = zoneOfTable(current.zones, table)
-      if (source === target && !position) return false
+      const targetZone = current.zones.find((zone) => zone.name === target)
+      if (!targetZone) return false
+      const alreadyMember = targetZone.members.includes(table)
+      if (alreadyMember && !position) return false
 
-      const zones = assignMember(current.zones, table, target)
+      const zones = alreadyMember ? current.zones : addMemberToZone(current.zones, table, target)
       let layouts = current.layouts
       if (position) {
-        const nextLayouts: Record<string, ZoneLayoutState> = {}
-        for (const [zoneName, layout] of Object.entries(current.layouts)) {
-          const positions = { ...layout.positions }
-          delete positions[table]
-          nextLayouts[zoneName] = { ...layout, positions }
+        const targetLayout = layouts[target] ?? EMPTY_ZONE_LAYOUT
+        layouts = {
+          ...layouts,
+          [target]: {
+            ...targetLayout,
+            positions: { ...targetLayout.positions, [table]: { x: position.x, y: position.y } },
+          },
         }
-        const targetLayout = nextLayouts[target] ?? EMPTY_ZONE_LAYOUT
-        nextLayouts[target] = {
-          ...targetLayout,
-          positions: { ...targetLayout.positions, [table]: { x: position.x, y: position.y } },
-        }
-        layouts = nextLayouts
       }
 
       commit({ zones, layouts: syncLayouts(zones, layouts) })
@@ -377,27 +377,42 @@ export function useDiagramZones({
     [canEdit, locked, commit, schedule],
   )
 
-  const removeTable = useCallback(
-    (table: string) => {
+  const removeTableFromZone = useCallback(
+    (table: string, name: string) => {
       if (!canEdit || locked) return false
       const current = stateRef.current
-      if (!zoneOfTable(current.zones, table)) return false
-      const zones = removeMember(current.zones, table)
-      commit({ zones, layouts: syncLayouts(zones, current.layouts) })
+      const zone = current.zones.find((candidate) => candidate.name === name)
+      if (!zone || !zone.members.includes(table)) return false
+
+      const zones = removeMemberFromZone(current.zones, table, name)
+      const layouts = { ...current.layouts }
+      const layout = layouts[name]
+      if (layout) {
+        const positions = { ...layout.positions }
+        delete positions[table]
+        layouts[name] = { ...layout, positions }
+      }
+
+      commit({ zones, layouts: syncLayouts(zones, layouts) })
       schedule()
       return true
     },
     [canEdit, locked, commit, schedule],
   )
 
+  const removeTableFromActiveZone = useCallback(
+    (table: string) => removeTableFromZone(table, activeZoneRef.current),
+    [removeTableFromZone],
+  )
+
   const addTableToActiveZone = useCallback(
-    (table: string, position?: DiagramPosition) => moveTable(table, activeZoneRef.current, position),
-    [moveTable],
+    (table: string, position?: DiagramPosition) => addTableToZone(table, activeZoneRef.current, position),
+    [addTableToZone],
   )
 
   const addTableToPrincipal = useCallback(
-    (table: string, position?: DiagramPosition) => moveTable(table, DEFAULT_ZONE, position),
-    [moveTable],
+    (table: string, position?: DiagramPosition) => addTableToZone(table, DEFAULT_ZONE, position),
+    [addTableToZone],
   )
 
   const renameTable = useCallback(
@@ -496,7 +511,12 @@ export function useDiagramZones({
     [state.zones, activeZone],
   )
   const activeLayout = state.layouts[activeZone] ?? EMPTY_ZONE_LAYOUT
-  const zoneOf = useCallback((table: string) => zoneOfTable(stateRef.current.zones, table), [])
+  const zonesOf = useCallback((table: string) => zonesOfTable(stateRef.current.zones, table), [])
+  const isInZone = useCallback(
+    (table: string, zone: string) =>
+      stateRef.current.zones.some((candidate) => candidate.name === zone && candidate.members.includes(table)),
+    [],
+  )
 
   return {
     zones: state.zones,
@@ -509,14 +529,16 @@ export function useDiagramZones({
       (enabled && layoutQuery.data !== undefined && layoutQuery.data !== lastDocumentRef.current),
     isError: layoutQuery.isError,
     saveState: { pending: mutation.isPending, error: failed, savedAt },
-    zoneOf,
+    zonesOf,
+    isInZone,
     setActiveZone,
     createZone,
     renameZone,
     deleteZone,
     reorderZones,
-    moveTable,
-    removeTable,
+    addTableToZone,
+    removeTableFromZone,
+    removeTableFromActiveZone,
     addTableToActiveZone,
     addTableToPrincipal,
     renameTable,
